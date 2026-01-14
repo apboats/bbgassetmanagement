@@ -8,18 +8,25 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 </head>
 <body>
   <div id="root"></div>
   
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-    const { 
-      Camera, Search, Plus, Trash2, Edit2, X, LogOut, Users, 
-      Map, Package, Settings, Grid, Home, ChevronRight 
-    } = lucide;
+    const { useState, useEffect } = React;
+
+    // Simple SVG Icons as components
+    const HomeIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
+    const MapIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>;
+    const PackageIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
+    const SettingsIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+    const LogoutIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
+    const PlusIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+    const EditIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+    const TrashIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+    const XIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+    const GridIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>;
 
     // Supabase initialization
     let supabase = null;
@@ -116,7 +123,7 @@
             <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-white" />
+                  <PackageIcon />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold">Boats By George</h1>
@@ -124,11 +131,11 @@
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <NavBtn icon={Home} label="Dashboard" active={view==='dashboard'} onClick={() => setView('dashboard')} />
-                <NavBtn icon={Map} label="Locations" active={view==='locations'} onClick={() => setView('locations')} />
-                <NavBtn icon={Package} label="Boats" active={view==='boats'} onClick={() => setView('boats')} />
-                <NavBtn icon={Settings} label="Settings" active={view==='settings'} onClick={() => setView('settings')} />
-                <button onClick={logout} className="p-2 hover:bg-slate-100 rounded-lg ml-2 border-l pl-4"><LogOut className="w-5 h-5" /></button>
+                <NavBtn icon={HomeIcon} label="Dashboard" active={view==='dashboard'} onClick={() => setView('dashboard')} />
+                <NavBtn icon={MapIcon} label="Locations" active={view==='locations'} onClick={() => setView('locations')} />
+                <NavBtn icon={PackageIcon} label="Boats" active={view==='boats'} onClick={() => setView('boats')} />
+                <NavBtn icon={SettingsIcon} label="Settings" active={view==='settings'} onClick={() => setView('settings')} />
+                <button onClick={logout} className="p-2 hover:bg-slate-100 rounded-lg ml-2 border-l pl-4 text-slate-600"><LogoutIcon /></button>
               </div>
             </div>
           </nav>
@@ -146,7 +153,7 @@
     function NavBtn({ icon: Icon, label, active, onClick }) {
       return (
         <button onClick={onClick} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium ${active ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}>
-          <Icon className="w-4 h-4" /><span className="hidden sm:inline">{label}</span>
+          <Icon /><span className="hidden sm:inline">{label}</span>
         </button>
       );
     }
@@ -159,7 +166,7 @@
           <div className="bg-white rounded-2xl p-8 max-w-md w-full">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Package className="w-10 h-10 text-white" />
+                <div className="w-10 h-10 text-white"><PackageIcon /></div>
               </div>
               <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
               <p className="text-slate-600">Configure Supabase</p>
@@ -209,7 +216,7 @@
           <div className="bg-white rounded-2xl p-8 max-w-md w-full">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Package className="w-10 h-10 text-white" />
+                <div className="w-10 h-10 text-white"><PackageIcon /></div>
               </div>
               <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
               <p className="text-slate-600">Sign In</p>
@@ -287,9 +294,9 @@
         green: 'from-green-500 to-green-600'
       };
       return (
-        <div onClick={onClick} className={`bg-white rounded-xl shadow-md p-6 border ${onClick ? 'cursor-pointer hover:shadow-lg' : ''}`}>
+        <div onClick={onClick} className={`bg-white rounded-xl shadow-md p-6 border ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}>
           <div className={`w-12 h-12 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center mb-4`}>
-            <Package className="w-6 h-6 text-white" />
+            <div className="text-white"><PackageIcon /></div>
           </div>
           <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
           <p className="text-3xl font-bold">{value}</p>
@@ -328,13 +335,13 @@
               <p className="text-slate-600">Manage boat inventory</p>
             </div>
             <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
-              <Plus className="w-5 h-5" />Add Boat
+              <PlusIcon />Add Boat
             </button>
           </div>
 
           {boats.length === 0 ? (
             <div className="bg-white rounded-xl shadow-md p-12 border text-center">
-              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <div className="w-16 h-16 text-slate-300 mx-auto mb-4"><PackageIcon /></div>
               <p className="text-slate-500 mb-4">No boats yet</p>
               <button onClick={() => setShowAdd(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add First Boat</button>
             </div>
@@ -360,7 +367,7 @@
     function BoatCard({ boat, onEdit, onDelete }) {
       const labels = { intake: 'Intake', service: 'In Service', waiting: 'Waiting', ready: 'Ready', completed: 'Completed' };
       return (
-        <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md border overflow-hidden hover:shadow-lg transition-shadow">
           <div className={`status-${boat.status} p-3`}>
             <span className="text-white font-semibold text-sm">{labels[boat.status]}</span>
           </div>
@@ -370,10 +377,10 @@
             <p className="text-slate-500 text-sm mb-4">Owner: {boat.owner}</p>
             <div className="flex gap-2">
               <button onClick={onEdit} className="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center gap-2">
-                <Edit2 className="w-4 h-4" />Edit
+                <EditIcon />Edit
               </button>
               <button onClick={onDelete} className="flex-1 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg flex items-center justify-center gap-2">
-                <Trash2 className="w-4 h-4" />Delete
+                <TrashIcon />Delete
               </button>
             </div>
           </div>
@@ -394,7 +401,7 @@
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">{boat ? 'Edit Boat' : 'Add Boat'}</h3>
-              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><XIcon /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -452,10 +459,6 @@
         }
       }
 
-      const racks = locations.filter(l => l.type === 'rack');
-      const parking = locations.filter(l => l.type === 'parking');
-      const workshops = locations.filter(l => l.type === 'workshop');
-
       return (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -464,21 +467,21 @@
               <p className="text-slate-600">Manage storage facilities</p>
             </div>
             <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-              <Plus className="w-5 h-5" />Add Location
+              <PlusIcon />Add Location
             </button>
           </div>
 
           {locations.length === 0 ? (
             <div className="bg-white rounded-xl shadow-md p-12 border text-center">
-              <Map className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <div className="w-16 h-16 text-slate-300 mx-auto mb-4"><MapIcon /></div>
               <p className="text-slate-500 mb-4">No locations yet</p>
               <button onClick={() => setShowAdd(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Create Location</button>
             </div>
           ) : (
-            <div className="space-y-8">
-              {racks.length > 0 && <LocationSection title="Rack Buildings" icon={Grid} color="blue" locations={racks} onEdit={setEditing} onDelete={deleteLocation} />}
-              {parking.length > 0 && <LocationSection title="Parking Lots" icon={Map} color="purple" locations={parking} onEdit={setEditing} onDelete={deleteLocation} />}
-              {workshops.length > 0 && <LocationSection title="Workshops" icon={Settings} color="orange" locations={workshops} onEdit={setEditing} onDelete={deleteLocation} />}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {locations.map(loc => (
+                <LocationCard key={loc.id} location={loc} onEdit={() => setEditing(loc)} onDelete={() => deleteLocation(loc.id)} />
+              ))}
             </div>
           )}
 
@@ -493,39 +496,20 @@
       );
     }
 
-    function LocationSection({ title, icon: Icon, color, locations, onEdit, onDelete }) {
-      const colors = {blue: 'from-blue-500 to-blue-600', purple: 'from-purple-500 to-purple-600', orange: 'from-orange-500 to-orange-600'};
-      return (
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center`}>
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold">{title}</h3>
-          </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {locations.map(loc => (
-              <LocationCard key={loc.id} location={loc} onEdit={() => onEdit(loc)} onDelete={() => onDelete(loc.id)} />
-            ))}
-          </div>
-        </div>
-      );
-    }
-
     function LocationCard({ location, onEdit, onDelete }) {
       const total = location.rows * location.columns;
       const occupied = Object.keys(location.boats || {}).length;
       return (
-        <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md border overflow-hidden hover:shadow-lg transition-shadow">
           <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
             <div>
               <h4 className="text-lg font-bold">{location.name}</h4>
               <p className="text-sm text-slate-600 capitalize">{location.type} • {location.rows} × {location.columns}</p>
-              <p className="text-sm text-slate-700 font-medium mt-1">{occupied}/{total} occupied</p>
+              <p className="text-sm text-slate-700 font-medium mt-1">{occupied}/{total} occupied ({Math.round(occupied/total*100)}%)</p>
             </div>
             <div className="flex gap-1">
-              <button onClick={onEdit} className="p-1.5 hover:bg-white rounded-lg"><Edit2 className="w-4 h-4" /></button>
-              <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4 text-red-600" /></button>
+              <button onClick={onEdit} className="p-1.5 hover:bg-white rounded-lg"><EditIcon /></button>
+              <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded-lg text-red-600"><TrashIcon /></button>
             </div>
           </div>
           <div className="p-4 bg-slate-50">
@@ -550,7 +534,7 @@
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">{location ? 'Edit Location' : 'Add Location'}</h3>
-              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><XIcon /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -585,7 +569,7 @@
       );
     }
 
-    function SettingsView({ user, reload }) {
+    function SettingsView({ user }) {
       return (
         <div className="space-y-6">
           <div>
