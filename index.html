@@ -32,6 +32,10 @@
     let supabase = null;
 
     function initSupabase() {
+      if (!window.supabase) {
+        console.error('Supabase library not loaded yet');
+        return false;
+      }
       const config = localStorage.getItem('bbg:supabase');
       if (config) {
         const { url, key } = JSON.parse(config);
@@ -43,7 +47,8 @@
 
     // Main App
     function App() {
-      const [configured, setConfigured] = useState(initSupabase());
+      const [supabaseReady, setSupabaseReady] = useState(false);
+      const [configured, setConfigured] = useState(false);
       const [session, setSession] = useState(null);
       const [user, setUser] = useState(null);
       const [loading, setLoading] = useState(true);
@@ -51,8 +56,22 @@
       const [boats, setBoats] = useState([]);
       const [locations, setLocations] = useState([]);
 
+      // Wait for Supabase library to load
       useEffect(() => {
-        if (!configured) {
+        const checkSupabase = () => {
+          if (window.supabase) {
+            setSupabaseReady(true);
+            setConfigured(initSupabase());
+            setLoading(false);
+          } else {
+            setTimeout(checkSupabase, 100);
+          }
+        };
+        checkSupabase();
+      }, []);
+
+      useEffect(() => {
+        if (!configured || !supabaseReady) {
           setLoading(false);
           return;
         }
@@ -103,8 +122,8 @@
         await supabase.auth.signOut();
       }
 
+      if (!supabaseReady || loading) return <LoadingScreen />;
       if (!configured) return <ConfigScreen onSave={handleConfig} />;
-      if (loading) return <LoadingScreen />;
       if (!session) return <LoginScreen />;
 
       return (
