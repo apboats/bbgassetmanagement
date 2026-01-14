@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boats By George - Asset Management</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { 
+      Camera, Search, Plus, Trash2, Edit2, X, LogOut, Users, 
+      Map, Package, Settings, Grid, Home, ChevronRight 
+    } = lucide;
+
+    // Supabase initialization
+    let supabase = null;
+
+    function initSupabase() {
+      const config = localStorage.getItem('bbg:supabase');
+      if (config) {
+        const { url, key } = JSON.parse(config);
+        supabase = window.supabase.createClient(url, key);
+        return true;
+      }
+      return false;
+    }
+
+    // Main App
+    function App() {
+      const [configured, setConfigured] = useState(initSupabase());
+      const [session, setSession] = useState(null);
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [view, setView] = useState('dashboard');
+      const [boats, setBoats] = useState([]);
+      const [locations, setLocations] = useState([]);
+
+      useEffect(() => {
+        if (!configured) {
+          setLoading(false);
+          return;
+        }
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+          if (session) loadUser(session.user.id);
+          else setLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+          setSession(session);
+          if (session) loadUser(session.user.id);
+          else { setUser(null); setLoading(false); }
+        });
+
+        return () => subscription.unsubscribe();
+      }, [configured]);
+
+      async function loadUser(id) {
+        try {
+          const { data } = await supabase.from('user_profiles').select('*').eq('id', id).single();
+          setUser(data);
+          await loadData();
+        } catch (err) {
+          console.error(err);
+          alert('Error loading profile');
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function loadData() {
+        const [b, l] = await Promise.all([
+          supabase.from('boats').select('*').order('created_at', { ascending: false }),
+          supabase.from('locations').select('*').order('name')
+        ]);
+        setBoats(b.data || []);
+        setLocations(l.data || []);
+      }
+
+      function handleConfig(url, key) {
+        localStorage.setItem('bbg:supabase', JSON.stringify({ url, key }));
+        window.location.reload();
+      }
+
+      async function logout() {
+        await supabase.auth.signOut();
+      }
+
+      if (!configured) return <ConfigScreen onSave={handleConfig} />;
+      if (loading) return <LoadingScreen />;
+      if (!session) return <LoginScreen />;
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+            * { font-family: 'Inter', sans-serif; }
+            .status-intake { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+            .status-service { background: linear-gradient(135deg, #f59e0b, #d97706); }
+            .status-waiting { background: linear-gradient(135deg, #ef4444, #dc2626); }
+            .status-ready { background: linear-gradient(135deg, #10b981, #059669); }
+            .status-completed { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+          `}</style>
+
+          <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold">Boats By George</h1>
+                  <p className="text-xs text-slate-500 hidden sm:block">Asset Management</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <NavBtn icon={Home} label="Dashboard" active={view==='dashboard'} onClick={() => setView('dashboard')} />
+                <NavBtn icon={Map} label="Locations" active={view==='locations'} onClick={() => setView('locations')} />
+                <NavBtn icon={Package} label="Boats" active={view==='boats'} onClick={() => setView('boats')} />
+                <NavBtn icon={Settings} label="Settings" active={view==='settings'} onClick={() => setView('settings')} />
+                <button onClick={logout} className="p-2 hover:bg-slate-100 rounded-lg ml-2 border-l pl-4"><LogOut className="w-5 h-5" /></button>
+              </div>
+            </div>
+          </nav>
+
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            {view === 'dashboard' && <Dashboard boats={boats} locations={locations} setView={setView} />}
+            {view === 'locations' && <Locations locations={locations} boats={boats} reload={loadData} />}
+            {view === 'boats' && <Boats boats={boats} reload={loadData} />}
+            {view === 'settings' && <SettingsView user={user} reload={loadData} />}
+          </div>
+        </div>
+      );
+    }
+
+    function NavBtn({ icon: Icon, label, active, onClick }) {
+      return (
+        <button onClick={onClick} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium ${active ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}>
+          <Icon className="w-4 h-4" /><span className="hidden sm:inline">{label}</span>
+        </button>
+      );
+    }
+
+    function ConfigScreen({ onSave }) {
+      const [url, setUrl] = useState('');
+      const [key, setKey] = useState('');
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Package className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
+              <p className="text-slate-600">Configure Supabase</p>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); onSave(url, key); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Supabase URL</label>
+                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className="w-full px-4 py-3 border rounded-lg" placeholder="https://xxxxx.supabase.co" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Anon Key</label>
+                <textarea value={key} onChange={e => setKey(e.target.value)} className="w-full px-4 py-3 border rounded-lg font-mono text-xs" rows="3" required />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700">Connect</button>
+            </form>
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
+              <p className="font-medium mb-2">Find in Supabase:</p>
+              <p className="text-slate-600">Settings → API → Project URL & anon key</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LoginScreen() {
+      const [email, setEmail] = useState('');
+      const [pass, setPass] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      async function handleLogin(e) {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+          if (error) throw error;
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Package className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
+              <p className="text-slate-600">Sign In</p>
+            </div>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 border rounded-lg" required disabled={loading} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Password</label>
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 border rounded-lg" required disabled={loading} />
+              </div>
+              {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
+              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function LoadingScreen() {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-4"></div>
+            <p className="text-slate-600 text-lg">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
+    function Dashboard({ boats, locations, setView }) {
+      const statuses = { intake: 0, service: 0, waiting: 0, ready: 0, completed: 0 };
+      boats.forEach(b => statuses[b.status]++);
+
+      return (
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-3xl font-bold mb-2">Dashboard</h2>
+            <p className="text-slate-600">Overview of operations</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard title="Total Boats" value={boats.length} color="blue" onClick={() => setView('boats')} />
+            <StatCard title="Locations" value={locations.length} color="purple" onClick={() => setView('locations')} />
+            <StatCard title="In Service" value={statuses.service} color="orange" />
+            <StatCard title="Ready" value={statuses.ready} color="green" />
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border">
+            <h3 className="text-xl font-bold mb-6">Status Overview</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {Object.entries(statuses).map(([status, count]) => (
+                <div key={status} className="text-center">
+                  <div className={`status-${status} h-24 rounded-lg flex items-center justify-center mb-2`}>
+                    <span className="text-4xl font-bold text-white">{count}</span>
+                  </div>
+                  <p className="text-sm font-medium capitalize">{status}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StatCard({ title, value, color, onClick }) {
+      const colors = {
+        blue: 'from-blue-500 to-blue-600',
+        purple: 'from-purple-500 to-purple-600',
+        orange: 'from-orange-500 to-orange-600',
+        green: 'from-green-500 to-green-600'
+      };
+      return (
+        <div onClick={onClick} className={`bg-white rounded-xl shadow-md p-6 border ${onClick ? 'cursor-pointer hover:shadow-lg' : ''}`}>
+          <div className={`w-12 h-12 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center mb-4`}>
+            <Package className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
+          <p className="text-3xl font-bold">{value}</p>
+        </div>
+      );
+    }
+
+    function Boats({ boats, reload }) {
+      const [showAdd, setShowAdd] = useState(false);
+      const [editing, setEditing] = useState(null);
+
+      async function addBoat(boat) {
+        await supabase.from('boats').insert([boat]);
+        await reload();
+        setShowAdd(false);
+      }
+
+      async function updateBoat(boat) {
+        await supabase.from('boats').update(boat).eq('id', boat.id);
+        await reload();
+        setEditing(null);
+      }
+
+      async function deleteBoat(id) {
+        if (confirm('Delete this boat?')) {
+          await supabase.from('boats').delete().eq('id', id);
+          await reload();
+        }
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-3xl font-bold mb-2">Boats</h2>
+              <p className="text-slate-600">Manage boat inventory</p>
+            </div>
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
+              <Plus className="w-5 h-5" />Add Boat
+            </button>
+          </div>
+
+          {boats.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-12 border text-center">
+              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500 mb-4">No boats yet</p>
+              <button onClick={() => setShowAdd(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add First Boat</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {boats.map(boat => (
+                <BoatCard key={boat.id} boat={boat} onEdit={() => setEditing(boat)} onDelete={() => deleteBoat(boat.id)} />
+              ))}
+            </div>
+          )}
+
+          {(showAdd || editing) && (
+            <BoatModal
+              boat={editing}
+              onSave={editing ? updateBoat : addBoat}
+              onCancel={() => { setShowAdd(false); setEditing(null); }}
+            />
+          )}
+        </div>
+      );
+    }
+
+    function BoatCard({ boat, onEdit, onDelete }) {
+      const labels = { intake: 'Intake', service: 'In Service', waiting: 'Waiting', ready: 'Ready', completed: 'Completed' };
+      return (
+        <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+          <div className={`status-${boat.status} p-3`}>
+            <span className="text-white font-semibold text-sm">{labels[boat.status]}</span>
+          </div>
+          <div className="p-4">
+            <h3 className="text-lg font-bold mb-1">{boat.name}</h3>
+            <p className="text-slate-600 text-sm mb-3">{boat.model}</p>
+            <p className="text-slate-500 text-sm mb-4">Owner: {boat.owner}</p>
+            <div className="flex gap-2">
+              <button onClick={onEdit} className="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center gap-2">
+                <Edit2 className="w-4 h-4" />Edit
+              </button>
+              <button onClick={onDelete} className="flex-1 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg flex items-center justify-center gap-2">
+                <Trash2 className="w-4 h-4" />Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function BoatModal({ boat, onSave, onCancel }) {
+      const [data, setData] = useState(boat || { name: '', model: '', owner: '', status: 'intake' });
+
+      function handleSubmit(e) {
+        e.preventDefault();
+        onSave(data);
+      }
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">{boat ? 'Edit Boat' : 'Add Boat'}</h3>
+              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Boat Name</label>
+                <input type="text" value={data.name} onChange={e => setData({...data, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Model</label>
+                <input type="text" value={data.model} onChange={e => setData({...data, model: e.target.value})} className="w-full px-3 py-2 border rounded-lg" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Owner</label>
+                <input type="text" value={data.owner} onChange={e => setData({...data, owner: e.target.value})} className="w-full px-3 py-2 border rounded-lg" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select value={data.status} onChange={e => setData({...data, status: e.target.value})} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="intake">Intake</option>
+                  <option value="service">In Service</option>
+                  <option value="waiting">Waiting</option>
+                  <option value="ready">Ready</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={onCancel} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{boat ? 'Save' : 'Add'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function Locations({ locations, boats, reload }) {
+      const [showAdd, setShowAdd] = useState(false);
+      const [editing, setEditing] = useState(null);
+
+      async function addLocation(loc) {
+        await supabase.from('locations').insert([{ ...loc, boats: {} }]);
+        await reload();
+        setShowAdd(false);
+      }
+
+      async function updateLocation(loc) {
+        await supabase.from('locations').update(loc).eq('id', loc.id);
+        await reload();
+        setEditing(null);
+      }
+
+      async function deleteLocation(id) {
+        if (confirm('Delete location?')) {
+          await supabase.from('locations').delete().eq('id', id);
+          await reload();
+        }
+      }
+
+      const racks = locations.filter(l => l.type === 'rack');
+      const parking = locations.filter(l => l.type === 'parking');
+      const workshops = locations.filter(l => l.type === 'workshop');
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-3xl font-bold mb-2">Locations</h2>
+              <p className="text-slate-600">Manage storage facilities</p>
+            </div>
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+              <Plus className="w-5 h-5" />Add Location
+            </button>
+          </div>
+
+          {locations.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-12 border text-center">
+              <Map className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500 mb-4">No locations yet</p>
+              <button onClick={() => setShowAdd(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Create Location</button>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {racks.length > 0 && <LocationSection title="Rack Buildings" icon={Grid} color="blue" locations={racks} onEdit={setEditing} onDelete={deleteLocation} />}
+              {parking.length > 0 && <LocationSection title="Parking Lots" icon={Map} color="purple" locations={parking} onEdit={setEditing} onDelete={deleteLocation} />}
+              {workshops.length > 0 && <LocationSection title="Workshops" icon={Settings} color="orange" locations={workshops} onEdit={setEditing} onDelete={deleteLocation} />}
+            </div>
+          )}
+
+          {(showAdd || editing) && (
+            <LocationModal
+              location={editing}
+              onSave={editing ? updateLocation : addLocation}
+              onCancel={() => { setShowAdd(false); setEditing(null); }}
+            />
+          )}
+        </div>
+      );
+    }
+
+    function LocationSection({ title, icon: Icon, color, locations, onEdit, onDelete }) {
+      const colors = {blue: 'from-blue-500 to-blue-600', purple: 'from-purple-500 to-purple-600', orange: 'from-orange-500 to-orange-600'};
+      return (
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-10 h-10 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center`}>
+              <Icon className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold">{title}</h3>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {locations.map(loc => (
+              <LocationCard key={loc.id} location={loc} onEdit={() => onEdit(loc)} onDelete={() => onDelete(loc.id)} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function LocationCard({ location, onEdit, onDelete }) {
+      const total = location.rows * location.columns;
+      const occupied = Object.keys(location.boats || {}).length;
+      return (
+        <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+            <div>
+              <h4 className="text-lg font-bold">{location.name}</h4>
+              <p className="text-sm text-slate-600 capitalize">{location.type} • {location.rows} × {location.columns}</p>
+              <p className="text-sm text-slate-700 font-medium mt-1">{occupied}/{total} occupied</p>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={onEdit} className="p-1.5 hover:bg-white rounded-lg"><Edit2 className="w-4 h-4" /></button>
+              <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4 text-red-600" /></button>
+            </div>
+          </div>
+          <div className="p-4 bg-slate-50">
+            <div className="bg-white p-4 rounded-lg border-2 border-dashed border-slate-300">
+              <p className="text-sm text-slate-500 text-center">Visual grid coming soon</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LocationModal({ location, onSave, onCancel }) {
+      const [data, setData] = useState(location || { name: '', type: 'rack', rows: 3, columns: 6 });
+
+      function handleSubmit(e) {
+        e.preventDefault();
+        onSave(data);
+      }
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">{location ? 'Edit Location' : 'Add Location'}</h3>
+              <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Name</label>
+                <input type="text" value={data.name} onChange={e => setData({...data, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Type</label>
+                <select value={data.type} onChange={e => setData({...data, type: e.target.value})} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="rack">Rack Building</option>
+                  <option value="parking">Parking Lot</option>
+                  <option value="workshop">Workshop</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Rows</label>
+                  <input type="number" min="1" value={data.rows} onChange={e => setData({...data, rows: parseInt(e.target.value)})} className="w-full px-3 py-2 border rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Columns</label>
+                  <input type="number" min="1" value={data.columns} onChange={e => setData({...data, columns: parseInt(e.target.value)})} className="w-full px-3 py-2 border rounded-lg" required />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={onCancel} className="flex-1 px-4 py-2 border rounded-lg hover:bg-slate-50">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function SettingsView({ user, reload }) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-3xl font-bold mb-2">Settings</h2>
+            <p className="text-slate-600">Your profile and preferences</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-md p-6 border max-w-2xl">
+            <h3 className="text-xl font-bold mb-6">My Profile</h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-50 border rounded-lg">
+                <p className="text-sm text-slate-600 mb-1">Name</p>
+                <p className="font-semibold">{user.full_name}</p>
+              </div>
+              <div className="p-4 bg-slate-50 border rounded-lg">
+                <p className="text-sm text-slate-600 mb-1">Username</p>
+                <p className="font-semibold">@{user.username}</p>
+              </div>
+              <div className="p-4 bg-slate-50 border rounded-lg">
+                <p className="text-sm text-slate-600 mb-1">Role</p>
+                <p className="font-semibold capitalize">{user.role}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render app
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
