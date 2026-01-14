@@ -16,7 +16,13 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // Simple SVG Icons as components
+    // ============================================
+    // SUPABASE CONFIGURATION - EDIT THESE VALUES
+    // ============================================
+    const SUPABASE_URL = 'https://lsqqojrdtynbgxycivdq.supabase.co';  // Replace with your Supabase URL
+    const SUPABASE_ANON_KEY = 'sb_publishable_Eca_HQK54Pki0sLcoz1YlA_SiP3tGoc';  // Replace with your anon/public key
+
+    // Simple SVG Icons
     const HomeIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
     const MapIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>;
     const PackageIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
@@ -26,29 +32,12 @@
     const EditIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
     const TrashIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
     const XIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
-    const GridIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>;
 
-    // Supabase initialization
-    let supabase = null;
-
-    function initSupabase() {
-      if (!window.supabase) {
-        console.error('Supabase library not loaded yet');
-        return false;
-      }
-      const config = localStorage.getItem('bbg:supabase');
-      if (config) {
-        const { url, key } = JSON.parse(config);
-        supabase = window.supabase.createClient(url, key);
-        return true;
-      }
-      return false;
-    }
+    // Initialize Supabase
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Main App
     function App() {
-      const [supabaseReady, setSupabaseReady] = useState(false);
-      const [configured, setConfigured] = useState(false);
       const [session, setSession] = useState(null);
       const [user, setUser] = useState(null);
       const [loading, setLoading] = useState(true);
@@ -56,22 +45,10 @@
       const [boats, setBoats] = useState([]);
       const [locations, setLocations] = useState([]);
 
-      // Wait for Supabase library to load
       useEffect(() => {
-        const checkSupabase = () => {
-          if (window.supabase) {
-            setSupabaseReady(true);
-            setConfigured(initSupabase());
-            setLoading(false);
-          } else {
-            setTimeout(checkSupabase, 100);
-          }
-        };
-        checkSupabase();
-      }, []);
-
-      useEffect(() => {
-        if (!configured || !supabaseReady) {
+        // Check if Supabase is configured
+        if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+          alert('Please configure your Supabase credentials in the HTML file!');
           setLoading(false);
           return;
         }
@@ -89,7 +66,7 @@
         });
 
         return () => subscription.unsubscribe();
-      }, [configured]);
+      }, []);
 
       async function loadUser(id) {
         try {
@@ -98,32 +75,30 @@
           await loadData();
         } catch (err) {
           console.error(err);
-          alert('Error loading profile');
+          alert('Error loading profile. Make sure you created your user profile in Supabase.');
         } finally {
           setLoading(false);
         }
       }
 
       async function loadData() {
-        const [b, l] = await Promise.all([
-          supabase.from('boats').select('*').order('created_at', { ascending: false }),
-          supabase.from('locations').select('*').order('name')
-        ]);
-        setBoats(b.data || []);
-        setLocations(l.data || []);
-      }
-
-      function handleConfig(url, key) {
-        localStorage.setItem('bbg:supabase', JSON.stringify({ url, key }));
-        window.location.reload();
+        try {
+          const [b, l] = await Promise.all([
+            supabase.from('boats').select('*').order('created_at', { ascending: false }),
+            supabase.from('locations').select('*').order('name')
+          ]);
+          setBoats(b.data || []);
+          setLocations(l.data || []);
+        } catch (err) {
+          console.error('Error loading data:', err);
+        }
       }
 
       async function logout() {
         await supabase.auth.signOut();
       }
 
-      if (!supabaseReady || loading) return <LoadingScreen />;
-      if (!configured) return <ConfigScreen onSave={handleConfig} />;
+      if (loading) return <LoadingScreen />;
       if (!session) return <LoginScreen />;
 
       return (
@@ -141,7 +116,7 @@
           <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center text-white">
                   <PackageIcon />
                 </div>
                 <div>
@@ -163,7 +138,7 @@
             {view === 'dashboard' && <Dashboard boats={boats} locations={locations} setView={setView} />}
             {view === 'locations' && <Locations locations={locations} boats={boats} reload={loadData} />}
             {view === 'boats' && <Boats boats={boats} reload={loadData} />}
-            {view === 'settings' && <SettingsView user={user} reload={loadData} />}
+            {view === 'settings' && <SettingsView user={user} />}
           </div>
         </div>
       );
@@ -174,39 +149,6 @@
         <button onClick={onClick} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium ${active ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}>
           <Icon /><span className="hidden sm:inline">{label}</span>
         </button>
-      );
-    }
-
-    function ConfigScreen({ onSave }) {
-      const [url, setUrl] = useState('');
-      const [key, setKey] = useState('');
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <div className="w-10 h-10 text-white"><PackageIcon /></div>
-              </div>
-              <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
-              <p className="text-slate-600">Configure Supabase</p>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); onSave(url, key); }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Supabase URL</label>
-                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className="w-full px-4 py-3 border rounded-lg" placeholder="https://xxxxx.supabase.co" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Anon Key</label>
-                <textarea value={key} onChange={e => setKey(e.target.value)} className="w-full px-4 py-3 border rounded-lg font-mono text-xs" rows="3" required />
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700">Connect</button>
-            </form>
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
-              <p className="font-medium mb-2">Find in Supabase:</p>
-              <p className="text-slate-600">Settings → API → Project URL & anon key</p>
-            </div>
-          </div>
-        </div>
       );
     }
 
@@ -234,8 +176,8 @@
         <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <div className="w-10 h-10 text-white"><PackageIcon /></div>
+              <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 text-white">
+                <PackageIcon />
               </div>
               <h1 className="text-3xl font-bold mb-2">Boats By George</h1>
               <p className="text-slate-600">Sign In</p>
@@ -243,14 +185,14 @@
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium mb-2">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 border rounded-lg" required disabled={loading} />
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required disabled={loading} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Password</label>
-                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 border rounded-lg" required disabled={loading} />
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required disabled={loading} />
               </div>
               {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
-              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
@@ -264,7 +206,7 @@
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-4"></div>
-            <p className="text-slate-600 text-lg">Loading...</p>
+            <p className="text-slate-600 text-lg">Loading Boats By George...</p>
           </div>
         </div>
       );
@@ -314,8 +256,8 @@
       };
       return (
         <div onClick={onClick} className={`bg-white rounded-xl shadow-md p-6 border ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}>
-          <div className={`w-12 h-12 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center mb-4`}>
-            <div className="text-white"><PackageIcon /></div>
+          <div className={`w-12 h-12 bg-gradient-to-br ${colors[color]} rounded-lg flex items-center justify-center mb-4 text-white`}>
+            <PackageIcon />
           </div>
           <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
           <p className="text-3xl font-bold">{value}</p>
