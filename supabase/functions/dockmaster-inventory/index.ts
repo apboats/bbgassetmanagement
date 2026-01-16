@@ -183,6 +183,8 @@ serve(async (req) => {
         make: item.boatModelInfo?.vendorName || '',
         year: item.boatModelInfo?.year || null,
         salesStatus: statusCode, // Store normalized code
+        length: item.boatModelInfo?.length || null, // For free-layout sizing
+        beam: item.boatModelInfo?.beam || null, // For free-layout sizing
       }
     })
 
