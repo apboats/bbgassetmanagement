@@ -436,6 +436,8 @@ function AppContainer() {
           status: 'needs-approval',
           sales_status: apiBoat.salesStatus,
           qr_code: `INV-${apiBoat.dockmasterId}`,
+          length: apiBoat.length,
+          beam: apiBoat.beam,
         }))
 
         await inventoryBoatsService.sync(boatsToSync, fullSync)
