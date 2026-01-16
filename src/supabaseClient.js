@@ -32,7 +32,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storageKey: 'boats-by-george-auth',
+    storage: window.localStorage,
+    flowType: 'pkce'
   }
 })
 
