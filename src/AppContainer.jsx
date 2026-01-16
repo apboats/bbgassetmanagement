@@ -462,10 +462,21 @@ function AppContainer() {
 
   const handleAddLocation = async (locationData) => {
     try {
-      await locationsService.create({
-        ...locationData,
-        boats: {},
-      })
+      // Remove id if present - let database auto-generate UUID
+      // Also remove poolBoats (camelCase) and undefined values
+      const { id, poolBoats, pool_boats, ...dataToSave } = locationData
+      
+      const cleanData = {
+        ...dataToSave,
+        boats: dataToSave.boats || {},
+      }
+      
+      // Only include pool_boats for pool type locations
+      if (locationData.type === 'pool') {
+        cleanData.pool_boats = pool_boats || []
+      }
+      
+      await locationsService.create(cleanData)
       await loadLocations()
     } catch (error) {
       console.error('Error adding location:', error)

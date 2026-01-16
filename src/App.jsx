@@ -2264,12 +2264,18 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   const handleAddLocation = (newLocation) => {
     const location = {
       ...newLocation,
-      id: newLocation.id || `loc-${Date.now()}`,
-      boats: {},
-      pool_boats: newLocation.type === 'pool' ? [] : undefined
+      boats: {}
     };
-    // Remove poolBoats if it exists (database uses pool_boats)
+    
+    // Only add pool_boats for pool type locations
+    if (newLocation.type === 'pool') {
+      location.pool_boats = [];
+    }
+    
+    // Remove fields that shouldn't be sent to database
     delete location.poolBoats;
+    delete location.id; // Let database auto-generate UUID
+    
     onUpdateLocations([...locations, location]);
     setShowAddLocation(false);
   };
