@@ -483,7 +483,7 @@ export const inventoryBoatsService = {
   },
 
   // Sync from Dockmaster API
-  async sync(apiBoats) {
+  async sync(apiBoats, fullSync = false) {
     // Get existing inventory boats
     const existing = await this.getAll()
     const existingMap = new Map(
@@ -514,10 +514,13 @@ export const inventoryBoatsService = {
       }
     }
 
-    // Find boats to delete (in our DB but not in API response - likely became SD)
-    for (const existingBoat of existing) {
-      if (!apiDockmasterIds.has(existingBoat.dockmaster_id)) {
-        toDelete.push(existingBoat.id)
+    // ONLY delete boats during a FULL sync (not incremental)
+    // Incremental syncs only return today's changes, so we can't know if a boat was deleted
+    if (fullSync) {
+      for (const existingBoat of existing) {
+        if (!apiDockmasterIds.has(existingBoat.dockmaster_id)) {
+          toDelete.push(existingBoat.id)
+        }
       }
     }
 
