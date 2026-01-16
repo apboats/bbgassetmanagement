@@ -28,11 +28,16 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
 
-  // Track if we're already loading the profile to prevent race conditions
-  const [profileLoading, setProfileLoading] = useState(false)
+  // Use a ref to track profile loading to avoid closure issues
+  const profileLoadingRef = React.useRef(false)
+  const initializedRef = React.useRef(false)
 
   // Check for existing session on mount
   useEffect(() => {
+    // Prevent double initialization in React strict mode
+    if (initializedRef.current) return
+    initializedRef.current = true
+    
     let isMounted = true
     
     const initAuth = async () => {
@@ -61,16 +66,26 @@ export const AuthProvider = ({ children }) => {
     
     initAuth()
 
-    // Listen for auth changes (but skip INITIAL_SESSION since we handle it above)
+    // Listen for auth changes AFTER initial load
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
         
         console.log('Auth event:', event, 'Session:', session ? 'exists' : 'null')
         
-        // Skip INITIAL_SESSION - we already handle this in initAuth
-        if (event === 'INITIAL_SESSION') {
-          return
+        // Skip initial events - we handle those in initAuth
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          // Only handle SIGNED_IN if it's a fresh login (not page load)
+          // We can tell by checking if we already have a user
+          if (user) {
+            console.log('Already have user, skipping duplicate load')
+            return
+          }
+          // If loading is still true, initAuth will handle it
+          if (loading) {
+            console.log('Initial auth in progress, skipping')
+            return
+          }
         }
         
         // Handle different auth events
@@ -116,13 +131,13 @@ export const AuthProvider = ({ children }) => {
 
   // Load user profile from database
   const loadUserProfile = async (authId, retryCount = 0) => {
-    if (profileLoading) {
+    if (profileLoadingRef.current) {
       console.log('Profile already loading, skipping duplicate request')
       return null
     }
     
     console.log('Loading user profile for auth_id:', authId)
-    setProfileLoading(true)
+    profileLoadingRef.current = true
     
     try {
       const { data, error } = await supabase
@@ -145,7 +160,7 @@ export const AuthProvider = ({ children }) => {
       // Retry up to 2 times for network errors
       if (retryCount < 2 && (error.code === 'PGRST000' || error.message?.includes('fetch'))) {
         console.log(`Retrying user profile load (attempt ${retryCount + 2}/3)...`)
-        setProfileLoading(false)
+        profileLoadingRef.current = false
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return loadUserProfile(authId, retryCount + 1)
       }
@@ -159,7 +174,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null)
       return null
     } finally {
-      setProfileLoading(false)
+      profileLoadingRef.current = false
     }
   }
 
