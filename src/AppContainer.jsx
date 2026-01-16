@@ -117,9 +117,10 @@ function AppContainer() {
         qrCode: boat.qr_code,
         nfcTag: boat.nfc_tag,
         workOrderNumber: boat.work_order_number,
-        mechanicalsComplete: boat.mechanicals_complete,
-        cleanComplete: boat.clean_complete,
-        fiberglassComplete: boat.fiberglass_complete,
+        mechanicalsComplete: boat.mechanicals_complete ?? false,
+        cleanComplete: boat.clean_complete ?? false,
+        fiberglassComplete: boat.fiberglass_complete ?? false,
+        warrantyComplete: boat.warranty_complete ?? false,
         archivedDate: boat.archived_date,
       }))
       
@@ -140,9 +141,10 @@ function AppContainer() {
         qrCode: boat.qr_code,
         nfcTag: boat.nfc_tag,
         workOrderNumber: boat.work_order_number,
-        mechanicalsComplete: boat.mechanicals_complete,
-        cleanComplete: boat.clean_complete,
-        fiberglassComplete: boat.fiberglass_complete,
+        mechanicalsComplete: boat.mechanicals_complete ?? false,
+        cleanComplete: boat.clean_complete ?? false,
+        fiberglassComplete: boat.fiberglass_complete ?? false,
+        warrantyComplete: boat.warranty_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         hullId: boat.hull_id,
@@ -247,6 +249,7 @@ function AppContainer() {
         mechanicals_complete: boatData.mechanicalsComplete || false,
         clean_complete: boatData.cleanComplete || false,
         fiberglass_complete: boatData.fiberglassComplete || false,
+        warranty_complete: boatData.warrantyComplete || false,
       })
       await loadBoats()
       return newBoat
@@ -274,6 +277,7 @@ function AppContainer() {
         mechanicalsComplete,
         cleanComplete,
         fiberglassComplete,
+        warrantyComplete,
         archivedDate,
         // Also remove snake_case versions (we'll add them back correctly)
         qr_code,
@@ -282,6 +286,7 @@ function AppContainer() {
         mechanicals_complete,
         clean_complete,
         fiberglass_complete,
+        warranty_complete,
         archived_date,
         ...cleanUpdates 
       } = updates
@@ -298,6 +303,7 @@ function AppContainer() {
       if ('mechanicalsComplete' in updates) updateData.mechanicals_complete = updates.mechanicalsComplete;
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
+      if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
       
       await boatsService.update(boatId, updateData)
@@ -357,6 +363,7 @@ function AppContainer() {
         mechanicalsComplete,
         cleanComplete,
         fiberglassComplete,
+        warrantyComplete,
         archivedDate,
         dockmasterId,
         hullId,
@@ -369,6 +376,7 @@ function AppContainer() {
         mechanicals_complete,
         clean_complete,
         fiberglass_complete,
+        warranty_complete,
         archived_date,
         dockmaster_id,
         hull_id,
@@ -387,6 +395,7 @@ function AppContainer() {
       if ('mechanicalsComplete' in updates) updateData.mechanicals_complete = updates.mechanicalsComplete;
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
+      if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       
       console.log('Inventory boat update - sending to DB:', updateData);
       
