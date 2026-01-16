@@ -122,6 +122,9 @@ function AppContainer() {
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
         archivedDate: boat.archived_date,
+        dockmasterId: boat.dockmaster_id,
+        customerId: boat.customer_id,
+        hullId: boat.hull_id,
       }))
       
       setBoats(transformedData)
@@ -279,6 +282,9 @@ function AppContainer() {
         fiberglassComplete,
         warrantyComplete,
         archivedDate,
+        dockmasterId,
+        customerId,
+        hullId,
         // Also remove snake_case versions (we'll add them back correctly)
         qr_code,
         nfc_tag,
@@ -288,6 +294,9 @@ function AppContainer() {
         fiberglass_complete,
         warranty_complete,
         archived_date,
+        dockmaster_id,
+        customer_id,
+        hull_id,
         ...cleanUpdates 
       } = updates
       
@@ -305,6 +314,9 @@ function AppContainer() {
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
+      if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
+      if ('customerId' in updates) updateData.customer_id = updates.customerId;
+      if ('hullId' in updates) updateData.hull_id = updates.hullId;
       
       await boatsService.update(boatId, updateData)
       await loadBoats()

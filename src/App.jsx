@@ -2118,7 +2118,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
     }
   };
 
-  const handleImportBoat = async (boatId, ownerName) => {
+  const handleImportBoat = async (boatId, ownerName, ownerId) => {
     setIsImporting(true);
     setError('');
     
@@ -2157,13 +2157,17 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
         model: boatData.model || '',
         make: boatData.make || '',
         year: boatData.year || '',
-        owner: (ownerName || 'Unknown').trim(), // Trim whitespace from owner name
+        owner: (ownerName || 'Unknown').trim(),
+        // Store Dockmaster IDs for syncing and work order lookups
+        dockmasterId: boatId, // The 10-digit boat ID
+        customerId: ownerId || boatData.ownerId || '', // The 10-digit customer ID
+        hullId: boatData.hin || '', // Hull Identification Number
         status: 'needs-approval',
         mechanicalsComplete: false,
         cleanComplete: false,
         fiberglassComplete: false,
         warrantyComplete: false,
-        workOrderNumber: '', // Dockmaster doesn't provide this for customer boats
+        workOrderNumber: '',
       };
 
       onImport(importedBoat);
@@ -2227,7 +2231,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
               {searchResults.map((boat) => (
                 <button
                   key={boat.boatId}
-                  onClick={() => handleImportBoat(boat.boatId, boat.ownerName)}
+                  onClick={() => handleImportBoat(boat.boatId, boat.ownerName, boat.ownerId)}
                   disabled={isImporting}
                   className="w-full p-3 border-2 border-slate-200 hover:border-green-500 rounded-lg text-left transition-all hover:shadow-md hover:bg-green-50 disabled:opacity-50"
                 >
@@ -3714,6 +3718,10 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
+  const [showWorkOrders, setShowWorkOrders] = useState(false);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
+  const [workOrdersError, setWorkOrdersError] = useState('');
   
   const statusLabels = {
     'needs-approval': 'Needs Approval',
@@ -3765,6 +3773,54 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
     
     const updatedBoat = { ...boat, status: newStatus };
     onUpdateBoat(updatedBoat);
+  };
+
+  const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
+  const [workOrdersFromCache, setWorkOrdersFromCache] = useState(false);
+
+  const fetchWorkOrders = async (refresh = false) => {
+    if (!boat.customerId && !boat.id) {
+      setWorkOrdersError('No customer ID associated with this boat. Work orders cannot be fetched.');
+      return;
+    }
+
+    setLoadingWorkOrders(true);
+    setWorkOrdersError('');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-workorders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          customerId: boat.customerId,
+          boatId: boat.dockmasterId,
+          boatUuid: boat.id,
+          refresh: refresh,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch work orders');
+      }
+
+      const data = await response.json();
+      setWorkOrders(data.workOrders || []);
+      setWorkOrdersLastSynced(data.lastSynced);
+      setWorkOrdersFromCache(data.fromCache || false);
+      setShowWorkOrders(true);
+    } catch (error) {
+      console.error('Error fetching work orders:', error);
+      setWorkOrdersError(error.message);
+    } finally {
+      setLoadingWorkOrders(false);
+    }
   };
 
   const handleReleaseBoat = async () => {
@@ -4093,6 +4149,22 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
           ) : (
             /* Active Boat View - Editable */
             <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+              {/* View Work Orders Button - only for customer boats with customerId */}
+              {!boat.isInventory && boat.customerId && (
+                <button
+                  onClick={fetchWorkOrders}
+                  disabled={loadingWorkOrders}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 text-white font-semibold rounded-lg transition-all shadow-md"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {loadingWorkOrders ? 'Loading Work Orders...' : 'View Open Work Orders'}
+                </button>
+              )}
+              {workOrdersError && (
+                <p className="text-sm text-red-600 text-center">{workOrdersError}</p>
+              )}
               <button
                 onClick={handleReleaseBoat}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg transition-all shadow-md"
@@ -4288,6 +4360,155 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Work Orders Modal */}
+      {showWorkOrders && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-slide-in">
+            <div className="p-4 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Open Work Orders</h3>
+                  <p className="text-sm text-slate-600">{boat.name} - {boat.owner}</p>
+                  {workOrdersLastSynced && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {workOrdersFromCache ? 'Cached' : 'Synced'}: {new Date(workOrdersLastSynced).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => fetchWorkOrders(true)}
+                    disabled={loadingWorkOrders}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 disabled:bg-slate-100 text-blue-700 disabled:text-slate-400 text-sm font-medium rounded-lg transition-colors"
+                    title="Refresh from Dockmaster"
+                  >
+                    <svg className={`w-4 h-4 ${loadingWorkOrders ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {loadingWorkOrders ? 'Syncing...' : 'Refresh'}
+                  </button>
+                  <button 
+                    onClick={() => setShowWorkOrders(false)} 
+                    className="p-1 hover:bg-slate-100 rounded transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {workOrders.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-slate-500">No open work orders found for this boat.</p>
+                  <button
+                    onClick={() => fetchWorkOrders(true)}
+                    disabled={loadingWorkOrders}
+                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {loadingWorkOrders ? 'Checking...' : 'Check Dockmaster'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {workOrders.map((wo) => (
+                    <div key={wo.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                      {/* Work Order Header */}
+                      <div className="bg-slate-50 p-3 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">WO# {wo.id}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                wo.status === 'O' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                              }`}>
+                                {wo.status === 'O' ? 'Open' : 'Closed'}
+                              </span>
+                            </div>
+                            {wo.title && <p className="text-sm text-slate-600 mt-1">{wo.title}</p>}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-slate-500">Created</p>
+                            <p className="text-sm font-medium text-slate-700">{wo.creationDate}</p>
+                          </div>
+                        </div>
+                        {wo.category && (
+                          <p className="text-xs text-slate-500 mt-2">Category: {wo.category}</p>
+                        )}
+                      </div>
+
+                      {/* Operations List */}
+                      {wo.operations && wo.operations.length > 0 && (
+                        <div className="p-3">
+                          <p className="text-xs font-medium text-slate-500 uppercase mb-2">Operations</p>
+                          <div className="space-y-2">
+                            {wo.operations.map((op, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`flex items-center justify-between p-2 rounded-lg ${
+                                  op.flagLaborFinished ? 'bg-green-50' : 'bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                    op.flagLaborFinished ? 'bg-green-500' : 'bg-slate-300'
+                                  }`}>
+                                    {op.flagLaborFinished ? (
+                                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    ) : (
+                                      <span className="text-xs text-white font-bold">{idx + 1}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-900">
+                                      {op.opcode} - {op.opcodeDesc}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      {op.type} • {op.status === 'O' ? 'Open' : 'Closed'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {op.totalCharges > 0 && (
+                                  <span className="text-sm font-medium text-slate-700">
+                                    ${op.totalCharges.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Work Order Total */}
+                      {wo.totalCharges > 0 && (
+                        <div className="bg-slate-100 p-3 flex justify-between items-center">
+                          <span className="text-sm font-medium text-slate-600">Total Charges</span>
+                          <span className="text-lg font-bold text-slate-900">${wo.totalCharges.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 flex-shrink-0">
+              <button
+                onClick={() => setShowWorkOrders(false)}
+                className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
