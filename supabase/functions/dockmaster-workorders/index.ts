@@ -72,16 +72,20 @@ serve(async (req) => {
 
     const { api_url, api_token } = config
 
+    // Dockmaster API headers
+    const dmHeaders = {
+      'Authorization': `Bearer ${api_token}`,
+      'Content-Type': 'application/json',
+      'X-DM_SYSTEM_ID': 'bbg0180_bbg',
+    }
+
     // Step 1: Get list of open work orders for customer
     const listUrl = `${api_url}/api/v1/Service/WorkOrders/ListForCustomer?CustId=${customerId}&Status=O`
     console.log('Fetching work orders list:', listUrl)
 
     const listResponse = await fetch(listUrl, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${api_token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: dmHeaders,
     })
 
     if (!listResponse.ok) {
@@ -126,10 +130,7 @@ serve(async (req) => {
         try {
           const detailResponse = await fetch(detailUrl, {
             method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${api_token}`,
-              'Content-Type': 'application/json',
-            },
+            headers: dmHeaders,
           })
 
           if (!detailResponse.ok) {
