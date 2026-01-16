@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Maximize2, Minimize2, ChevronLeft, Pencil } from 'lucide-react';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -2187,6 +2187,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDraggingActive, setIsDraggingActive] = useState(false);
+  const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
 
   // Track mouse position continuously
@@ -2737,6 +2738,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
           isDragging={!!draggingBoat}
+          onMaximize={setMaximizedLocation}
         />
       )}
 
@@ -2754,6 +2756,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
           isDragging={!!draggingBoat}
+          onMaximize={setMaximizedLocation}
         />
       )}
 
@@ -2771,6 +2774,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
           isDragging={!!draggingBoat}
+          onMaximize={setMaximizedLocation}
         />
       )}
 
@@ -2865,11 +2869,25 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           onClose={() => setViewingBoat(null)}
         />
       )}
+      
+      {/* Maximized Location Modal */}
+      {maximizedLocation && (
+        <MaximizedLocationModal
+          location={maximizedLocation}
+          boats={boats}
+          onSlotClick={handleSlotClick}
+          onDragStart={handleDragStart}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          isDragging={!!draggingBoat}
+          onClose={() => setMaximizedLocation(null)}
+        />
+      )}
     </div>
   );
 }
 
-function LocationSection({ title, icon: Icon, color, locations, boats, onSlotClick, onEdit, onDelete, onDragStart, onDrop, onDragEnd, isDragging }) {
+function LocationSection({ title, icon: Icon, color, locations, boats, onSlotClick, onEdit, onDelete, onDragStart, onDrop, onDragEnd, isDragging, onMaximize }) {
   const colors = {
     blue: 'from-blue-500 to-blue-600',
     purple: 'from-purple-500 to-purple-600',
@@ -2897,6 +2915,7 @@ function LocationSection({ title, icon: Icon, color, locations, boats, onSlotCli
             onDrop={onDrop}
             onDragEnd={onDragEnd}
             isDragging={isDragging}
+            onMaximize={() => onMaximize(location)}
           />
         ))}
       </div>
@@ -2904,7 +2923,7 @@ function LocationSection({ title, icon: Icon, color, locations, boats, onSlotCli
   );
 }
 
-function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragStart, onDrop, onDragEnd, isDragging }) {
+function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragStart, onDrop, onDragEnd, isDragging, onMaximize }) {
   const isUShape = location.layout === 'u-shaped';
   const totalSlots = isUShape 
     ? (location.rows * 2) + location.columns 
@@ -3073,6 +3092,13 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
           </div>
           <div className="flex gap-1">
             <button
+              onClick={onMaximize}
+              className="p-1.5 hover:bg-white rounded-lg transition-colors"
+              title="Expand view"
+            >
+              <Maximize2 className="w-4 h-4 text-slate-600" />
+            </button>
+            <button
               onClick={onEdit}
               className="p-1.5 hover:bg-white rounded-lg transition-colors"
               title="Edit"
@@ -3113,6 +3139,146 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
         <div className="mt-3 pt-3 border-t border-slate-200">
           <p className="text-xs text-slate-500 text-center">
             💡 Drag boats to move them between slots
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Maximized Location Modal - Full screen view of a single location
+function MaximizedLocationModal({ location, boats, onSlotClick, onDragStart, onDrop, onDragEnd, isDragging, onClose }) {
+  const isUShape = location.layout === 'u-shaped';
+  const totalSlots = isUShape 
+    ? (location.rows * 2) + location.columns 
+    : location.rows * location.columns;
+  const occupiedSlots = Object.keys(location.boats || {}).length;
+  const occupancyRate = Math.round((occupiedSlots / totalSlots) * 100);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const renderSlot = (row, col, isPerimeter = true) => {
+    if (!isPerimeter && isUShape) {
+      return <div key={`${row}-${col}`} className="aspect-square"></div>;
+    }
+
+    const slotId = `${row}-${col}`;
+    const boatId = location.boats?.[slotId];
+    const boat = boats.find(b => b.id === boatId);
+
+    return (
+      <div
+        key={slotId}
+        draggable={!!boat}
+        title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
+        onDragStart={(e) => {
+          if (boat) {
+            onDragStart(e, boat, location, slotId);
+          }
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={(e) => onDrop(e, location, row, col)}
+        onClick={(e) => {
+          if (!isDragging) {
+            onSlotClick(location, row, col);
+          }
+        }}
+        className={`aspect-square border-2 rounded-xl p-3 flex flex-col items-center justify-center text-center transition-all ${
+          boat 
+            ? `status-${boat.status} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-[1.02]` 
+            : isDragging 
+              ? 'border-blue-400 bg-blue-50 cursor-pointer' 
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+        }`}
+      >
+        {boat ? (
+          <>
+            <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full">{boat.owner}</p>
+            {boat.workOrderNumber && (
+              <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full mt-1">
+                WO: {boat.workOrderNumber}
+              </p>
+            )}
+            <div className="flex gap-2 mt-2 pointer-events-none">
+              <Wrench className={`w-5 h-5 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} />
+              <Sparkles className={`w-5 h-5 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} />
+              <Layers className={`w-5 h-5 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} />
+            </div>
+            <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
+          </>
+        ) : (
+          <div className="text-slate-400 pointer-events-none">
+            <div className="text-3xl mb-1">+</div>
+            <p className="text-sm">{row + 1}-{col + 1}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderGrid = () => {
+    const slots = [];
+    for (let row = 0; row < location.rows; row++) {
+      for (let col = 0; col < location.columns; col++) {
+        if (isUShape) {
+          const isLeftEdge = col === 0;
+          const isRightEdge = col === location.columns - 1;
+          const isBottomRow = row === location.rows - 1;
+          const isPerimeter = isLeftEdge || isRightEdge || isBottomRow;
+          slots.push(renderSlot(row, col, isPerimeter));
+        } else {
+          slots.push(renderSlot(row, col));
+        }
+      }
+    }
+    return slots;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[95vh] flex flex-col animate-slide-in">
+        {/* Header */}
+        <div className="p-4 md:p-6 bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{location.name}</h3>
+              <p className="text-slate-300 text-sm mt-1">
+                {location.type?.replace('-', ' ')} • {occupiedSlots}/{totalSlots} slots ({occupancyRate}%)
+                {isUShape && ' • U-Shaped Layout'}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+              title="Close"
+            >
+              <Minimize2 className="w-6 h-6 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-100">
+          <div className="inline-block min-w-full">
+            <div 
+              className="grid gap-3" 
+              style={{ 
+                gridTemplateColumns: `repeat(${location.columns}, minmax(120px, 150px))` 
+              }}
+            >
+              {renderGrid()}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl flex-shrink-0">
+          <p className="text-sm text-slate-500 text-center">
+            💡 Click slots to assign boats • Drag boats to move them
           </p>
         </div>
       </div>
