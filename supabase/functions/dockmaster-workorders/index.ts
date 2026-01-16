@@ -9,6 +9,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Authenticate with Dockmaster API and get bearer token
+async function authenticateDockmaster(username: string, password: string) {
+  const authResponse = await fetch('https://auth.dmeapi.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      UserName: username,
+      Password: password,
+    }),
+  })
+
+  if (!authResponse.ok) {
+    const errorText = await authResponse.text()
+    console.error('Dockmaster auth failed:', authResponse.status, errorText)
+    throw new Error(`Authentication failed: ${authResponse.status}`)
+  }
+
+  const authData = await authResponse.json()
+  
+  // Extract the token and system ID
+  const authToken = authData.authToken
+  const systemId = authData.availableConnections?.[0]?.systemId
+  
+  if (!authToken || !systemId) {
+    throw new Error('Authentication response missing token or systemId')
+  }
+
+  return { authToken, systemId }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -55,32 +87,35 @@ serve(async (req) => {
       )
     }
 
-    // Get Dockmaster config from database
+    // Get Dockmaster credentials from database
     const { data: config, error: configError } = await supabase
       .from('dockmaster_config')
-      .select('*')
+      .select('username, password')
       .limit(1)
       .single()
 
-    if (configError || !config) {
+    if (configError || !config || !config.username || !config.password) {
       console.error('Config error:', configError)
       return new Response(
-        JSON.stringify({ error: 'Dockmaster not configured' }),
+        JSON.stringify({ error: 'Dockmaster credentials not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const { api_url, api_token } = config
+    // Authenticate with Dockmaster to get token
+    console.log('Authenticating with Dockmaster...')
+    const { authToken, systemId } = await authenticateDockmaster(config.username, config.password)
+    console.log('Authentication successful, systemId:', systemId)
 
     // Dockmaster API headers
     const dmHeaders = {
-      'Authorization': `Bearer ${api_token}`,
       'Content-Type': 'application/json',
-      'X-DM_SYSTEM_ID': 'bbg0180_bbg',
+      'Authorization': `Bearer ${authToken}`,
+      'X-DM_SYSTEM_ID': systemId,
     }
 
     // Step 1: Get list of open work orders for customer
-    const listUrl = `${api_url}/api/v1/Service/WorkOrders/ListForCustomer?CustId=${customerId}&Status=O`
+    const listUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListForCustomer?CustId=${customerId}&Status=O`
     console.log('Fetching work orders list:', listUrl)
 
     const listResponse = await fetch(listUrl, {
@@ -124,7 +159,7 @@ serve(async (req) => {
     // Step 2: Get detailed info for each work order
     const detailedWorkOrders = await Promise.all(
       filteredWorkOrders.map(async (wo: any) => {
-        const detailUrl = `${api_url}/api/v1/Service/WorkOrders/Retrieve?Id=${wo.id}&Detail=true`
+        const detailUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/Retrieve?Id=${wo.id}&Detail=true`
         console.log('Fetching work order detail:', detailUrl)
 
         try {
