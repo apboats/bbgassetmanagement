@@ -3794,18 +3794,21 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
 
+      // Extract only the primitive values we need to avoid circular references
+      const requestBody = {
+        customerId: String(boat.customerId || ''),
+        boatId: String(boat.dockmasterId || ''),
+        boatUuid: String(boat.id || ''),
+        refresh: Boolean(refresh),
+      };
+
       const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-workorders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseAnonKey}`,
         },
-        body: JSON.stringify({
-          customerId: boat.customerId,
-          boatId: boat.dockmasterId,
-          boatUuid: boat.id,
-          refresh: refresh,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
