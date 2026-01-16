@@ -28,14 +28,50 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
 
+  // Track if we're already loading the profile to prevent race conditions
+  const [profileLoading, setProfileLoading] = useState(false)
+
   // Check for existing session on mount
   useEffect(() => {
-    checkUser()
+    let isMounted = true
+    
+    const initAuth = async () => {
+      try {
+        console.log('Checking for existing user session...')
+        const session = await authService.getSession()
+        
+        if (!isMounted) return
+        
+        console.log('Session found:', session ? 'Yes' : 'No')
+        setSession(session)
+        
+        if (session?.user) {
+          console.log('Loading user profile from session...')
+          await loadUserProfile(session.user.id)
+        }
+      } catch (error) {
+        console.error('Error checking user:', error)
+      } finally {
+        if (isMounted) {
+          console.log('✓ Check user complete, setting loading to false')
+          setLoading(false)
+        }
+      }
+    }
+    
+    initAuth()
 
-    // Listen for auth changes
+    // Listen for auth changes (but skip INITIAL_SESSION since we handle it above)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return
+        
         console.log('Auth event:', event, 'Session:', session ? 'exists' : 'null')
+        
+        // Skip INITIAL_SESSION - we already handle this in initAuth
+        if (event === 'INITIAL_SESSION') {
+          return
+        }
         
         // Handle different auth events
         switch (event) {
@@ -43,7 +79,7 @@ export const AuthProvider = ({ children }) => {
           case 'TOKEN_REFRESHED':
           case 'USER_UPDATED':
             setSession(session)
-            if (session?.user) {
+            if (session?.user && !profileLoading) {
               console.log('Auth state changed, loading user profile...')
               await loadUserProfile(session.user.id)
             }
@@ -62,21 +98,10 @@ export const AuthProvider = ({ children }) => {
             setShowPasswordReset(true)
             break
             
-          case 'INITIAL_SESSION':
-            // Initial session check on page load
-            setSession(session)
-            if (session?.user) {
-              await loadUserProfile(session.user.id)
-            }
-            break
-            
           default:
-            // For unknown events, only clear if explicitly no session
+            // For unknown events, only update if we have a session
             if (session) {
               setSession(session)
-              if (session.user && !user) {
-                await loadUserProfile(session.user.id)
-              }
             }
             break
         }
@@ -84,35 +109,20 @@ export const AuthProvider = ({ children }) => {
     )
 
     return () => {
+      isMounted = false
       authListener?.subscription?.unsubscribe()
     }
   }, [])
 
-  // Check if user is already logged in
-  const checkUser = async () => {
-    console.log('Checking for existing user session...')
-    try {
-      const session = await authService.getSession()
-      console.log('Session found:', session ? 'Yes' : 'No')
-      setSession(session)
-      
-      if (session?.user) {
-        console.log('Loading user profile from session...')
-        await loadUserProfile(session.user.id)
-      } else {
-        console.log('No active session')
-      }
-    } catch (error) {
-      console.error('Error checking user:', error)
-    } finally {
-      console.log('✓ Check user complete, setting loading to false')
-      setLoading(false)
-    }
-  }
-
   // Load user profile from database
   const loadUserProfile = async (authId, retryCount = 0) => {
+    if (profileLoading) {
+      console.log('Profile already loading, skipping duplicate request')
+      return null
+    }
+    
     console.log('Loading user profile for auth_id:', authId)
+    setProfileLoading(true)
     
     try {
       const { data, error } = await supabase
@@ -135,6 +145,7 @@ export const AuthProvider = ({ children }) => {
       // Retry up to 2 times for network errors
       if (retryCount < 2 && (error.code === 'PGRST000' || error.message?.includes('fetch'))) {
         console.log(`Retrying user profile load (attempt ${retryCount + 2}/3)...`)
+        setProfileLoading(false)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return loadUserProfile(authId, retryCount + 1)
       }
@@ -147,6 +158,8 @@ export const AuthProvider = ({ children }) => {
       // Set user to null so they see login screen
       setUser(null)
       return null
+    } finally {
+      setProfileLoading(false)
     }
   }
 
