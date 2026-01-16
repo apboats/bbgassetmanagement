@@ -2463,6 +2463,42 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     }
   };
 
+  // Create a new boat from the assignment modal and return it for immediate assignment
+  const handleCreateBoatFromAssignModal = async (newBoatData) => {
+    const newBoat = {
+      ...newBoatData,
+      id: `boat-${Date.now()}`,
+      qrCode: `BBG-${Date.now().toString(36).toUpperCase()}`,
+      status: newBoatData.status || 'needs-approval',
+      mechanicalsComplete: false,
+      cleanComplete: false,
+      fiberglassComplete: false
+    };
+    
+    const updatedBoats = [...boats, newBoat];
+    await onUpdateBoats(updatedBoats);
+    
+    return newBoat;
+  };
+
+  // Import a boat from Dockmaster and return it for immediate assignment
+  const handleImportBoatFromAssignModal = async (importedBoatData) => {
+    const newBoat = {
+      ...importedBoatData,
+      id: `boat-${Date.now()}`,
+      qrCode: importedBoatData.qrCode || `BBG-${Date.now().toString(36).toUpperCase()}`,
+      status: importedBoatData.status || 'needs-approval',
+      mechanicalsComplete: false,
+      cleanComplete: false,
+      fiberglassComplete: false
+    };
+    
+    const updatedBoats = [...boats, newBoat];
+    await onUpdateBoats(updatedBoats);
+    
+    return newBoat;
+  };
+
   const handleAssignBoat = async (boatId) => {
     if (!selectedLocation || isProcessing) return;
 
@@ -2851,7 +2887,10 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
         <BoatAssignmentModal
           boats={unassignedBoats}
           allBoats={boats}
+          locations={locations}
           onAssign={handleAssignBoat}
+          onCreateBoat={handleCreateBoatFromAssignModal}
+          onImportBoat={handleImportBoatFromAssignModal}
           onCancel={() => {
             setShowBoatAssignModal(false);
             setSelectedLocation(null);
@@ -3417,8 +3456,10 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
   );
 }
 
-function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel }) {
+function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat, onImportBoat, locations }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateBoat, setShowCreateBoat] = useState(false);
+  const [showImportBoat, setShowImportBoat] = useState(false);
 
   const filteredBoats = boats.filter(boat => {
     const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -3426,6 +3467,50 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel }) {
                          boat.owner.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+
+  const handleCreateBoat = async (newBoat) => {
+    if (onCreateBoat) {
+      const createdBoat = await onCreateBoat(newBoat);
+      if (createdBoat && createdBoat.id) {
+        // Auto-assign the newly created boat to the slot
+        onAssign(createdBoat.id);
+      }
+    }
+    setShowCreateBoat(false);
+  };
+
+  const handleImportBoat = async (importedBoat) => {
+    if (onImportBoat) {
+      const createdBoat = await onImportBoat(importedBoat);
+      if (createdBoat && createdBoat.id) {
+        // Auto-assign the newly imported boat to the slot
+        onAssign(createdBoat.id);
+      }
+    }
+    setShowImportBoat(false);
+  };
+
+  // If showing create or import modal, render those instead
+  if (showCreateBoat) {
+    return (
+      <BoatModal
+        boat={null}
+        locations={locations || []}
+        onSave={handleCreateBoat}
+        onCancel={() => setShowCreateBoat(false)}
+      />
+    );
+  }
+
+  if (showImportBoat) {
+    return (
+      <DockmasterImportModal
+        dockmasterConfig={{}}
+        onImport={handleImportBoat}
+        onCancel={() => setShowImportBoat(false)}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -3437,6 +3522,27 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel }) {
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
+          
+          {/* Create/Import buttons */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setShowCreateBoat(true)}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Boat
+            </button>
+            <button
+              onClick={() => setShowImportBoat(true)}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import from Dockmaster
+            </button>
+          </div>
+          
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -3453,12 +3559,15 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel }) {
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: '200px', maxHeight: 'calc(85vh - 140px)' }}>
+        <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: '200px', maxHeight: 'calc(85vh - 200px)' }}>
           {filteredBoats.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">
+              <p className="text-slate-500 mb-4">
                 {searchQuery ? 'No boats match your search' : 'No boats available'}
+              </p>
+              <p className="text-sm text-slate-400">
+                Create a new boat or import from Dockmaster above
               </p>
             </div>
           ) : (
@@ -4866,6 +4975,42 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     }
   };
 
+  // Create a new boat from the assignment modal and return it for immediate assignment
+  const handleCreateBoatFromAssignModal = async (newBoatData) => {
+    const newBoat = {
+      ...newBoatData,
+      id: `boat-${Date.now()}`,
+      qrCode: `BBG-${Date.now().toString(36).toUpperCase()}`,
+      status: newBoatData.status || 'needs-approval',
+      mechanicalsComplete: false,
+      cleanComplete: false,
+      fiberglassComplete: false
+    };
+    
+    const updatedBoats = [...boats, newBoat];
+    await onUpdateBoats(updatedBoats);
+    
+    return newBoat;
+  };
+
+  // Import a boat from Dockmaster and return it for immediate assignment
+  const handleImportBoatFromAssignModal = async (importedBoatData) => {
+    const newBoat = {
+      ...importedBoatData,
+      id: `boat-${Date.now()}`,
+      qrCode: importedBoatData.qrCode || `BBG-${Date.now().toString(36).toUpperCase()}`,
+      status: importedBoatData.status || 'needs-approval',
+      mechanicalsComplete: false,
+      cleanComplete: false,
+      fiberglassComplete: false
+    };
+    
+    const updatedBoats = [...boats, newBoat];
+    await onUpdateBoats(updatedBoats);
+    
+    return newBoat;
+  };
+
   const handleAssignBoat = async (boatId) => {
     if (!selectedLocation || !selectedSlot || isProcessing) return;
 
@@ -5394,7 +5539,10 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <BoatAssignmentModal
           boats={unassignedBoats}
           allBoats={boats.filter(b => b.status !== 'archived')}
+          locations={locations}
           onAssign={handleAssignBoat}
+          onCreateBoat={handleCreateBoatFromAssignModal}
+          onImportBoat={handleImportBoatFromAssignModal}
           onCancel={() => {
             setShowBoatAssignModal(false);
             setSelectedLocation(null);
