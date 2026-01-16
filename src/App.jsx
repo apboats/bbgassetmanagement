@@ -3722,6 +3722,9 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
   const [workOrders, setWorkOrders] = useState([]);
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
   const [workOrdersError, setWorkOrdersError] = useState('');
+  const [updatingFromDockmaster, setUpdatingFromDockmaster] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const [updateSuccess, setUpdateSuccess] = useState('');
   
   const statusLabels = {
     'needs-approval': 'Needs Approval',
@@ -3820,6 +3823,64 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
       setWorkOrdersError(error.message);
     } finally {
       setLoadingWorkOrders(false);
+    }
+  };
+
+  const updateFromDockmaster = async () => {
+    if (!boat.dockmasterId) {
+      setUpdateError('This boat has no Dockmaster ID. It may have been created manually.');
+      return;
+    }
+
+    setUpdatingFromDockmaster(true);
+    setUpdateError('');
+    setUpdateSuccess('');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      // Call the retrieve endpoint to get fresh data
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-retrieve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          boatId: boat.dockmasterId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch boat data from Dockmaster');
+      }
+
+      const boatData = await response.json();
+      console.log('Updated boat data from Dockmaster:', boatData);
+
+      // Update the boat with fresh data from Dockmaster
+      const updatedBoat = {
+        ...boat,
+        name: boatData.name || boat.name,
+        model: boatData.model || boat.model,
+        make: boatData.make || boat.make,
+        year: boatData.year || boat.year,
+        hullId: boatData.hin || boat.hullId,
+        customerId: boatData.ownerId || boat.customerId, // This is the key field we need!
+      };
+
+      onUpdateBoat(updatedBoat);
+      setUpdateSuccess('Boat updated successfully from Dockmaster!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setUpdateSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error updating from Dockmaster:', error);
+      setUpdateError(error.message);
+    } finally {
+      setUpdatingFromDockmaster(false);
     }
   };
 
@@ -4149,6 +4210,26 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
           ) : (
             /* Active Boat View - Editable */
             <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+              {/* Update from Dockmaster button - show for boats with dockmasterId */}
+              {!boat.isInventory && boat.dockmasterId && (
+                <button
+                  onClick={updateFromDockmaster}
+                  disabled={updatingFromDockmaster}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:from-purple-400 disabled:to-purple-500 text-white font-semibold rounded-lg transition-all shadow-md"
+                >
+                  <svg className={`w-5 h-5 ${updatingFromDockmaster ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {updatingFromDockmaster ? 'Updating...' : 'Update from Dockmaster'}
+                </button>
+              )}
+              {updateError && (
+                <p className="text-sm text-red-600 text-center">{updateError}</p>
+              )}
+              {updateSuccess && (
+                <p className="text-sm text-green-600 text-center">{updateSuccess}</p>
+              )}
+              
               {/* View Work Orders Button - only for customer boats with customerId */}
               {!boat.isInventory && boat.customerId && (
                 <button
@@ -4161,6 +4242,9 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                   </svg>
                   {loadingWorkOrders ? 'Loading Work Orders...' : 'View Open Work Orders'}
                 </button>
+              )}
+              {!boat.isInventory && !boat.customerId && boat.dockmasterId && (
+                <p className="text-xs text-slate-500 text-center">Click "Update from Dockmaster" to enable Work Orders</p>
               )}
               {workOrdersError && (
                 <p className="text-sm text-red-600 text-center">{workOrdersError}</p>
