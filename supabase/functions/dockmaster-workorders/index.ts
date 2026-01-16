@@ -248,6 +248,19 @@ serve(async (req) => {
         .delete()
         .eq('boat_id', boatUuid)
         .not('id', 'in', `(${validIds.join(',')})`)
+
+      // Step 4: Update the boat's work_order_number field with the work order IDs
+      const workOrderNumbers = validWorkOrders.map(wo => wo.id).join(', ')
+      console.log('Updating boat work_order_number to:', workOrderNumbers)
+      
+      const { error: boatUpdateError } = await supabase
+        .from('boats')
+        .update({ work_order_number: workOrderNumbers })
+        .eq('id', boatUuid)
+      
+      if (boatUpdateError) {
+        console.error('Error updating boat work_order_number:', boatUpdateError)
+      }
     }
 
     // Return the work orders with operations nested
