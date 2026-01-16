@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     console.log('Loading user profile for auth_id:', authId)
     
     try {
-      // Add timeout to prevent hanging forever - but increase to 15 seconds
+      // Add timeout to prevent hanging forever
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('User profile load timeout after 15 seconds')), 15000)
       )
@@ -146,38 +146,14 @@ export const AuthProvider = ({ children }) => {
         return loadUserProfile(authId, retryCount + 1)
       }
       
-      // If user profile doesn't exist, try to create one
+      // Profile doesn't exist - database trigger should have created it
+      // This might happen if trigger failed or user was created before trigger existed
       if (error.code === 'PGRST116') {
-        console.log('User profile not found, attempting to create one...')
-        try {
-          const { data: authUser } = await supabase.auth.getUser()
-          if (authUser?.user) {
-            const { data: newUser, error: createError } = await supabase
-              .from('users')
-              .insert([{
-                auth_id: authId,
-                username: authUser.user.email?.split('@')[0] || 'user',
-                name: authUser.user.email?.split('@')[0] || 'User',
-                email: authUser.user.email,
-                role: 'user'
-              }])
-              .select()
-              .single()
-            
-            if (!createError && newUser) {
-              console.log('✓ Created new user profile:', newUser)
-              setUser(newUser)
-              return newUser
-            }
-          }
-        } catch (createErr) {
-          console.error('Failed to create user profile:', createErr)
-        }
+        console.error('User profile not found. Please contact an administrator.')
       }
       
-      // Don't set user to null for temporary errors - keep existing user if we have one
-      // Only clear if we truly have no user
-      console.warn('Could not load user profile, but keeping session active')
+      // Don't log out for temporary errors - keep session but show limited access
+      console.warn('Could not load user profile')
       return null
     }
   }
