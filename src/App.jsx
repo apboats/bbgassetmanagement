@@ -4207,7 +4207,27 @@ function EditLocationModal({ location, onSave, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Clean up the data before saving
+    const dataToSave = {
+      name: formData.name,
+      type: formData.type,
+      layout: formData.type === 'pool' ? 'grid' : (formData.layout || 'grid'),
+      rows: formData.type === 'pool' ? 1 : formData.rows,
+      columns: formData.type === 'pool' ? 1 : formData.columns,
+    };
+    
+    // Preserve id if editing existing location
+    if (formData.id) {
+      dataToSave.id = formData.id;
+    }
+    
+    // Preserve boats data if it exists
+    if (formData.boats) {
+      dataToSave.boats = formData.boats;
+    }
+    
+    onSave(dataToSave);
   };
 
   const totalSlots = formData.layout === 'u-shaped' 
@@ -4245,8 +4265,7 @@ function EditLocationModal({ location, onSave, onCancel }) {
                 const newType = e.target.value;
                 setFormData({ 
                   ...formData, 
-                  type: newType,
-                  layoutType: newType === 'pool' ? 'pool' : 'grid'
+                  type: newType
                 });
               }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
