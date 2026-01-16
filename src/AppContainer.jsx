@@ -240,7 +240,11 @@ function AppContainer() {
         mechanicalsComplete,
         cleanComplete,
         fiberglassComplete,
+        warrantyComplete,
         archivedDate,
+        dockmasterId,
+        customerId,
+        hullId,
         ...cleanData 
       } = boatData
       
@@ -253,6 +257,9 @@ function AppContainer() {
         clean_complete: boatData.cleanComplete || false,
         fiberglass_complete: boatData.fiberglassComplete || false,
         warranty_complete: boatData.warrantyComplete || false,
+        dockmaster_id: boatData.dockmasterId || null,
+        customer_id: boatData.customerId || null,
+        hull_id: boatData.hullId || null,
       })
       await loadBoats()
       return newBoat
