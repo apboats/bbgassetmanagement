@@ -368,6 +368,38 @@ function AppContainer() {
 
   const handleUpdateInventoryBoat = async (boatId, updates) => {
     try {
+      // Check if location/slot is changing - if so, we need to update locations too
+      const locationChanging = 'location' in updates || 'slot' in updates;
+      
+      if (locationChanging) {
+        // Get the current boat to see its old location
+        const currentBoat = inventoryBoats.find(b => b.id === boatId);
+        
+        // If there's a new location, use the proper assign/move methods
+        if (updates.location && updates.slot) {
+          // Find the target location
+          const targetLocation = locations.find(l => l.name === updates.location);
+          if (targetLocation) {
+            // Convert display slot (e.g., "1-1") to internal slot format (e.g., "0-0")
+            let slotId = updates.slot;
+            if (updates.slot !== 'pool' && updates.slot.includes('-')) {
+              const [row, col] = updates.slot.split('-').map(n => parseInt(n) - 1);
+              slotId = `${row}-${col}`;
+            }
+            await inventoryBoatsService.moveToSlot(boatId, targetLocation.id, slotId);
+            await loadInventoryBoats();
+            await loadLocations();
+            return;
+          }
+        } else if (!updates.location) {
+          // Removing from location
+          await inventoryBoatsService.removeFromSlot(boatId);
+          await loadInventoryBoats();
+          await loadLocations();
+          return;
+        }
+      }
+      
       // Filter out fields that don't belong in database
       const { 
         isInventory,
@@ -661,6 +693,7 @@ function AppContainer() {
       
       // Users (admin)
       users={users}
+      onReloadUsers={loadUsers}
       
       // Dockmaster Config
       dockmasterConfig={dockmasterConfig}
