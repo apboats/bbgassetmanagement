@@ -35,20 +35,50 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event)
-        setSession(session)
+        console.log('Auth event:', event, 'Session:', session ? 'exists' : 'null')
         
-        // Handle password recovery
-        if (event === 'PASSWORD_RECOVERY') {
-          // User clicked reset link in email - show password reset form
-          console.log('Password recovery mode activated')
-          setShowPasswordReset(true)
-        } else if (session?.user) {
-          console.log('Auth state changed, loading user profile...')
-          await loadUserProfile(session.user.id)
-        } else {
-          console.log('No session, clearing user')
-          setUser(null)
+        // Handle different auth events
+        switch (event) {
+          case 'SIGNED_IN':
+          case 'TOKEN_REFRESHED':
+          case 'USER_UPDATED':
+            setSession(session)
+            if (session?.user) {
+              console.log('Auth state changed, loading user profile...')
+              await loadUserProfile(session.user.id)
+            }
+            break
+            
+          case 'SIGNED_OUT':
+            console.log('User signed out, clearing state')
+            setSession(null)
+            setUser(null)
+            break
+            
+          case 'PASSWORD_RECOVERY':
+            // User clicked reset link in email - show password reset form
+            console.log('Password recovery mode activated')
+            setSession(session)
+            setShowPasswordReset(true)
+            break
+            
+          case 'INITIAL_SESSION':
+            // Initial session check on page load
+            setSession(session)
+            if (session?.user) {
+              await loadUserProfile(session.user.id)
+            }
+            break
+            
+          default:
+            // For unknown events, only clear if explicitly no session
+            if (session) {
+              setSession(session)
+              if (session.user && !user) {
+                await loadUserProfile(session.user.id)
+              }
+            }
+            break
         }
       }
     )
@@ -81,13 +111,13 @@ export const AuthProvider = ({ children }) => {
   }
 
   // Load user profile from database
-  const loadUserProfile = async (authId) => {
+  const loadUserProfile = async (authId, retryCount = 0) => {
     console.log('Loading user profile for auth_id:', authId)
     
     try {
-      // Add timeout to prevent hanging forever
+      // Add timeout to prevent hanging forever - but increase to 15 seconds
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('User profile load timeout after 5 seconds')), 5000)
+        setTimeout(() => reject(new Error('User profile load timeout after 15 seconds')), 15000)
       )
       
       const queryPromise = supabase
@@ -105,15 +135,50 @@ export const AuthProvider = ({ children }) => {
       
       console.log('✓ User profile loaded:', data)
       setUser(data)
+      return data
     } catch (error) {
       console.error('Failed to load user profile:', error)
       
-      // If user profile doesn't exist, show helpful message
-      if (error.code === 'PGRST116' || error.message?.includes('timeout')) {
-        console.error('User profile not found or timed out. You may need to create a user record.')
+      // Retry up to 3 times for timeout/network errors
+      if (retryCount < 3 && (error.message?.includes('timeout') || error.code === 'PGRST000')) {
+        console.log(`Retrying user profile load (attempt ${retryCount + 2}/4)...`)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return loadUserProfile(authId, retryCount + 1)
       }
       
-      setUser(null)
+      // If user profile doesn't exist, try to create one
+      if (error.code === 'PGRST116') {
+        console.log('User profile not found, attempting to create one...')
+        try {
+          const { data: authUser } = await supabase.auth.getUser()
+          if (authUser?.user) {
+            const { data: newUser, error: createError } = await supabase
+              .from('users')
+              .insert([{
+                auth_id: authId,
+                username: authUser.user.email?.split('@')[0] || 'user',
+                name: authUser.user.email?.split('@')[0] || 'User',
+                email: authUser.user.email,
+                role: 'user'
+              }])
+              .select()
+              .single()
+            
+            if (!createError && newUser) {
+              console.log('✓ Created new user profile:', newUser)
+              setUser(newUser)
+              return newUser
+            }
+          }
+        } catch (createErr) {
+          console.error('Failed to create user profile:', createErr)
+        }
+      }
+      
+      // Don't set user to null for temporary errors - keep existing user if we have one
+      // Only clear if we truly have no user
+      console.warn('Could not load user profile, but keeping session active')
+      return null
     }
   }
 
