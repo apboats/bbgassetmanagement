@@ -451,7 +451,7 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} />
+          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
         )}
         {currentView === 'locations' && (
           <LocationsView
@@ -674,7 +674,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, onNavigate, onUpdateBoats }) {
+function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   const statusCounts = {
@@ -690,28 +690,99 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats }) {
   
   // Calculate total capacity and occupancy
   const totalCapacity = locations.reduce((sum, loc) => {
+    if (loc.type === 'pool') return sum; // Pools don't have fixed capacity
     const isUShape = loc.layout === 'u-shaped';
     return sum + (isUShape ? (loc.rows * 2) + loc.columns : loc.rows * loc.columns);
   }, 0);
   
-  const totalOccupiedSlots = locations.reduce((acc, loc) => acc + Object.keys(loc.boats).length, 0);
+  const totalOccupiedSlots = locations.reduce((acc, loc) => {
+    if (loc.type === 'pool') {
+      return acc + (loc.pool_boats || loc.poolBoats || []).length;
+    }
+    return acc + Object.keys(loc.boats || {}).length;
+  }, 0);
   const occupancyRate = totalCapacity > 0 ? Math.round((totalOccupiedSlots / totalCapacity) * 100) : 0;
 
   const handleViewBoat = (boat) => {
     // Find the location if boat is assigned
     const location = boat.location ? locations.find(l => l.name === boat.location) : null;
-    const slotId = location ? Object.keys(location.boats).find(key => location.boats[key] === boat.id) : null;
+    const slotId = location ? Object.keys(location.boats || {}).find(key => location.boats[key] === boat.id) : null;
     
     setViewingBoat({
       ...boat,
       currentLocation: location,
-      currentSlot: slotId
+      currentSlot: slotId || (location?.type === 'pool' ? 'pool' : null)
     });
   };
 
   const handleUpdateBoatFromModal = (updatedBoat) => {
     onUpdateBoats(boats.map(b => b.id === updatedBoat.id ? updatedBoat : b));
     setViewingBoat(updatedBoat);
+  };
+
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    let updatedLocations = [...locations];
+    
+    // Remove from current location
+    if (boat.location) {
+      const currentLoc = locations.find(l => l.name === boat.location);
+      if (currentLoc) {
+        if (currentLoc.type === 'pool') {
+          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
+          const updatedLoc = {
+            ...currentLoc,
+            pool_boats: poolBoats.filter(id => id !== boat.id),
+            poolBoats: poolBoats.filter(id => id !== boat.id)
+          };
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        } else {
+          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
+          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
+          if (slotKey) delete updatedLoc.boats[slotKey];
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        }
+      }
+    }
+    
+    // Add to new location
+    let updatedBoat = { ...boat };
+    if (targetLocation) {
+      if (targetLocation.type === 'pool') {
+        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
+        const updatedLoc = {
+          ...targetLocation,
+          pool_boats: [...poolBoats, boat.id],
+          poolBoats: [...poolBoats, boat.id]
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = 'pool';
+      } else {
+        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
+        const updatedLoc = {
+          ...currentTargetLoc,
+          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        const [row, col] = targetSlot.split('-').map(Number);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = `${row + 1}-${col + 1}`;
+      }
+    } else {
+      updatedBoat.location = null;
+      updatedBoat.slot = null;
+    }
+    
+    await onUpdateLocations(updatedLocations);
+    onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+    
+    // Update viewing boat with new location info
+    const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
+    setViewingBoat({
+      ...updatedBoat,
+      currentLocation: newLocation,
+      currentSlot: targetSlot
+    });
   };
 
   const handleRemoveBoatFromLocation = () => {
@@ -802,8 +873,10 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats }) {
       {viewingBoat && (
         <BoatDetailsModal
           boat={viewingBoat}
+          locations={locations}
           onRemove={handleRemoveBoatFromLocation}
           onUpdateBoat={handleUpdateBoatFromModal}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -1034,6 +1107,71 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
     
     // Don't close modal here - let the caller decide
     // This allows handleReleaseBoat to remove from location, then archive, then close
+  };
+
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    let updatedLocations = [...locations];
+    
+    // Remove from current location
+    if (boat.location) {
+      const currentLoc = locations.find(l => l.name === boat.location);
+      if (currentLoc) {
+        if (currentLoc.type === 'pool') {
+          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
+          const updatedLoc = {
+            ...currentLoc,
+            pool_boats: poolBoats.filter(id => id !== boat.id),
+            poolBoats: poolBoats.filter(id => id !== boat.id)
+          };
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        } else {
+          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
+          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
+          if (slotKey) delete updatedLoc.boats[slotKey];
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        }
+      }
+    }
+    
+    // Add to new location
+    let updatedBoat = { ...boat };
+    if (targetLocation) {
+      if (targetLocation.type === 'pool') {
+        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
+        const updatedLoc = {
+          ...targetLocation,
+          pool_boats: [...poolBoats, boat.id],
+          poolBoats: [...poolBoats, boat.id]
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = 'pool';
+      } else {
+        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
+        const updatedLoc = {
+          ...currentTargetLoc,
+          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        const [row, col] = targetSlot.split('-').map(Number);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = `${row + 1}-${col + 1}`;
+      }
+    } else {
+      updatedBoat.location = null;
+      updatedBoat.slot = null;
+    }
+    
+    await onUpdateLocations(updatedLocations);
+    await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+    
+    // Update viewing boat with new location info
+    const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
+    setViewingBoat({
+      ...updatedBoat,
+      currentLocation: newLocation,
+      currentSlot: targetSlot
+    });
   };
 
   return (
@@ -1470,8 +1608,10 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
       {viewingBoat && (
         <BoatDetailsModal
           boat={viewingBoat}
+          locations={locations}
           onRemove={handleRemoveBoatFromLocation}
           onUpdateBoat={handleUpdateBoatFromModal}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -2448,6 +2588,79 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     setViewingBoat(updatedBoat);
   };
 
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    setIsProcessing(true);
+    let updatedLocations = [...locations];
+    
+    // Remove from current location
+    if (boat.location) {
+      const currentLoc = locations.find(l => l.name === boat.location);
+      if (currentLoc) {
+        if (currentLoc.type === 'pool') {
+          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
+          const updatedLoc = {
+            ...currentLoc,
+            pool_boats: poolBoats.filter(id => id !== boat.id),
+            poolBoats: poolBoats.filter(id => id !== boat.id)
+          };
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        } else {
+          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
+          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
+          if (slotKey) delete updatedLoc.boats[slotKey];
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        }
+      }
+    }
+    
+    // Add to new location
+    let updatedBoat = { ...boat };
+    if (targetLocation) {
+      if (targetLocation.type === 'pool') {
+        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
+        const updatedLoc = {
+          ...targetLocation,
+          pool_boats: [...poolBoats, boat.id],
+          poolBoats: [...poolBoats, boat.id]
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = 'pool';
+      } else {
+        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
+        const updatedLoc = {
+          ...currentTargetLoc,
+          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        const [row, col] = targetSlot.split('-').map(Number);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = `${row + 1}-${col + 1}`;
+      }
+    } else {
+      updatedBoat.location = null;
+      updatedBoat.slot = null;
+    }
+    
+    try {
+      await onUpdateLocations(updatedLocations);
+      await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+      
+      // Update viewing boat with new location info
+      const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
+      setViewingBoat({
+        ...updatedBoat,
+        currentLocation: newLocation,
+        currentSlot: targetSlot
+      });
+    } catch (error) {
+      console.error('Error moving boat:', error);
+      alert('Failed to move boat. Please try again.');
+    }
+    
+    setIsProcessing(false);
+  };
+
   // Get unassigned boats (include both grid slots and pool boats)
   const assignedBoatIds = new Set();
   locations.forEach(loc => {
@@ -2645,8 +2858,10 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       {viewingBoat && (
         <BoatDetailsModal
           boat={viewingBoat}
+          locations={locations}
           onRemove={handleRemoveBoatFromLocation}
           onUpdateBoat={handleUpdateBoatFromModal}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -3120,7 +3335,11 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel }) {
   );
 }
 
-function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations }) {
+function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat }) {
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
+  const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
+  
   const statusLabels = {
     'needs-approval': 'Needs Approval',
     'needs-parts': 'Needs Parts',
@@ -3263,14 +3482,24 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
               
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="text-xs text-slate-600 mb-0.5">Current Location</p>
-                <p className="text-sm font-semibold text-slate-900 truncate">
-                  {boat.location || 'Unassigned'}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900 truncate">
+                    {boat.location || 'Unassigned'}
+                  </p>
+                  {!isArchived && locations.length > 0 && (
+                    <button
+                      onClick={() => setShowLocationPicker(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                    >
+                      {boat.location ? 'Move...' : 'Assign...'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="text-xs text-slate-600 mb-0.5">Slot</p>
                 <p className="text-sm font-semibold text-slate-900 truncate">
-                  {boat.slot || 'N/A'}
+                  {boat.slot === 'pool' ? 'Pool' : boat.slot || 'N/A'}
                 </p>
               </div>
               
@@ -3491,6 +3720,177 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
           )}
         </div>
       </div>
+      
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-slide-in">
+            <div className="p-4 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-bold text-slate-900">
+                  {selectedMoveLocation ? 'Select Slot' : 'Move to Location'}
+                </h4>
+                <button
+                  onClick={() => {
+                    setShowLocationPicker(false);
+                    setSelectedMoveLocation(null);
+                    setSelectedMoveSlot(null);
+                  }}
+                  className="p-1 hover:bg-slate-100 rounded"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              {!selectedMoveLocation ? (
+                // Step 1: Select location
+                <div className="space-y-2">
+                  {/* Unassigned option */}
+                  {boat.location && (
+                    <button
+                      onClick={async () => {
+                        if (onMoveBoat) {
+                          await onMoveBoat(boat, null, null);
+                          setShowLocationPicker(false);
+                        }
+                      }}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 transition-colors"
+                    >
+                      <p className="font-semibold text-slate-900">Unassigned</p>
+                      <p className="text-xs text-slate-500">Remove from current location</p>
+                    </button>
+                  )}
+                  
+                  {/* Pool locations */}
+                  {locations.filter(l => l.type === 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={async () => {
+                        if (onMoveBoat) {
+                          await onMoveBoat(boat, loc, 'pool');
+                          setShowLocationPicker(false);
+                        }
+                      }}
+                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                        boat.location === loc.name
+                          ? 'border-teal-500 bg-teal-50'
+                          : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-teal-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Pool • {(loc.pool_boats || loc.poolBoats || []).length} boats
+                      </p>
+                    </button>
+                  ))}
+                  
+                  {/* Grid locations */}
+                  {locations.filter(l => l.type !== 'pool').map(loc => {
+                    const totalSlots = loc.layout === 'u-shaped' 
+                      ? (loc.rows * 2) + loc.columns 
+                      : loc.rows * loc.columns;
+                    const occupiedSlots = Object.keys(loc.boats || {}).length;
+                    const availableSlots = totalSlots - occupiedSlots;
+                    
+                    return (
+                      <button
+                        key={loc.id}
+                        onClick={() => setSelectedMoveLocation(loc)}
+                        disabled={availableSlots === 0 && boat.location !== loc.name}
+                        className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                          boat.location === loc.name
+                            ? 'border-blue-500 bg-blue-50'
+                            : availableSlots === 0
+                            ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${
+                            loc.type === 'rack-building' ? 'bg-blue-500' :
+                            loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                          }`} />
+                          <p className="font-semibold text-slate-900">{loc.name}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {loc.type.replace('-', ' ')} • {availableSlots} slots available
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Step 2: Select slot for grid location
+                <div>
+                  <button
+                    onClick={() => setSelectedMoveLocation(null)}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back to locations
+                  </button>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Select a slot in <strong>{selectedMoveLocation.name}</strong>:
+                  </p>
+                  <div 
+                    className="grid gap-1.5 max-h-[300px] overflow-y-auto"
+                    style={{ 
+                      gridTemplateColumns: `repeat(${Math.min(selectedMoveLocation.columns, 6)}, minmax(50px, 1fr))` 
+                    }}
+                  >
+                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
+                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
+                        const slotId = `${row}-${col}`;
+                        const isOccupied = selectedMoveLocation.boats?.[slotId];
+                        const isCurrentBoat = isOccupied === boat.id;
+                        const displaySlot = `${row + 1}-${col + 1}`;
+                        
+                        // Skip non-perimeter slots for U-shaped
+                        if (selectedMoveLocation.layout === 'u-shaped') {
+                          const isLeftEdge = col === 0;
+                          const isRightEdge = col === selectedMoveLocation.columns - 1;
+                          const isBottomRow = row === selectedMoveLocation.rows - 1;
+                          if (!isLeftEdge && !isRightEdge && !isBottomRow) {
+                            return null;
+                          }
+                        }
+                        
+                        return (
+                          <button
+                            key={slotId}
+                            onClick={async () => {
+                              if (!isOccupied && onMoveBoat) {
+                                await onMoveBoat(boat, selectedMoveLocation, slotId);
+                                setShowLocationPicker(false);
+                                setSelectedMoveLocation(null);
+                              }
+                            }}
+                            disabled={isOccupied && !isCurrentBoat}
+                            className={`p-2 text-xs font-medium rounded transition-colors ${
+                              isCurrentBoat
+                                ? 'bg-blue-500 text-white'
+                                : isOccupied
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-100 hover:bg-blue-100 text-slate-700'
+                            }`}
+                          >
+                            {displaySlot}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4383,6 +4783,79 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     setViewingBoat(null);
   };
 
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    setIsProcessing(true);
+    let updatedLocations = [...locations];
+    
+    // Remove from current location
+    if (boat.location) {
+      const currentLoc = locations.find(l => l.name === boat.location);
+      if (currentLoc) {
+        if (currentLoc.type === 'pool') {
+          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
+          const updatedLoc = {
+            ...currentLoc,
+            pool_boats: poolBoats.filter(id => id !== boat.id),
+            poolBoats: poolBoats.filter(id => id !== boat.id)
+          };
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        } else {
+          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
+          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
+          if (slotKey) delete updatedLoc.boats[slotKey];
+          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+        }
+      }
+    }
+    
+    // Add to new location
+    let updatedBoat = { ...boat };
+    if (targetLocation) {
+      if (targetLocation.type === 'pool') {
+        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
+        const updatedLoc = {
+          ...targetLocation,
+          pool_boats: [...poolBoats, boat.id],
+          poolBoats: [...poolBoats, boat.id]
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = 'pool';
+      } else {
+        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
+        const updatedLoc = {
+          ...currentTargetLoc,
+          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
+        };
+        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+        const [row, col] = targetSlot.split('-').map(Number);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = `${row + 1}-${col + 1}`;
+      }
+    } else {
+      updatedBoat.location = null;
+      updatedBoat.slot = null;
+    }
+    
+    try {
+      await onUpdateLocations(updatedLocations);
+      await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+      
+      // Update viewing boat with new location info
+      const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
+      setViewingBoat({
+        ...updatedBoat,
+        currentLocation: newLocation,
+        currentSlot: targetSlot
+      });
+    } catch (error) {
+      console.error('Error moving boat:', error);
+      alert('Failed to move boat. Please try again.');
+    }
+    
+    setIsProcessing(false);
+  };
+
   const handleBoatDrop = async (e, targetLocation, row, col) => {
     e.preventDefault();
     e.stopPropagation();
@@ -4768,12 +5241,14 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       {viewingBoat && (
         <BoatDetailsModal
           boat={viewingBoat}
+          locations={locations}
           onRemove={handleRemoveBoatFromLocation}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
             onUpdateBoats(updatedBoats);
             setViewingBoat(updatedBoat);
           }}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -4886,6 +5361,36 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
       await onUpdateSingleBoat(viewingBoat.id, updatedBoat);
     }
     setViewingBoat(null);
+  };
+
+  // Note: For inventory boats, we only update the boat's location reference
+  // We don't update the locations array itself since inventory boats aren't stored there
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    let updatedBoat = { ...boat };
+    
+    if (targetLocation) {
+      if (targetLocation.type === 'pool') {
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = 'pool';
+      } else {
+        const [row, col] = targetSlot.split('-').map(Number);
+        updatedBoat.location = targetLocation.name;
+        updatedBoat.slot = `${row + 1}-${col + 1}`;
+      }
+    } else {
+      updatedBoat.location = null;
+      updatedBoat.slot = null;
+    }
+    
+    if (onUpdateSingleBoat) {
+      await onUpdateSingleBoat(boat.id, updatedBoat);
+    }
+    
+    setViewingBoat({
+      ...updatedBoat,
+      currentLocation: targetLocation,
+      currentSlot: targetSlot
+    });
   };
 
   const isConfigured = dockmasterConfig && dockmasterConfig.username;
@@ -5220,8 +5725,10 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
       {viewingBoat && (
         <BoatDetailsModal
           boat={viewingBoat}
+          locations={locations}
           onRemove={handleRemoveBoatFromLocation}
           onUpdateBoat={handleUpdateBoatFromModal}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
