@@ -2102,7 +2102,9 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   const handleAddLocation = (newLocation) => {
     const location = {
       ...newLocation,
-      boats: {}
+      boats: {},
+      pool_boats: newLocation.type === 'pool' ? [] : undefined,
+      poolBoats: newLocation.type === 'pool' ? [] : undefined
     };
     onUpdateLocations([...locations, location]);
     setShowAddLocation(false);
@@ -2219,6 +2221,89 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     setIsProcessing(false);
   };
 
+  // Handle dropping boat into a pool location
+  const handlePoolDrop = async (poolId, slotType) => {
+    if (!draggingBoat || isProcessing) return;
+
+    setIsProcessing(true);
+
+    const targetPool = locations.find(l => l.id === poolId);
+    if (!targetPool) {
+      setIsProcessing(false);
+      return;
+    }
+
+    let updatedLocations = [...locations];
+
+    // Remove from old location if it had one
+    if (draggingBoat.location) {
+      const oldLocation = locations.find(l => l.name === draggingBoat.location);
+      if (oldLocation) {
+        if (oldLocation.type === 'pool') {
+          // Remove from old pool
+          const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
+          const updatedOldPool = {
+            ...oldLocation,
+            pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
+            poolBoats: oldPoolBoats.filter(id => id !== draggingBoat.id)
+          };
+          updatedLocations = updatedLocations.map(l => 
+            l.id === oldLocation.id ? updatedOldPool : l
+          );
+        } else {
+          // Remove from old grid slot
+          const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
+          const oldSlotId = Object.keys(oldLocation.boats).find(
+            key => oldLocation.boats[key] === draggingBoat.id
+          );
+          if (oldSlotId) {
+            delete updatedOldLocation.boats[oldSlotId];
+          }
+          updatedLocations = updatedLocations.map(l => 
+            l.id === oldLocation.id ? updatedOldLocation : l
+          );
+        }
+      }
+    }
+
+    // Add to new pool
+    const currentPool = updatedLocations.find(l => l.id === poolId);
+    const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
+    
+    // Don't add if already in this pool
+    if (!currentPoolBoats.includes(draggingBoat.id)) {
+      const updatedPool = {
+        ...currentPool,
+        pool_boats: [...currentPoolBoats, draggingBoat.id],
+        poolBoats: [...currentPoolBoats, draggingBoat.id]
+      };
+      updatedLocations = updatedLocations.map(l => 
+        l.id === poolId ? updatedPool : l
+      );
+    }
+
+    // Update boat's location reference
+    const updatedBoat = {
+      ...draggingBoat,
+      location: targetPool.name,
+      slot: 'pool'
+    };
+    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+
+    // Save changes
+    try {
+      await onUpdateLocations(updatedLocations);
+      await onUpdateBoats(updatedBoats);
+    } catch (error) {
+      console.error('Error updating boat location:', error);
+      alert('Failed to update boat location. Please try again.');
+    }
+
+    setDraggingBoat(null);
+    setDraggingFrom(null);
+    setIsProcessing(false);
+  };
+
   const handleSlotClick = (location, row, col) => {
     const slotId = `${row}-${col}`;
     const boatId = location.boats[slotId];
@@ -2238,37 +2323,66 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   };
 
   const handleAssignBoat = async (boatId) => {
-    if (!selectedLocation || !selectedSlot || isProcessing) return;
+    if (!selectedLocation || isProcessing) return;
 
     setIsProcessing(true);
 
-    // Update location
-    const updatedLocation = {
-      ...selectedLocation,
-      boats: { ...selectedLocation.boats, [selectedSlot.slotId]: boatId }
-    };
-    const updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
-
-    // Update boat
+    let updatedLocations;
+    let updatedBoat;
     const boat = boats.find(b => b.id === boatId);
-    if (boat) {
-      const updatedBoat = {
+    
+    if (!boat) {
+      setIsProcessing(false);
+      return;
+    }
+
+    // Check if this is a pool location
+    if (selectedLocation.type === 'pool') {
+      // Add to pool
+      const currentPoolBoats = selectedLocation.pool_boats || selectedLocation.poolBoats || [];
+      const updatedLocation = {
+        ...selectedLocation,
+        pool_boats: [...currentPoolBoats, boatId],
+        poolBoats: [...currentPoolBoats, boatId]
+      };
+      updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
+      
+      updatedBoat = {
+        ...boat,
+        location: selectedLocation.name,
+        slot: 'pool'
+      };
+    } else {
+      // Grid assignment (existing logic)
+      if (!selectedSlot) {
+        setIsProcessing(false);
+        return;
+      }
+      
+      const updatedLocation = {
+        ...selectedLocation,
+        boats: { ...selectedLocation.boats, [selectedSlot.slotId]: boatId }
+      };
+      updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
+      
+      updatedBoat = {
         ...boat,
         location: selectedLocation.name,
         slot: `${selectedSlot.row + 1}-${selectedSlot.col + 1}`
       };
-      const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
+    }
 
-      // Await both updates
-      try {
-        await onUpdateLocations(updatedLocations);
-        await onUpdateBoats(updatedBoats);
-      } catch (error) {
-        console.error('Error assigning boat:', error);
-        alert('Failed to assign boat. Please try again.');
-        setIsProcessing(false);
-        return;
-      }
+    const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
+
+    // Await both updates
+    try {
+      await onUpdateLocations(updatedLocations);
+      await onUpdateBoats(updatedBoats);
+    } catch (error) {
+      console.error('Error assigning boat:', error);
+      alert('Failed to assign boat. Please try again.');
+      setIsProcessing(false);
+      return;
     }
 
     setShowBoatAssignModal(false);
@@ -2283,11 +2397,27 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     setIsProcessing(true);
 
     // Remove boat from location
-    const updatedLocation = {
-      ...viewingBoat.currentLocation,
-      boats: { ...viewingBoat.currentLocation.boats }
-    };
-    delete updatedLocation.boats[viewingBoat.currentSlot];
+    // Check if this is a pool location
+    const isPool = viewingBoat.currentLocation.type === 'pool';
+    
+    let updatedLocation;
+    if (isPool) {
+      // Remove from pool_boats array
+      const currentPoolBoats = viewingBoat.currentLocation.pool_boats || viewingBoat.currentLocation.poolBoats || [];
+      updatedLocation = {
+        ...viewingBoat.currentLocation,
+        pool_boats: currentPoolBoats.filter(id => id !== viewingBoat.id),
+        poolBoats: currentPoolBoats.filter(id => id !== viewingBoat.id)
+      };
+    } else {
+      // Remove from grid slot
+      updatedLocation = {
+        ...viewingBoat.currentLocation,
+        boats: { ...viewingBoat.currentLocation.boats }
+      };
+      delete updatedLocation.boats[viewingBoat.currentSlot];
+    }
+    
     const updatedLocations = locations.map(l => l.id === viewingBoat.currentLocation.id ? updatedLocation : l);
 
     // Update boat to have no location
@@ -2318,10 +2448,13 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     setViewingBoat(updatedBoat);
   };
 
-  // Get unassigned boats
+  // Get unassigned boats (include both grid slots and pool boats)
   const assignedBoatIds = new Set();
   locations.forEach(loc => {
-    Object.values(loc.boats).forEach(boatId => assignedBoatIds.add(boatId));
+    // Grid-based locations
+    Object.values(loc.boats || {}).forEach(boatId => assignedBoatIds.add(boatId));
+    // Pool-based locations
+    (loc.pool_boats || loc.poolBoats || []).forEach(boatId => assignedBoatIds.add(boatId));
   });
   const unassignedBoats = boats.filter(b => b.status !== 'archived' && !assignedBoatIds.has(b.id));
 
@@ -2329,6 +2462,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   const racks = locations.filter(l => l.type === 'rack-building');
   const parking = locations.filter(l => l.type === 'parking-lot');
   const workshops = locations.filter(l => l.type === 'shop');
+  const pools = locations.filter(l => l.type === 'pool');
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -2425,6 +2559,47 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           onDragEnd={handleDragEnd}
           isDragging={!!draggingBoat}
         />
+      )}
+
+      {/* Pool Locations */}
+      {pools.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {pools.map(pool => (
+              <PoolLocation
+                key={pool.id}
+                location={pool}
+                boats={boats}
+                onEdit={() => setEditingLocation(pool)}
+                onDelete={() => handleDeleteLocation(pool.id)}
+                onDragStart={handleDragStart}
+                onDrop={handlePoolDrop}
+                onDragEnd={handleDragEnd}
+                isDragging={!!draggingBoat}
+                onBoatClick={(boat) => {
+                  const poolBoatIds = pool.pool_boats || pool.poolBoats || [];
+                  setViewingBoat({
+                    ...boat,
+                    currentLocation: pool,
+                    currentSlot: 'pool',
+                    location: pool.name
+                  });
+                }}
+                onAddBoat={() => {
+                  setSelectedLocation(pool);
+                  setSelectedSlot('pool');
+                  setShowBoatAssignModal(true);
+                }}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       {locations.length === 0 && (
@@ -2725,6 +2900,137 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
             💡 Drag boats to move them between slots
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Pool Location Component - flexible container without grid slots
+function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, onDragEnd, isDragging, onBoatClick, onAddBoat }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Get boats in this pool
+  const poolBoatIds = location.pool_boats || location.poolBoats || [];
+  const poolBoats = poolBoatIds.map(id => boats.find(b => b.id === id)).filter(Boolean);
+  
+  // Filter by search
+  const filteredBoats = poolBoats.filter(boat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return boat.name?.toLowerCase().includes(query) ||
+           boat.model?.toLowerCase().includes(query) ||
+           boat.owner?.toLowerCase().includes(query);
+  });
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDropOnPool = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop(location.id, 'pool');
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden border-2 border-slate-200 hover:border-teal-400 transition-colors">
+      {/* Header */}
+      <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-teal-500 to-teal-600">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-bold text-white text-lg">{location.name}</h4>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onEdit}
+              className="p-1.5 hover:bg-white/20 rounded transition-colors"
+              title="Edit location"
+            >
+              <Pencil className="w-4 h-4 text-white" />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1.5 hover:bg-white/20 rounded transition-colors"
+              title="Delete location"
+            >
+              <Trash2 className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-teal-100">Pool • Flexible Layout</p>
+          <p className="text-white font-medium">{poolBoats.length} boat{poolBoats.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      {poolBoats.length > 5 && (
+        <div className="p-3 border-b border-slate-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search boats..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Drop Zone / Boat List */}
+      <div 
+        className={`p-4 min-h-[150px] ${isDragging ? 'bg-teal-50 border-2 border-dashed border-teal-400' : 'bg-slate-50'}`}
+        onDragOver={handleDragOver}
+        onDrop={handleDropOnPool}
+      >
+        {filteredBoats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+            <Package className="w-10 h-10 mb-2 opacity-50" />
+            <p className="text-sm">
+              {isDragging ? 'Drop boat here' : poolBoats.length === 0 ? 'No boats in pool' : 'No matches'}
+            </p>
+            {!isDragging && poolBoats.length === 0 && (
+              <button
+                onClick={onAddBoat}
+                className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium"
+              >
+                + Add boat
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {filteredBoats.map(boat => (
+              <div
+                key={boat.id}
+                draggable
+                onDragStart={(e) => onDragStart(e, boat, location.name)}
+                onDragEnd={onDragEnd}
+                onClick={() => onBoatClick(boat)}
+                className="p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all"
+              >
+                <p className="font-semibold text-slate-900 text-sm truncate">{boat.owner}</p>
+                <p className="text-xs text-slate-600 truncate">{boat.name}</p>
+                {boat.workOrderNumber && (
+                  <p className="text-xs text-slate-500 font-mono mt-1">WO: {boat.workOrderNumber}</p>
+                )}
+                <div className="flex gap-1 mt-2">
+                  <Wrench className={`w-3.5 h-3.5 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Sparkles className={`w-3.5 h-3.5 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Layers className={`w-3.5 h-3.5 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2 bg-slate-100 border-t border-slate-200">
+        <p className="text-xs text-slate-500 text-center">
+          💡 Drag boats in or out of this pool
+        </p>
       </div>
     </div>
   );
@@ -3234,88 +3540,105 @@ function EditLocationModal({ location, onSave, onCancel }) {
             <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              onChange={(e) => {
+                const newType = e.target.value;
+                setFormData({ 
+                  ...formData, 
+                  type: newType,
+                  layoutType: newType === 'pool' ? 'pool' : 'grid'
+                });
+              }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="rack-building">Rack Building</option>
               <option value="parking-lot">Parking Lot</option>
               <option value="shop">Shop</option>
+              <option value="pool">Pool (No Grid)</option>
             </select>
+            {formData.type === 'pool' && (
+              <p className="text-xs text-slate-500 mt-1">
+                A flexible container for boats without assigned slots. Great for boat shows, transit, or temporary staging.
+              </p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Layout Style</label>
-            <select
-              value={formData.layout || 'grid'}
-              onChange={(e) => setFormData({ ...formData, layout: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="grid">Grid (Full)</option>
-              <option value="u-shaped">U-Shaped (Perimeter)</option>
-            </select>
-            <p className="text-xs text-slate-500 mt-1">
-              {formData.layout === 'u-shaped' 
-                ? 'Boats placed along three edges (left, right, bottom)'
-                : 'Boats fill entire rectangular area'}
-            </p>
-          </div>
+          {formData.type !== 'pool' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Layout Style</label>
+                <select
+                  value={formData.layout || 'grid'}
+                  onChange={(e) => setFormData({ ...formData, layout: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="grid">Grid (Full)</option>
+                  <option value="u-shaped">U-Shaped (Perimeter)</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formData.layout === 'u-shaped' 
+                    ? 'Boats placed along three edges (left, right, bottom)'
+                    : 'Boats fill entire rectangular area'}
+                </p>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                {formData.layout === 'u-shaped' ? 'Unit Depth' : 'Rows'}
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.rows}
-                onChange={(e) => setFormData({ ...formData, rows: parseInt(e.target.value) || 1 })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              {formData.layout === 'u-shaped' && (
-                <p className="text-xs text-slate-500 mt-1">Height of U</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                {formData.layout === 'u-shaped' ? 'Unit Width' : 'Columns'}
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.columns}
-                onChange={(e) => setFormData({ ...formData, columns: parseInt(e.target.value) || 1 })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              {formData.layout === 'u-shaped' && (
-                <p className="text-xs text-slate-500 mt-1">Width of U</p>
-              )}
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    {formData.layout === 'u-shaped' ? 'Unit Depth' : 'Rows'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={formData.rows}
+                    onChange={(e) => setFormData({ ...formData, rows: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                  {formData.layout === 'u-shaped' && (
+                    <p className="text-xs text-slate-500 mt-1">Height of U</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    {formData.layout === 'u-shaped' ? 'Unit Width' : 'Columns'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={formData.columns}
+                    onChange={(e) => setFormData({ ...formData, columns: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                  {formData.layout === 'u-shaped' && (
+                    <p className="text-xs text-slate-500 mt-1">Width of U</p>
+                  )}
+                </div>
+              </div>
 
-          {/* Preview */}
-          <div className="border-2 border-slate-200 rounded-lg p-3 bg-slate-50">
-            <p className="text-xs font-medium text-slate-700 mb-2">Preview:</p>
-            <div className="text-xs text-slate-600 space-y-1">
-              {formData.layout === 'u-shaped' ? (
-                <>
-                  <p>• Left side: {formData.rows} slots</p>
-                  <p>• Bottom: {formData.columns} slots</p>
-                  <p>• Right side: {formData.rows} slots</p>
-                  <p className="font-semibold mt-2 pt-2 border-t border-slate-300">Total: {totalSlots} slots</p>
-                </>
-              ) : (
-                <>
-                  <p>• Grid: {formData.rows} rows × {formData.columns} columns</p>
-                  <p className="font-semibold mt-2 pt-2 border-t border-slate-300">Total: {totalSlots} slots</p>
-                </>
-              )}
-            </div>
-          </div>
+              {/* Preview */}
+              <div className="border-2 border-slate-200 rounded-lg p-3 bg-slate-50">
+                <p className="text-xs font-medium text-slate-700 mb-2">Preview:</p>
+                <div className="text-xs text-slate-600 space-y-1">
+                  {formData.layout === 'u-shaped' ? (
+                    <>
+                      <p>• Left side: {formData.rows} slots</p>
+                      <p>• Bottom: {formData.columns} slots</p>
+                      <p>• Right side: {formData.rows} slots</p>
+                      <p className="font-semibold mt-2 pt-2 border-t border-slate-300">Total: {totalSlots} slots</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>• Grid: {formData.rows} rows × {formData.columns} columns</p>
+                      <p className="font-semibold mt-2 pt-2 border-t border-slate-300">Total: {totalSlots} slots</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3 pt-4">
             <button
