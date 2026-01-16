@@ -1415,6 +1415,31 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               </div>
             </label>
           ))}
+
+          {/* Pools */}
+          {locations.filter(l => l.type === 'pool').map(location => (
+            <label 
+              key={location.id}
+              className={`flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                filterLocations.includes(location.name)
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={filterLocations.includes(location.name)}
+                onChange={() => handleLocationToggle(location.name)}
+                className="w-4 h-4 text-teal-600 rounded focus:ring-2 focus:ring-teal-500"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-900">{location.name}</p>
+                <p className="text-xs text-slate-500">
+                  Pool • {boats.filter(b => b.location === location.name).length} boats
+                </p>
+              </div>
+            </label>
+          ))}
         </div>
         {filterLocations.length === 0 && (
           <p className="text-xs text-slate-500 mt-3 text-center">
@@ -2243,6 +2268,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
   const handleAddLocation = (newLocation) => {
     const location = {
       ...newLocation,
+      id: newLocation.id || `loc-${Date.now()}`,
       boats: {},
       pool_boats: newLocation.type === 'pool' ? [] : undefined,
       poolBoats: newLocation.type === 'pool' ? [] : undefined
