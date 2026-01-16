@@ -133,13 +133,13 @@ serve(async (req) => {
     }
 
     const workOrdersList = await listResponse.json()
-    console.log('Work orders list:', workOrdersList)
+    console.log('Work orders list count:', workOrdersList?.length)
 
-    // Filter to only work orders for this specific boat (if boatId provided)
-    let filteredWorkOrders = workOrdersList
-    if (boatId) {
-      filteredWorkOrders = workOrdersList.filter((wo: any) => wo.boat === boatId)
-    }
+    // Note: The API returns boat NAME in the "boat" field, not boat ID
+    // Since we're already filtering by customer ID, we'll return all work orders for that customer
+    // The UI can filter by boat if needed
+    let filteredWorkOrders = workOrdersList || []
+    console.log('Work orders count:', filteredWorkOrders.length)
 
     if (filteredWorkOrders.length === 0) {
       // Clear any old cached work orders for this boat
