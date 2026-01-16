@@ -732,7 +732,6 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
           const updatedLoc = {
             ...currentLoc,
             pool_boats: poolBoats.filter(id => id !== boat.id),
-            poolBoats: poolBoats.filter(id => id !== boat.id)
           };
           updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
         } else {
@@ -752,7 +751,6 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         const updatedLoc = {
           ...targetLocation,
           pool_boats: [...poolBoats, boat.id],
-          poolBoats: [...poolBoats, boat.id]
         };
         updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
         updatedBoat.location = targetLocation.name;
@@ -1121,7 +1119,6 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
           const updatedLoc = {
             ...currentLoc,
             pool_boats: poolBoats.filter(id => id !== boat.id),
-            poolBoats: poolBoats.filter(id => id !== boat.id)
           };
           updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
         } else {
@@ -1141,7 +1138,6 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
         const updatedLoc = {
           ...targetLocation,
           pool_boats: [...poolBoats, boat.id],
-          poolBoats: [...poolBoats, boat.id]
         };
         updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
         updatedBoat.location = targetLocation.name;
@@ -2270,9 +2266,10 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       ...newLocation,
       id: newLocation.id || `loc-${Date.now()}`,
       boats: {},
-      pool_boats: newLocation.type === 'pool' ? [] : undefined,
-      poolBoats: newLocation.type === 'pool' ? [] : undefined
+      pool_boats: newLocation.type === 'pool' ? [] : undefined
     };
+    // Remove poolBoats if it exists (database uses pool_boats)
+    delete location.poolBoats;
     onUpdateLocations([...locations, location]);
     setShowAddLocation(false);
   };
@@ -2412,7 +2409,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           const updatedOldPool = {
             ...oldLocation,
             pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
-            poolBoats: oldPoolBoats.filter(id => id !== draggingBoat.id)
           };
           updatedLocations = updatedLocations.map(l => 
             l.id === oldLocation.id ? updatedOldPool : l
@@ -2442,7 +2438,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       const updatedPool = {
         ...currentPool,
         pool_boats: [...currentPoolBoats, draggingBoat.id],
-        poolBoats: [...currentPoolBoats, draggingBoat.id]
       };
       updatedLocations = updatedLocations.map(l => 
         l.id === poolId ? updatedPool : l
@@ -2546,7 +2541,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       const updatedLocation = {
         ...selectedLocation,
         pool_boats: [...currentPoolBoats, boatId],
-        poolBoats: [...currentPoolBoats, boatId]
       };
       updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
       
@@ -2610,7 +2604,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       updatedLocation = {
         ...viewingBoat.currentLocation,
         pool_boats: currentPoolBoats.filter(id => id !== viewingBoat.id),
-        poolBoats: currentPoolBoats.filter(id => id !== viewingBoat.id)
       };
     } else {
       // Remove from grid slot
@@ -2664,7 +2657,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           const updatedLoc = {
             ...currentLoc,
             pool_boats: poolBoats.filter(id => id !== boat.id),
-            poolBoats: poolBoats.filter(id => id !== boat.id)
           };
           updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
         } else {
@@ -2684,7 +2676,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
         const updatedLoc = {
           ...targetLocation,
           pool_boats: [...poolBoats, boat.id],
-          poolBoats: [...poolBoats, boat.id]
         };
         updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
         updatedBoat.location = targetLocation.name;
@@ -5152,7 +5143,6 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
           const updatedLoc = {
             ...currentLoc,
             pool_boats: poolBoats.filter(id => id !== boat.id),
-            poolBoats: poolBoats.filter(id => id !== boat.id)
           };
           updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
         } else {
@@ -5172,7 +5162,6 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         const updatedLoc = {
           ...targetLocation,
           pool_boats: [...poolBoats, boat.id],
-          poolBoats: [...poolBoats, boat.id]
         };
         updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
         updatedBoat.location = targetLocation.name;
