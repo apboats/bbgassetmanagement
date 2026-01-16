@@ -438,7 +438,7 @@ function AppContainer() {
           qr_code: `INV-${apiBoat.dockmasterId}`,
         }))
 
-        await inventoryBoatsService.sync(boatsToSync)
+        await inventoryBoatsService.sync(boatsToSync, fullSync)
       }
       
       // Update the last sync time
