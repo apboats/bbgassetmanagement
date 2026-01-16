@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Maximize2, Minimize2, ChevronLeft, Pencil } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil } from 'lucide-react';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -974,8 +974,10 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
       matchesWorkPhase = !boat.cleanComplete;
     } else if (filterWorkPhase === 'needs-fiberglass') {
       matchesWorkPhase = !boat.fiberglassComplete;
+    } else if (filterWorkPhase === 'needs-warranty') {
+      matchesWorkPhase = !boat.warrantyComplete;
     } else if (filterWorkPhase === 'all-complete') {
-      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete;
+      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
     }
     
     let matchesLocation = true;
@@ -1283,6 +1285,25 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               {boats.filter(b => !b.fiberglassComplete).length}
             </p>
           </button>
+
+          <button
+            onClick={() => setFilterWorkPhase(filterWorkPhase === 'needs-warranty' ? 'all' : 'needs-warranty')}
+            className={`p-3 rounded-lg border-2 transition-all ${
+              filterWorkPhase === 'needs-warranty'
+                ? 'border-teal-400 bg-teal-50'
+                : 'border-slate-200 bg-white hover:border-teal-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-slate-600">Warranty</span>
+              <div className="w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center">
+                <Shield className="w-4 h-4 text-teal-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">
+              {boats.filter(b => !b.warrantyComplete).length}
+            </p>
+          </button>
         </div>
       </div>
 
@@ -1479,6 +1500,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               <option value="needs-mechanicals">Needs Mechanicals</option>
               <option value="needs-clean">Needs Clean</option>
               <option value="needs-fiberglass">Needs Fiberglass</option>
+              <option value="needs-warranty">Needs Warranty</option>
               <option value="all-complete">All Phases Complete</option>
             </select>
           </div>
@@ -1684,43 +1706,54 @@ function BoatCard({ boat, onEdit, onDelete, compact }) {
 
         {/* Work Phase Checkboxes */}
         <div className="mt-3 pt-3 border-t border-slate-200">
-          <div className="flex gap-3 text-xs">
-            <label className="flex items-center gap-1.5">
+          <div className="flex gap-2 text-xs">
+            <label className="flex items-center gap-1">
               <input
                 type="checkbox"
                 checked={boat.mechanicalsComplete || false}
                 readOnly
-                className="w-3.5 h-3.5 rounded pointer-events-none"
+                className="w-3 h-3 rounded pointer-events-none"
               />
               <span className={boat.mechanicalsComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
                 Mech
               </span>
             </label>
-            <label className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1">
               <input
                 type="checkbox"
                 checked={boat.cleanComplete || false}
                 readOnly
-                className="w-3.5 h-3.5 rounded pointer-events-none"
+                className="w-3 h-3 rounded pointer-events-none"
               />
               <span className={boat.cleanComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
                 Clean
               </span>
             </label>
-            <label className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1">
               <input
                 type="checkbox"
                 checked={boat.fiberglassComplete || false}
                 readOnly
-                className="w-3.5 h-3.5 rounded pointer-events-none"
+                className="w-3 h-3 rounded pointer-events-none"
               />
               <span className={boat.fiberglassComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
                 Fiber
               </span>
             </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={boat.warrantyComplete || false}
+                readOnly
+                className="w-3 h-3 rounded pointer-events-none"
+              />
+              <span className={boat.warrantyComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
+                Warr
+              </span>
+            </label>
           </div>
           {/* Pending work badges */}
-          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete) && (
+          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete || !boat.warrantyComplete) && (
             <div className="flex flex-wrap gap-1 mt-2">
               {!boat.mechanicalsComplete && (
                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-medium rounded-full">
@@ -1735,6 +1768,11 @@ function BoatCard({ boat, onEdit, onDelete, compact }) {
               {!boat.fiberglassComplete && (
                 <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-medium rounded-full">
                   Needs Fiber
+                </span>
+              )}
+              {!boat.warrantyComplete && (
+                <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-medium rounded-full">
+                  Needs Warr
                 </span>
               )}
             </div>
@@ -1801,17 +1839,18 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
     workOrderNumber: '',
     mechanicalsComplete: false,
     cleanComplete: false,
-    fiberglassComplete: false
+    fiberglassComplete: false,
+    warrantyComplete: false
   });
 
-  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete;
+  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete && formData.warrantyComplete;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
     // Validate: can't set to complete without all phases done
     if (formData.status === 'all-work-complete' && !allWorkPhasesComplete) {
-      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass) must be completed first.');
+      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty) must be completed first.');
       return;
     }
     
@@ -1909,7 +1948,8 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
 
           {/* Work Phase Checkboxes */}
           <div className="border-t border-slate-200 pt-4">
-            <label className="block text-sm font-medium text-slate-700 mb-3">Work Phases</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Work Phases</label>
+            <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
             <div className="space-y-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1956,6 +1996,21 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm text-slate-700">Fiberglass Complete</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.warrantyComplete || false}
+                  onChange={(e) => {
+                    const newData = { ...formData, warrantyComplete: e.target.checked };
+                    if (!e.target.checked && formData.status === 'all-work-complete') {
+                      newData.status = 'on-deck';
+                    }
+                    setFormData(newData);
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-slate-700">Warranty Complete</span>
               </label>
             </div>
           </div>
@@ -2092,6 +2147,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
         mechanicalsComplete: false,
         cleanComplete: false,
         fiberglassComplete: false,
+        warrantyComplete: false,
         workOrderNumber: '', // Dockmaster doesn't provide this for customer boats
       };
 
@@ -2499,7 +2555,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       status: newBoatData.status || 'needs-approval',
       mechanicalsComplete: false,
       cleanComplete: false,
-      fiberglassComplete: false
+      fiberglassComplete: false,
+      warrantyComplete: false
     };
     
     const updatedBoats = [...boats, newBoat];
@@ -2517,7 +2574,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       status: importedBoatData.status || 'needs-approval',
       mechanicalsComplete: false,
       cleanComplete: false,
-      fiberglassComplete: false
+      fiberglassComplete: false,
+      warrantyComplete: false
     };
     
     const updatedBoats = [...boats, newBoat];
@@ -3062,10 +3120,11 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
                     WO: {boat.workOrderNumber}
                   </p>
                 )}
-                <div className="flex gap-1.5 mt-1 pointer-events-none">
-                  <Wrench className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                  <Sparkles className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                  <Layers className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                <div className="flex gap-1 mt-1 pointer-events-none">
+                  <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+                  <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+                  <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                  <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
                 </div>
                 <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
               </>
@@ -3125,10 +3184,11 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
                     WO: {boat.workOrderNumber}
                   </p>
                 )}
-                <div className="flex gap-1.5 mt-1 pointer-events-none">
-                  <Wrench className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                  <Sparkles className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                  <Layers className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                <div className="flex gap-1 mt-1 pointer-events-none">
+                  <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+                  <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+                  <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                  <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
                 </div>
                 <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
               </>
@@ -3265,10 +3325,11 @@ function MaximizedLocationModal({ location, boats, onSlotClick, onDragStart, onD
                 WO: {boat.workOrderNumber}
               </p>
             )}
-            <div className="flex gap-2 mt-2 pointer-events-none">
-              <Wrench className={`w-5 h-5 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} />
-              <Sparkles className={`w-5 h-5 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} />
-              <Layers className={`w-5 h-5 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} />
+            <div className="flex gap-1.5 mt-2 pointer-events-none">
+              <Wrench className={`w-4 h-4 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} />
+              <Sparkles className={`w-4 h-4 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} />
+              <Layers className={`w-4 h-4 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} />
+              <Shield className={`w-4 h-4 ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} />
             </div>
             <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
           </>
@@ -3459,9 +3520,10 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
                   <p className="text-xs text-slate-500 font-mono mt-1">WO: {boat.workOrderNumber}</p>
                 )}
                 <div className="flex gap-1 mt-2">
-                  <Wrench className={`w-3.5 h-3.5 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                  <Sparkles className={`w-3.5 h-3.5 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                  <Layers className={`w-3.5 h-3.5 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Wrench className={`w-3 h-3 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Sparkles className={`w-3 h-3 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Layers className={`w-3 h-3 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                  <Shield className={`w-3 h-3 ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`} />
                 </div>
               </div>
             ))}
@@ -3660,7 +3722,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
     'FP': 'Floor Planned'
   };
 
-  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete;
+  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
   const isArchived = boat.status === 'archived';
   const isInventory = boat.isInventory === true; // Check if this is an inventory boat
 
@@ -3682,7 +3744,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
     
     // Validate: can't set to complete without all phases done
     if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
-      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass) must be completed first.');
+      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty) must be completed first.');
       return;
     }
     
@@ -3835,7 +3897,8 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
           </div>
 
           <div>
-            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-3">Work Phases</h4>
+            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
+            <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
             <div className="space-y-2">
               <button
                 onClick={() => handleWorkPhaseToggle('mechanicalsComplete')}
@@ -3909,6 +3972,31 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                   boat.fiberglassComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {boat.fiberglassComplete ? '✓' : '○'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleWorkPhaseToggle('warrantyComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.warrantyComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.warrantyComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Warranty</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.warrantyComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.warrantyComplete ? '✓' : '○'}
                 </span>
               </button>
             </div>
@@ -5026,7 +5114,8 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       status: newBoatData.status || 'needs-approval',
       mechanicalsComplete: false,
       cleanComplete: false,
-      fiberglassComplete: false
+      fiberglassComplete: false,
+      warrantyComplete: false
     };
     
     const updatedBoats = [...boats, newBoat];
@@ -5044,7 +5133,8 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       status: importedBoatData.status || 'needs-approval',
       mechanicalsComplete: false,
       cleanComplete: false,
-      fiberglassComplete: false
+      fiberglassComplete: false,
+      warrantyComplete: false
     };
     
     const updatedBoats = [...boats, newBoat];
@@ -5488,10 +5578,11 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                               WO: {boat.workOrderNumber}
                             </p>
                           )}
-                          <div className="flex gap-1.5 mt-1 pointer-events-none">
-                            <Wrench className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                            <Sparkles className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                            <Layers className={`w-[clamp(1rem,2vw,1.5rem)] h-[clamp(1rem,2vw,1.5rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                          <div className="flex gap-1 mt-1 pointer-events-none">
+                            <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+                            <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+                            <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                            <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
                           </div>
                           <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
                         </>
