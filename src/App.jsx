@@ -1005,12 +1005,27 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   };
 
   const handleAddBoat = (newBoat) => {
-    // Check if an archived boat with the same name and owner already exists
-    const existingArchivedBoat = boats.find(b => 
-      b.status === 'archived' && 
-      b.name.toLowerCase().trim() === newBoat.name.toLowerCase().trim() && 
-      b.owner.toLowerCase().trim() === newBoat.owner.toLowerCase().trim()
-    );
+    // Check if an archived boat with the same Dockmaster ID exists
+    // This is more reliable than name+owner since owners can change
+    let existingArchivedBoat = null;
+    
+    if (newBoat.dockmasterId) {
+      // Primary match: Dockmaster ID (most reliable)
+      existingArchivedBoat = boats.find(b => 
+        b.status === 'archived' && 
+        b.dockmasterId && 
+        b.dockmasterId === newBoat.dockmasterId
+      );
+    }
+    
+    if (!existingArchivedBoat && newBoat.hullId) {
+      // Fallback match: Hull ID (HIN is permanent to the boat)
+      existingArchivedBoat = boats.find(b => 
+        b.status === 'archived' && 
+        b.hullId && 
+        b.hullId === newBoat.hullId
+      );
+    }
 
     if (existingArchivedBoat) {
       // Unarchive the existing boat and update it with new data
@@ -1034,7 +1049,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
       setShowAddBoat(false);
       
       // Show a message to the user
-      alert(`Boat owned by ${newBoat.owner.trim()} has been restored from the archive.`);
+      alert(`Boat "${newBoat.name}" has been restored from the archive with updated information.`);
     } else {
       // No archived boat found, create a new one
       const boat = {
