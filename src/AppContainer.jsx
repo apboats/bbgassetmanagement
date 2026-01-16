@@ -266,7 +266,6 @@ function AppContainer() {
     try {
       // Filter out fields that don't belong in boats table or would conflict
       const { 
-        dockmaster_id, 
         sales_status, 
         last_synced, 
         isInventory,
