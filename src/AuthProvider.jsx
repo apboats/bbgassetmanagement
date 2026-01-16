@@ -115,18 +115,11 @@ export const AuthProvider = ({ children }) => {
     console.log('Loading user profile for auth_id:', authId)
     
     try {
-      // Add timeout to prevent hanging forever
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('User profile load timeout after 15 seconds')), 15000)
-      )
-      
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', authId)
         .single()
-      
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
 
       if (error) {
         console.error('Error loading user profile:', error)
@@ -139,21 +132,20 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to load user profile:', error)
       
-      // Retry up to 3 times for timeout/network errors
-      if (retryCount < 3 && (error.message?.includes('timeout') || error.code === 'PGRST000')) {
-        console.log(`Retrying user profile load (attempt ${retryCount + 2}/4)...`)
+      // Retry up to 2 times for network errors
+      if (retryCount < 2 && (error.code === 'PGRST000' || error.message?.includes('fetch'))) {
+        console.log(`Retrying user profile load (attempt ${retryCount + 2}/3)...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return loadUserProfile(authId, retryCount + 1)
       }
       
       // Profile doesn't exist - database trigger should have created it
-      // This might happen if trigger failed or user was created before trigger existed
       if (error.code === 'PGRST116') {
         console.error('User profile not found. Please contact an administrator.')
       }
       
-      // Don't log out for temporary errors - keep session but show limited access
-      console.warn('Could not load user profile')
+      // Set user to null so they see login screen
+      setUser(null)
       return null
     }
   }
