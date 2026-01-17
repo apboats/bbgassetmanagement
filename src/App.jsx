@@ -452,7 +452,7 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
+          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
         )}
         {currentView === 'locations' && (
           <LocationsView
@@ -493,6 +493,7 @@ export default function BoatsByGeorgeAssetManager({
               saveBoats(regularBoats);
               saveInventoryBoats(invBoats);
             }}
+            onMoveBoat={onMoveBoat}
           />
         )}
         {currentView === 'boats' && (
@@ -549,6 +550,7 @@ export default function BoatsByGeorgeAssetManager({
               saveBoats(regularBoats);
               saveInventoryBoats(invBoats);
             }}
+            onMoveBoat={onMoveBoat}
           />
         )}
         {currentView === 'inventory' && (
@@ -677,7 +679,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations }) {
+function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   const statusCounts = {
@@ -724,6 +726,31 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    // For inventory boats, use AppContainer's handleMoveBoat directly
+    if (boat.isInventory && onMoveBoatFromContainer) {
+      try {
+        await onMoveBoatFromContainer(boat.id, targetLocation?.id || null, targetSlot || null, true);
+        
+        // Update viewing boat state
+        if (targetLocation) {
+          setViewingBoat({
+            ...boat,
+            location: targetLocation.name,
+            slot: targetSlot,
+            currentLocation: targetLocation,
+            currentSlot: targetSlot
+          });
+        } else {
+          setViewingBoat(null);
+        }
+      } catch (error) {
+        console.error('Error moving inventory boat:', error);
+        alert('Failed to move boat. Please try again.');
+      }
+      return;
+    }
+    
+    // For regular boats, use the existing logic
     let updatedLocations = [...locations];
     
     // Remove from current location
@@ -870,8 +897,16 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         </div>
       </div>
 
-      {/* Boat Details Modal */}
-      {viewingBoat && (
+      {/* Boat Details Modal - use appropriate modal based on boat type */}
+      {viewingBoat && viewingBoat.isInventory && (
+        <InventoryBoatDetailsModal
+          boat={viewingBoat}
+          locations={locations}
+          onMoveBoat={handleMoveBoat}
+          onClose={() => setViewingBoat(null)}
+        />
+      )}
+      {viewingBoat && !viewingBoat.isInventory && (
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
@@ -2370,7 +2405,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
+function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [draggingBoat, setDraggingBoat] = useState(null);
@@ -2827,6 +2862,33 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
     setIsProcessing(true);
+    
+    // For inventory boats, use AppContainer's handleMoveBoat directly
+    if (boat.isInventory && onMoveBoatFromContainer) {
+      try {
+        await onMoveBoatFromContainer(boat.id, targetLocation?.id || null, targetSlot || null, true);
+        
+        // Update viewing boat state
+        if (targetLocation) {
+          setViewingBoat({
+            ...boat,
+            location: targetLocation.name,
+            slot: targetSlot,
+            currentLocation: targetLocation,
+            currentSlot: targetSlot
+          });
+        } else {
+          setViewingBoat(null);
+        }
+      } catch (error) {
+        console.error('Error moving inventory boat:', error);
+        alert('Failed to move boat. Please try again.');
+      }
+      setIsProcessing(false);
+      return;
+    }
+    
+    // For regular boats, use the existing logic
     let updatedLocations = [...locations];
     
     // Remove from current location
@@ -3096,7 +3158,15 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
           }}
         />
       )}
-      {viewingBoat && (
+      {viewingBoat && viewingBoat.isInventory && (
+        <InventoryBoatDetailsModal
+          boat={viewingBoat}
+          locations={locations}
+          onMoveBoat={handleMoveBoat}
+          onClose={() => setViewingBoat(null)}
+        />
+      )}
+      {viewingBoat && !viewingBoat.isInventory && (
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
@@ -5585,7 +5655,7 @@ function WorkPhaseToggle({ label, checked, onChange }) {
  * - Reordering locations via drag and drop
  * - Preferences are saved per user
  */
-function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats }) {
+function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
     userPreferences.selectedLocations || locations.map(l => l.id)
   );
@@ -5896,6 +5966,33 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
     setIsProcessing(true);
+    
+    // For inventory boats, use AppContainer's handleMoveBoat directly
+    if (boat.isInventory && onMoveBoatFromContainer) {
+      try {
+        await onMoveBoatFromContainer(boat.id, targetLocation?.id || null, targetSlot || null, true);
+        
+        // Update viewing boat state
+        if (targetLocation) {
+          setViewingBoat({
+            ...boat,
+            location: targetLocation.name,
+            slot: targetSlot,
+            currentLocation: targetLocation,
+            currentSlot: targetSlot
+          });
+        } else {
+          setViewingBoat(null);
+        }
+      } catch (error) {
+        console.error('Error moving inventory boat:', error);
+        alert('Failed to move boat. Please try again.');
+      }
+      setIsProcessing(false);
+      return;
+    }
+    
+    // For regular boats, use the existing logic
     let updatedLocations = [...locations];
     
     // Remove from current location
@@ -6350,8 +6447,16 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         />
       )}
 
-      {/* Boat Details Modal */}
-      {viewingBoat && (
+      {/* Boat Details Modal - use appropriate modal based on boat type */}
+      {viewingBoat && viewingBoat.isInventory && (
+        <InventoryBoatDetailsModal
+          boat={viewingBoat}
+          locations={locations}
+          onMoveBoat={handleMoveBoat}
+          onClose={() => setViewingBoat(null)}
+        />
+      )}
+      {viewingBoat && !viewingBoat.isInventory && (
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
