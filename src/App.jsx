@@ -3793,45 +3793,16 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {filteredBoats.map(boat => (
-              <div
-                key={boat.id}
-                draggable
-                onDragStart={(e) => onDragStart(e, boat, location.name)}
-                onDragEnd={onDragEnd}
-                onClick={() => onBoatClick(boat)}
-                className="p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all"
-              >
-                {boat.isInventory ? (
-                  // Inventory boat display
-                  <>
-                    <p className="font-semibold text-slate-900 text-sm truncate">{boat.name}</p>
-                    <p className="text-xs text-slate-600 truncate">{boat.year} {boat.model}</p>
-                    <div className="flex items-center gap-1 mt-2">
-                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">
-                        {boat.salesStatus || 'INV'}
-                      </span>
-                      <span className="text-xs text-slate-500">Inventory</span>
-                    </div>
-                  </>
-                ) : (
-                  // Regular boat display
-                  <>
-                    <p className="font-semibold text-slate-900 text-sm truncate">{boat.owner}</p>
-                    <p className="text-xs text-slate-600 truncate">{boat.name}</p>
-                    {boat.workOrderNumber && (
-                      <p className="text-xs text-slate-500 font-mono mt-1">WO: {boat.workOrderNumber}</p>
-                    )}
-                    <div className="flex gap-1 mt-2">
-                      <Wrench className={`w-3 h-3 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                      <Sparkles className={`w-3 h-3 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                      <Layers className={`w-3 h-3 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                      <Shield className={`w-3 h-3 ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+                <BoatCard
+                  key={boat.id}
+                  boat={boat}
+                  onClick={onBoatClick}
+                  draggable={true}
+                  onDragStart={(e) => onDragStart(e, boat, location.name)}
+                  onDragEnd={onDragEnd}
+                />
+              ))}
+            </div>
           {!isDragging && (
             <div className="flex justify-center mt-3">
               <button
