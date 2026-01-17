@@ -27,6 +27,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
+  const [showResendEmail, setShowResendEmail] = useState(false)
+  const [resendEmailAddress, setResendEmailAddress] = useState('')
+  const [resendSuccess, setResendSuccess] = useState(false)
 
   // Use ref to prevent duplicate profile loads (doesn't trigger re-renders)
   const loadingProfileRef = useRef(false)
@@ -294,15 +297,34 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       const result = await authService.signIn(email, password)
-      
+
       // Load user profile
       if (result.session?.user) {
         await loadUserProfile(result.session.user.id)
       }
-      
+
       return { data: result, error: null }
     } catch (error) {
       console.error('Sign in error:', error)
+
+      // Check if error is due to unconfirmed email
+      if (error.message?.includes('Email not confirmed') ||
+          error.message?.includes('email_not_confirmed') ||
+          error.message?.includes('Email link is invalid or has expired')) {
+        // Set state to show resend email option
+        setShowResendEmail(true)
+        setResendEmailAddress(email)
+
+        return {
+          data: null,
+          error: {
+            ...error,
+            isEmailNotConfirmed: true,
+            message: 'Please confirm your email address before logging in. Check your inbox for the confirmation link.'
+          }
+        }
+      }
+
       return { data: null, error }
     } finally {
       setLoading(false)
@@ -320,6 +342,28 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Sign out error:', error)
       return { error }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Resend confirmation email
+  const handleResendConfirmation = async () => {
+    try {
+      setLoading(true)
+      await authService.resendConfirmationEmail(resendEmailAddress)
+      setResendSuccess(true)
+      setError('')
+      setMessage('Confirmation email sent! Please check your inbox.')
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        setShowResendEmail(false)
+        setResendSuccess(false)
+        setMessage('')
+      }, 5000)
+    } catch (error) {
+      console.error('Resend error:', error)
+      setError('Failed to resend email. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -437,13 +481,16 @@ export const LoginForm = () => {
         setEmail('')
       } else if (isSignUp) {
         // Sign up
-        if (!username || !name) {
-          setError('Please fill in all fields')
+        if (!name) {
+          setError('Please enter your full name')
           return
         }
 
+        // Auto-generate username from email if not provided
+        const finalUsername = username.trim() || email.split('@')[0]
+
         const { data, error: signUpError } = await signUp(email, password, {
-          username,
+          username: finalUsername,
           name,
         })
 
@@ -498,6 +545,16 @@ export const LoginForm = () => {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
             {error}
+            {showResendEmail && !resendSuccess && (
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                className="mt-2 text-sm text-blue-600 hover:text-blue-700 underline"
+                disabled={loading}
+              >
+                Resend confirmation email
+              </button>
+            )}
           </div>
         )}
         {message && (
@@ -526,7 +583,7 @@ export const LoginForm = () => {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Username
+                  Username <span className="text-slate-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -534,8 +591,10 @@ export const LoginForm = () => {
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="johndoe"
-                  required={isSignUp}
                 />
+                <p className="text-xs text-slate-500 mt-1">
+                  Leave blank to use your email as username
+                </p>
               </div>
             </>
           )}
