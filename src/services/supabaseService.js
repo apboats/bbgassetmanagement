@@ -1027,6 +1027,242 @@ export const toSnakeCase = (obj) => {
 }
 
 // ============================================================================
+// BOAT SHOWS SERVICE (Layout Planner)
+// ============================================================================
+
+export const boatShowsService = {
+  // Get all boat shows
+  async getAll() {
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .select('*')
+      .order('show_date', { ascending: true, nullsFirst: false })
+
+    if (error) throw error
+    return data?.map(toCamelCase) || []
+  },
+
+  // Get single boat show with items
+  async getById(id) {
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .select(`
+        *,
+        items:boat_show_items(*)
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+    return toCamelCase(data)
+  },
+
+  // Create new boat show
+  async create(show) {
+    const dbShow = {
+      name: show.name,
+      venue: show.venue || null,
+      show_date: show.showDate || null,
+      width_ft: show.widthFt || 100,
+      height_ft: show.heightFt || 100,
+      notes: show.notes || null,
+    }
+
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .insert([dbShow])
+      .select()
+      .single()
+
+    if (error) throw error
+    return toCamelCase(data)
+  },
+
+  // Update boat show
+  async update(id, updates) {
+    const dbUpdates = {}
+    if (updates.name !== undefined) dbUpdates.name = updates.name
+    if (updates.venue !== undefined) dbUpdates.venue = updates.venue
+    if (updates.showDate !== undefined) dbUpdates.show_date = updates.showDate
+    if (updates.widthFt !== undefined) dbUpdates.width_ft = updates.widthFt
+    if (updates.heightFt !== undefined) dbUpdates.height_ft = updates.heightFt
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return toCamelCase(data)
+  },
+
+  // Delete boat show (cascade deletes items)
+  async delete(id) {
+    const { error } = await supabase
+      .from('boat_shows')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  },
+
+  // Get items for a show
+  async getItems(showId) {
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .select(`
+        *,
+        inventory_boat:inventory_boats(*)
+      `)
+      .eq('show_id', showId)
+      .order('z_index', { ascending: true })
+
+    if (error) throw error
+    return data?.map(item => {
+      const camelItem = toCamelCase(item)
+      // Flatten inventory_boat data if present
+      if (camelItem.inventoryBoat) {
+        camelItem.boat = toCamelCase(camelItem.inventoryBoat)
+        delete camelItem.inventoryBoat
+      }
+      return camelItem
+    }) || []
+  },
+
+  // Add item to show
+  async addItem(showId, item) {
+    const dbItem = {
+      show_id: showId,
+      item_type: item.itemType,
+      inventory_boat_id: item.inventoryBoatId || null,
+      x: item.x || 0,
+      y: item.y || 0,
+      rotation: item.rotation || 0,
+      width_ft: item.widthFt || null,
+      height_ft: item.heightFt || null,
+      label: item.label || null,
+      color: item.color || null,
+      z_index: item.zIndex || 0,
+    }
+
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .insert([dbItem])
+      .select(`
+        *,
+        inventory_boat:inventory_boats(*)
+      `)
+      .single()
+
+    if (error) throw error
+    
+    const camelItem = toCamelCase(data)
+    if (camelItem.inventoryBoat) {
+      camelItem.boat = toCamelCase(camelItem.inventoryBoat)
+      delete camelItem.inventoryBoat
+    }
+    return camelItem
+  },
+
+  // Update item position/rotation
+  async updateItem(itemId, updates) {
+    const dbUpdates = {}
+    if (updates.x !== undefined) dbUpdates.x = updates.x
+    if (updates.y !== undefined) dbUpdates.y = updates.y
+    if (updates.rotation !== undefined) dbUpdates.rotation = updates.rotation
+    if (updates.widthFt !== undefined) dbUpdates.width_ft = updates.widthFt
+    if (updates.heightFt !== undefined) dbUpdates.height_ft = updates.heightFt
+    if (updates.label !== undefined) dbUpdates.label = updates.label
+    if (updates.color !== undefined) dbUpdates.color = updates.color
+    if (updates.zIndex !== undefined) dbUpdates.z_index = updates.zIndex
+
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .update(dbUpdates)
+      .eq('id', itemId)
+      .select(`
+        *,
+        inventory_boat:inventory_boats(*)
+      `)
+      .single()
+
+    if (error) throw error
+    
+    const camelItem = toCamelCase(data)
+    if (camelItem.inventoryBoat) {
+      camelItem.boat = toCamelCase(camelItem.inventoryBoat)
+      delete camelItem.inventoryBoat
+    }
+    return camelItem
+  },
+
+  // Remove item from show
+  async removeItem(itemId) {
+    const { error } = await supabase
+      .from('boat_show_items')
+      .delete()
+      .eq('id', itemId)
+
+    if (error) throw error
+    return true
+  },
+
+  // Batch update items (for bulk position changes)
+  async updateItems(items) {
+    const updates = items.map(item => ({
+      id: item.id,
+      x: item.x,
+      y: item.y,
+      rotation: item.rotation,
+      z_index: item.zIndex,
+    }))
+
+    // Supabase doesn't have native batch update, so we do individual updates
+    const results = await Promise.all(
+      updates.map(update => 
+        supabase
+          .from('boat_show_items')
+          .update({ x: update.x, y: update.y, rotation: update.rotation, z_index: update.z_index })
+          .eq('id', update.id)
+      )
+    )
+
+    const errors = results.filter(r => r.error)
+    if (errors.length > 0) throw errors[0].error
+
+    return true
+  },
+
+  // Subscribe to show changes
+  subscribeToShow(showId, callback) {
+    return supabase
+      .channel(`boat_show_${showId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'boat_show_items',
+          filter: `show_id=eq.${showId}`,
+        },
+        callback
+      )
+      .subscribe()
+  },
+
+  // Unsubscribe
+  unsubscribe(channel) {
+    if (channel) {
+      supabase.removeChannel(channel)
+    }
+  },
+}
+
+// ============================================================================
 // EXPORT ALL SERVICES
 // ============================================================================
 
@@ -1038,6 +1274,7 @@ export default {
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
+  boatShows: boatShowsService,
   subscriptions,
   getAllBoatsCombined,
   toCamelCase,
