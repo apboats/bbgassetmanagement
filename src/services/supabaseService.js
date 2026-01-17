@@ -365,7 +365,7 @@ export const boatsService = {
     const boat = await this.getById(boatId)
 
     // Remove from old location
-    if (boat.location && boat.slot) {
+    if (boat.location) {
       const { data: oldLocations } = await supabase
         .from('locations')
         .select('*')
@@ -374,7 +374,12 @@ export const boatsService = {
       if (oldLocations && oldLocations.length > 0) {
         const oldLocation = oldLocations[0]
         const updatedOldBoats = { ...oldLocation.boats }
-        delete updatedOldBoats[boat.slot]
+        
+        // Find the slot by boat ID (more reliable than using boat.slot)
+        const oldSlotKey = Object.keys(updatedOldBoats).find(key => updatedOldBoats[key] === boatId)
+        if (oldSlotKey) {
+          delete updatedOldBoats[oldSlotKey]
+        }
 
         await supabase
           .from('locations')
@@ -437,28 +442,6 @@ export const inventoryBoatsService = {
     return data && data.length > 0 ? data[0] : null
   },
 
-  // Get by Hull ID (HIN)
-  async getByHullId(hullId) {
-    const { data, error } = await supabase
-      .from('inventory_boats')
-      .select('*')
-      .eq('hull_id', hullId)
-
-    if (error) throw error
-    return data && data.length > 0 ? data[0] : null
-  },
-
-  // Search by Hull ID (partial match)
-  async searchByHullId(query) {
-    const { data, error } = await supabase
-      .from('inventory_boats')
-      .select('*')
-      .ilike('hull_id', `%${query}%`)
-
-    if (error) throw error
-    return data || []
-  },
-
   // Create new inventory boat
   async create(boatData) {
     const { data, error } = await supabase
@@ -483,7 +466,7 @@ export const inventoryBoatsService = {
   },
 
   // Sync from Dockmaster API
-  async sync(apiBoats, fullSync = false) {
+  async sync(apiBoats) {
     // Get existing inventory boats
     const existing = await this.getAll()
     const existingMap = new Map(
@@ -492,11 +475,12 @@ export const inventoryBoatsService = {
 
     const toUpdate = []
     const toCreate = []
-    const toDelete = []
-    const apiDockmasterIds = new Set(apiBoats.map(b => b.dockmaster_id))
+    const existingIds = new Set()
 
     // Process API boats
     for (const apiBoat of apiBoats) {
+      existingIds.add(apiBoat.dockmaster_id)
+      
       if (existingMap.has(apiBoat.dockmaster_id)) {
         // Update existing
         const existingBoat = existingMap.get(apiBoat.dockmaster_id)
@@ -511,16 +495,6 @@ export const inventoryBoatsService = {
           ...apiBoat,
           last_synced: new Date().toISOString()
         })
-      }
-    }
-
-    // ONLY delete boats during a FULL sync (not incremental)
-    // Incremental syncs only return today's changes, so we can't know if a boat was deleted
-    if (fullSync) {
-      for (const existingBoat of existing) {
-        if (!apiDockmasterIds.has(existingBoat.dockmaster_id)) {
-          toDelete.push(existingBoat.id)
-        }
       }
     }
 
@@ -541,16 +515,6 @@ export const inventoryBoatsService = {
             .update(boat)
             .eq('id', boat.id)
         )
-      )
-    }
-
-    if (toDelete.length > 0) {
-      console.log(`Deleting ${toDelete.length} inventory boats no longer in Dockmaster`)
-      operations.push(
-        supabase
-          .from('inventory_boats')
-          .delete()
-          .in('id', toDelete)
       )
     }
 
@@ -576,7 +540,7 @@ export const inventoryBoatsService = {
     const { data, error } = await supabase
       .from('inventory_boats')
       .select('*')
-      .or(`name.ilike.%${lowerQuery}%,model.ilike.%${lowerQuery}%,make.ilike.%${lowerQuery}%,hull_id.ilike.%${lowerQuery}%,dockmaster_id.ilike.%${lowerQuery}%`)
+      .or(`name.ilike.%${lowerQuery}%,model.ilike.%${lowerQuery}%,make.ilike.%${lowerQuery}%`)
 
     if (error) throw error
     return data || []
@@ -716,7 +680,8 @@ export const inventoryBoatsService = {
 
     const boat = await this.getById(boatId)
 
-    if (boat.location && boat.slot) {
+    // Remove from old location if exists
+    if (boat.location) {
       const { data: oldLocations } = await supabase
         .from('locations')
         .select('*')
@@ -725,7 +690,13 @@ export const inventoryBoatsService = {
       if (oldLocations && oldLocations.length > 0) {
         const oldLocation = oldLocations[0]
         const updatedOldBoats = { ...oldLocation.boats }
-        delete updatedOldBoats[boat.slot]
+        
+        // Find the slot by boat ID (more reliable than using boat.slot which might be corrupted)
+        const oldSlotKey = Object.keys(updatedOldBoats).find(key => updatedOldBoats[key] === boatId)
+        if (oldSlotKey) {
+          delete updatedOldBoats[oldSlotKey]
+          console.log('Removing boat from old slot:', oldSlotKey)
+        }
 
         await supabase
           .from('locations')
