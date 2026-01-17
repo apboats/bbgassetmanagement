@@ -72,11 +72,23 @@ export function useBoatLocation(boat, locations = []) {
   const location = locations.find(l => l.name === boat.location);
   const isInPool = location?.type === 'pool' || boat.slot === 'pool';
 
+  // Convert slot to display format
+  let displaySlot = boat.slot;
+  if (isInPool) {
+    displaySlot = 'Pool';
+  } else if (boat.slot) {
+    // Convert 0-indexed slot to 1-indexed for display (e.g., "0-2" → "1-3")
+    const parts = boat.slot.split('-');
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      displaySlot = `${parseInt(parts[0]) + 1}-${parseInt(parts[1]) + 1}`;
+    }
+  }
+
   return {
     location,
     isInPool,
     displayLocation: boat.location,
-    displaySlot: isInPool ? 'Pool' : boat.slot,
+    displaySlot,
   };
 }
 
