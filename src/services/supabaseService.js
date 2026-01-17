@@ -697,45 +697,51 @@ export const inventoryBoatsService = {
   // Remove from slot
   async removeFromSlot(boatId) {
     console.log('[removeFromSlot] Starting removal for boat:', boatId)
-    const boat = await this.getById(boatId)
-    console.log('[removeFromSlot] Boat data:', { id: boat.id, location: boat.location, slot: boat.slot })
 
-    // If boat has a location, remove it from the location's boats/pool_boats
-    if (boat.location) {
-      console.log('[removeFromSlot] Boat has location, fetching location data...')
-      const { data: locations } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('name', boat.location)
+    // Fetch all locations to find which one contains this boat
+    const { data: allLocations } = await supabase
+      .from('locations')
+      .select('*')
 
-      console.log('[removeFromSlot] Found locations:', locations)
+    console.log('[removeFromSlot] Searching through all locations for boat:', boatId)
 
-      if (locations && locations.length > 0) {
-        const location = locations[0]
+    // Search through all locations to find where this boat is
+    for (const location of allLocations || []) {
+      let foundInLocation = false
 
-        if (location.type === 'pool') {
-          // Pool location - remove from pool_boats array
-          console.log('[removeFromSlot] Removing from pool location')
-          const updatedPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
+      if (location.type === 'pool') {
+        // Check pool_boats array
+        const poolBoats = location.pool_boats || []
+        if (poolBoats.includes(boatId)) {
+          console.log('[removeFromSlot] Found boat in pool location:', location.name)
+          foundInLocation = true
+          const updatedPoolBoats = poolBoats.filter(id => id !== boatId)
           await supabase
             .from('locations')
             .update({ pool_boats: updatedPoolBoats })
             .eq('id', location.id)
-          console.log('[removeFromSlot] Updated pool_boats:', updatedPoolBoats)
-        } else if (boat.slot) {
-          // Grid location - remove from boats object
-          console.log('[removeFromSlot] Removing from grid location, slot:', boat.slot)
-          const updatedBoats = { ...location.boats }
-          delete updatedBoats[boat.slot]
+          console.log('[removeFromSlot] Removed from pool_boats')
+        }
+      } else {
+        // Check boats object for grid locations
+        const boats = location.boats || {}
+        const slotWithBoat = Object.keys(boats).find(slot => boats[slot] === boatId)
+        if (slotWithBoat) {
+          console.log('[removeFromSlot] Found boat in grid location:', location.name, 'slot:', slotWithBoat)
+          foundInLocation = true
+          const updatedBoats = { ...boats }
+          delete updatedBoats[slotWithBoat]
           await supabase
             .from('locations')
             .update({ boats: updatedBoats })
             .eq('id', location.id)
-          console.log('[removeFromSlot] Updated boats object')
+          console.log('[removeFromSlot] Removed from boats object')
         }
       }
-    } else {
-      console.log('[removeFromSlot] Boat has no location set')
+
+      if (foundInLocation) {
+        break // Found and removed, no need to check other locations
+      }
     }
 
     // Always clear the boat's location and slot fields
