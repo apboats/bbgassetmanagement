@@ -4282,7 +4282,14 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="text-xs text-slate-600 mb-0.5">Slot</p>
                 <p className="text-sm font-semibold text-slate-900 truncate">
-                  {boat.slot === 'pool' ? 'Pool' : boat.slot || 'N/A'}
+                  {boat.slot === 'pool' ? 'Pool' : boat.slot ? (() => {
+                    // Convert 0-indexed slot to 1-indexed for display (e.g., "0-2" → "1-3")
+                    const parts = boat.slot.split('-');
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                      return `${parseInt(parts[0]) + 1}-${parseInt(parts[1]) + 1}`;
+                    }
+                    return boat.slot;
+                  })() : 'N/A'}
                 </p>
               </div>
               
