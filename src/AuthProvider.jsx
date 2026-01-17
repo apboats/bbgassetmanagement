@@ -471,10 +471,22 @@ export const LoginForm = () => {
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
         {/* Logo/Title */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <img
+              src="/images/logo.png"
+              alt="Boats by George"
+              className="h-24 w-auto object-contain"
+              onError={(e) => {
+                // Fallback to default icon if logo not found
+                e.target.style.display = 'none';
+                e.target.nextElementSibling.style.display = 'flex';
+              }}
+            />
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center" style={{display: 'none'}}>
+              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Boats by George

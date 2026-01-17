@@ -420,7 +420,17 @@ export default function BoatsByGeorgeAssetManager({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+              <img
+                src="/images/favicon.png"
+                alt="Boats by George"
+                className="w-10 h-10 object-contain"
+                onError={(e) => {
+                  // Fallback to package icon if favicon not found
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center" style={{display: 'none'}}>
                 <Package className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -4800,15 +4810,15 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {workOrders.map((wo) => (
-                    <div key={wo.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div key={wo.id} className="border-2 border-slate-300 rounded-xl overflow-hidden shadow-md bg-white">
                       {/* Work Order Header */}
-                      <div className="bg-slate-50 p-3 border-b border-slate-200">
+                      <div className="bg-gradient-to-r from-slate-100 to-slate-50 p-4 border-b-2 border-slate-300">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">WO# {wo.id}</span>
+                              <span className="text-lg font-bold text-slate-900">WO# {wo.id}</span>
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 wo.status === 'O' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
                               }`}>
@@ -4829,44 +4839,66 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 
                       {/* Operations List */}
                       {wo.operations && wo.operations.length > 0 && (
-                        <div className="p-3">
-                          <p className="text-xs font-medium text-slate-500 uppercase mb-2">Operations</p>
+                        <div className="p-4 bg-slate-50">
+                          <p className="text-xs font-medium text-slate-500 uppercase mb-3">Operations</p>
                           <div className="space-y-2">
-                            {wo.operations.map((op, idx) => (
-                              <div 
-                                key={idx} 
-                                className={`flex items-center justify-between p-2 rounded-lg ${
-                                  op.flagLaborFinished ? 'bg-green-50' : 'bg-slate-50'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                    op.flagLaborFinished ? 'bg-green-500' : 'bg-slate-300'
-                                  }`}>
-                                    {op.flagLaborFinished ? (
-                                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    ) : (
-                                      <span className="text-xs text-white font-bold">{idx + 1}</span>
-                                    )}
+                            {wo.operations.map((op, idx) => {
+                              // Determine opcode status
+                              const isClosed = op.status === 'C';
+                              const isUnbilled = !isClosed && op.flagLaborFinished;
+                              const isOpen = !isClosed && !op.flagLaborFinished;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center justify-between p-3 rounded-lg border-2 ${
+                                    isClosed ? 'bg-green-50 border-green-200' :
+                                    isUnbilled ? 'bg-orange-50 border-orange-300' :
+                                    'bg-white border-slate-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                      isClosed ? 'bg-green-500' :
+                                      isUnbilled ? 'bg-orange-500' :
+                                      'bg-slate-300'
+                                    }`}>
+                                      {isClosed ? (
+                                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      ) : isUnbilled ? (
+                                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      ) : (
+                                        <span className="text-xs text-white font-bold">{idx + 1}</span>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-sm font-medium text-slate-900">
+                                          {op.opcode} - {op.opcodeDesc}
+                                        </p>
+                                        {isUnbilled && (
+                                          <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded uppercase">
+                                            Unbilled
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-500">
+                                        {op.type} • {op.status === 'O' ? 'Open' : 'Closed'}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-slate-900">
-                                      {op.opcode} - {op.opcodeDesc}
-                                    </p>
-                                    <p className="text-xs text-slate-500">
-                                      {op.type} • {op.status === 'O' ? 'Open' : 'Closed'}
-                                    </p>
-                                  </div>
+                                  {op.totalCharges > 0 && (
+                                    <span className="text-sm font-medium text-slate-700 flex-shrink-0 ml-2">
+                                      ${op.totalCharges.toFixed(2)}
+                                    </span>
+                                  )}
                                 </div>
-                                {op.totalCharges > 0 && (
-                                  <span className="text-sm font-medium text-slate-700">
-                                    ${op.totalCharges.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
