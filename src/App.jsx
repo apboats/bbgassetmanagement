@@ -490,12 +490,30 @@ export default function BoatsByGeorgeAssetManager({
               return combined;
             })()}
             onUpdateLocations={saveLocations}
-            onUpdateBoats={(updatedBoats) => {
+            onUpdateBoats={async (updatedBoats) => {
               // Split boats and inventory boats when saving
               const regularBoats = updatedBoats.filter(b => !b.isInventory);
               const invBoats = updatedBoats.filter(b => b.isInventory);
-              saveBoats(regularBoats);
-              saveInventoryBoats(invBoats);
+              
+              // Only save regular boats if they actually changed
+              const regularChanged = regularBoats.some(nb => {
+                const oldBoat = boats.find(b => b.id === nb.id);
+                return !oldBoat || JSON.stringify(oldBoat) !== JSON.stringify(nb);
+              });
+              if (regularChanged) {
+                console.log('Regular boats changed, saving...');
+                await saveBoats(regularBoats);
+              }
+              
+              // Only save inventory boats if they actually changed
+              const invChanged = invBoats.some(nb => {
+                const oldBoat = inventoryBoats.find(b => b.id === nb.id);
+                return !oldBoat || JSON.stringify(oldBoat) !== JSON.stringify(nb);
+              });
+              if (invChanged) {
+                console.log('Inventory boats changed, saving...');
+                await saveInventoryBoats(invBoats);
+              }
             }}
           />
         )}
