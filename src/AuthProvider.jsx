@@ -28,73 +28,67 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
 
-  // Use a ref to track profile loading to avoid closure issues
-  const profileLoadingRef = React.useRef(false)
-  const initializedRef = React.useRef(false)
-
   // Check for existing session on mount
   useEffect(() => {
-    // Prevent double initialization in React strict mode
-    if (initializedRef.current) return
-    initializedRef.current = true
-    
-    let isMounted = true
-    
-    const initAuth = async () => {
-      try {
-        console.log('Checking for existing user session...')
-        const session = await authService.getSession()
-        
-        if (!isMounted) return
-        
-        console.log('Session found:', session ? 'Yes' : 'No')
-        setSession(session)
-        
-        if (session?.user) {
-          console.log('Loading user profile from session...')
-          await loadUserProfile(session.user.id)
-        }
-      } catch (error) {
-        console.error('Error checking user:', error)
-      } finally {
-        if (isMounted) {
-          console.log('✓ Check user complete, setting loading to false')
-          setLoading(false)
+    // Check URL for recovery/invite tokens FIRST before checking session
+    const checkUrlForRecovery = () => {
+      const hash = window.location.hash
+      const params = new URLSearchParams(window.location.search)
+      
+      // Check for recovery type in URL hash (e.g., #access_token=...&type=recovery)
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1))
+        if (hashParams.get('type') === 'recovery') {
+          console.log('Recovery token detected in URL hash')
+          setShowPasswordReset(true)
+          return true
         }
       }
+      
+      // Also check query params (some Supabase versions use this)
+      if (params.get('type') === 'recovery') {
+        console.log('Recovery token detected in URL params')
+        setShowPasswordReset(true)
+        return true
+      }
+      
+      return false
     }
     
-    initAuth()
+    const isRecovery = checkUrlForRecovery()
+    
+    // Only check user session if not in recovery mode
+    if (!isRecovery) {
+      checkUser()
+    } else {
+      // In recovery mode, still need to process the token
+      checkUser()
+    }
 
-    // Listen for auth changes AFTER initial load
+    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!isMounted) return
-        
         console.log('Auth event:', event, 'Session:', session ? 'exists' : 'null')
         
-        // Skip initial events - we handle those in initAuth
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-          // Only handle SIGNED_IN if it's a fresh login (not page load)
-          // We can tell by checking if we already have a user
-          if (user) {
-            console.log('Already have user, skipping duplicate load')
-            return
-          }
-          // If loading is still true, initAuth will handle it
-          if (loading) {
-            console.log('Initial auth in progress, skipping')
-            return
-          }
-        }
+        // Check if this is a recovery sign-in (URL still has recovery type)
+        const hash = window.location.hash
+        const isRecoverySignIn = hash && hash.includes('type=recovery')
         
         // Handle different auth events
         switch (event) {
           case 'SIGNED_IN':
+            // Check if this is actually a password recovery sign-in
+            if (isRecoverySignIn || showPasswordReset) {
+              console.log('Recovery sign-in detected, showing password reset form')
+              setSession(session)
+              setShowPasswordReset(true)
+              return // Don't load profile yet
+            }
+            // Fall through to normal sign-in handling
           case 'TOKEN_REFRESHED':
           case 'USER_UPDATED':
             setSession(session)
-            if (session?.user && !profileLoadingRef.current) {
+            if (session?.user) {
               console.log('Auth state changed, loading user profile...')
               await loadUserProfile(session.user.id)
             }
@@ -113,10 +107,21 @@ export const AuthProvider = ({ children }) => {
             setShowPasswordReset(true)
             break
             
+          case 'INITIAL_SESSION':
+            // Initial session check on page load
+            setSession(session)
+            if (session?.user) {
+              await loadUserProfile(session.user.id)
+            }
+            break
+            
           default:
-            // For unknown events, only update if we have a session
+            // For unknown events, only clear if explicitly no session
             if (session) {
               setSession(session)
+              if (session.user && !user) {
+                await loadUserProfile(session.user.id)
+              }
             }
             break
         }
@@ -124,27 +129,49 @@ export const AuthProvider = ({ children }) => {
     )
 
     return () => {
-      isMounted = false
       authListener?.subscription?.unsubscribe()
     }
   }, [])
 
+  // Check if user is already logged in
+  const checkUser = async () => {
+    console.log('Checking for existing user session...')
+    try {
+      const session = await authService.getSession()
+      console.log('Session found:', session ? 'Yes' : 'No')
+      setSession(session)
+      
+      if (session?.user) {
+        console.log('Loading user profile from session...')
+        await loadUserProfile(session.user.id)
+      } else {
+        console.log('No active session')
+      }
+    } catch (error) {
+      console.error('Error checking user:', error)
+    } finally {
+      console.log('✓ Check user complete, setting loading to false')
+      setLoading(false)
+    }
+  }
+
   // Load user profile from database
   const loadUserProfile = async (authId, retryCount = 0) => {
-    if (profileLoadingRef.current) {
-      console.log('Profile already loading, skipping duplicate request')
-      return null
-    }
-    
     console.log('Loading user profile for auth_id:', authId)
-    profileLoadingRef.current = true
     
     try {
-      const { data, error } = await supabase
+      // Add timeout to prevent hanging forever
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('User profile load timeout after 15 seconds')), 15000)
+      )
+      
+      const queryPromise = supabase
         .from('users')
         .select('*')
         .eq('auth_id', authId)
         .single()
+      
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
 
       if (error) {
         console.error('Error loading user profile:', error)
@@ -157,24 +184,22 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to load user profile:', error)
       
-      // Retry up to 2 times for network errors
-      if (retryCount < 2 && (error.code === 'PGRST000' || error.message?.includes('fetch'))) {
-        console.log(`Retrying user profile load (attempt ${retryCount + 2}/3)...`)
-        profileLoadingRef.current = false
+      // Retry up to 3 times for timeout/network errors
+      if (retryCount < 3 && (error.message?.includes('timeout') || error.code === 'PGRST000')) {
+        console.log(`Retrying user profile load (attempt ${retryCount + 2}/4)...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
         return loadUserProfile(authId, retryCount + 1)
       }
       
       // Profile doesn't exist - database trigger should have created it
+      // This might happen if trigger failed or user was created before trigger existed
       if (error.code === 'PGRST116') {
         console.error('User profile not found. Please contact an administrator.')
       }
       
-      // Set user to null so they see login screen
-      setUser(null)
+      // Don't log out for temporary errors - keep session but show limited access
+      console.warn('Could not load user profile')
       return null
-    } finally {
-      profileLoadingRef.current = false
     }
   }
 
