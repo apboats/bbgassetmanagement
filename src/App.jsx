@@ -3243,6 +3243,84 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
     e.dataTransfer.dropEffect = 'move';
   };
 
+  // Get slot styling based on boat type
+  const getSlotStyle = (boat) => {
+    if (!boat) return '';
+    
+    if (boat.isInventory) {
+      // Inventory boats - blue gradient based on sales status
+      const salesStatusColors = {
+        'HA': 'bg-gradient-to-br from-green-500 to-green-600', // On Hand Available
+        'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700', // On Hand Sold
+        'OA': 'bg-gradient-to-br from-blue-500 to-blue-600', // On Order Available
+        'OS': 'bg-gradient-to-br from-blue-600 to-blue-700', // On Order Sold
+        'FA': 'bg-gradient-to-br from-amber-500 to-amber-600', // Future Available
+        'FS': 'bg-gradient-to-br from-amber-600 to-amber-700', // Future Sold
+        'S': 'bg-gradient-to-br from-purple-500 to-purple-600', // Sold
+        'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600', // Reserved
+        'FP': 'bg-gradient-to-br from-slate-500 to-slate-600', // Floor Planned
+      };
+      return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
+    }
+    
+    // Regular boats - use status classes
+    return `status-${boat.status}`;
+  };
+
+  // Render slot content based on boat type
+  const renderSlotContent = (boat, row, col) => {
+    if (!boat) {
+      return (
+        <div className="text-slate-400 pointer-events-none">
+          <div className="text-[clamp(1.25rem,2.5vw,2rem)] mb-0.5">+</div>
+          <p className="text-[clamp(0.6rem,1.2vw,0.75rem)] leading-tight">{row + 1}-{col + 1}</p>
+        </div>
+      );
+    }
+
+    if (boat.isInventory) {
+      // Inventory boat display
+      const salesStatusShort = {
+        'HA': 'AVAIL', 'HS': 'SOLD', 'OA': 'ORDER', 'OS': 'ORD-S',
+        'FA': 'FUTURE', 'FS': 'FUT-S', 'S': 'SOLD', 'R': 'RSVD', 'FP': 'FP'
+      };
+      return (
+        <>
+          <p className="text-white font-bold text-[clamp(0.65rem,1.5vw,0.875rem)] leading-tight pointer-events-none truncate w-full px-1">
+            {boat.name}
+          </p>
+          <p className="text-white/80 text-[clamp(0.55rem,1.1vw,0.75rem)] pointer-events-none truncate w-full">
+            {boat.year} {boat.model}
+          </p>
+          <div className="flex items-center gap-1 mt-1 pointer-events-none">
+            <span className="px-1.5 py-0.5 bg-white/20 rounded text-[clamp(0.5rem,1vw,0.625rem)] text-white font-bold">
+              {salesStatusShort[boat.salesStatus] || boat.salesStatus || 'INV'}
+            </span>
+          </div>
+        </>
+      );
+    }
+
+    // Regular boat display
+    return (
+      <>
+        <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
+        {boat.workOrderNumber && (
+          <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full">
+            WO: {boat.workOrderNumber}
+          </p>
+        )}
+        <div className="flex gap-1 mt-1 pointer-events-none">
+          <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+          <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+          <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+          <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
+        </div>
+        <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
+      </>
+    );
+  };
+
   // Render U-shaped layout
   const renderUShapedGrid = () => {
     const slots = [];
@@ -3293,34 +3371,13 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
               boat 
-                ? `status-${boat.status} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
+                ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
                 : isDragging 
                   ? 'border-blue-400 bg-blue-50 cursor-pointer' 
                   : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
             }`}
           >
-            {boat ? (
-              <>
-                <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
-                {boat.workOrderNumber && (
-                  <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full">
-                    WO: {boat.workOrderNumber}
-                  </p>
-                )}
-                <div className="flex gap-1 mt-1 pointer-events-none">
-                  <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                  <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                  <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
-                  <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
-                </div>
-                <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
-              </>
-            ) : (
-              <div className="text-slate-400 pointer-events-none">
-                <div className="text-[clamp(1.25rem,2.5vw,2rem)] mb-0.5">+</div>
-                <p className="text-[clamp(0.6rem,1.2vw,0.75rem)] leading-tight">{row + 1}-{col + 1}</p>
-              </div>
-            )}
+            {renderSlotContent(boat, row, col)}
           </div>
         );
       }
@@ -3357,34 +3414,13 @@ function LocationGrid({ location, boats, onSlotClick, onEdit, onDelete, onDragSt
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
               boat 
-                ? `status-${boat.status} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
+                ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
                 : isDragging 
                   ? 'border-blue-400 bg-blue-50 cursor-pointer' 
                   : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
             }`}
           >
-            {boat ? (
-              <>
-                <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
-                {boat.workOrderNumber && (
-                  <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full">
-                    WO: {boat.workOrderNumber}
-                  </p>
-                )}
-                <div className="flex gap-1 mt-1 pointer-events-none">
-                  <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                  <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                  <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
-                  <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
-                </div>
-                <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
-              </>
-            ) : (
-              <div className="text-slate-400 pointer-events-none">
-                <div className="text-[clamp(1.25rem,2.5vw,2rem)] mb-0.5">+</div>
-                <p className="text-[clamp(0.6rem,1.2vw,0.75rem)] leading-tight">{row + 1}-{col + 1}</p>
-              </div>
-            )}
+            {renderSlotContent(boat, row, col)}
           </div>
         );
       })
@@ -3469,6 +3505,28 @@ function MaximizedLocationModal({ location, boats, onSlotClick, onDragStart, onD
     e.dataTransfer.dropEffect = 'move';
   };
 
+  // Get slot styling based on boat type
+  const getSlotStyle = (boat) => {
+    if (!boat) return '';
+    
+    if (boat.isInventory) {
+      const salesStatusColors = {
+        'HA': 'bg-gradient-to-br from-green-500 to-green-600',
+        'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700',
+        'OA': 'bg-gradient-to-br from-blue-500 to-blue-600',
+        'OS': 'bg-gradient-to-br from-blue-600 to-blue-700',
+        'FA': 'bg-gradient-to-br from-amber-500 to-amber-600',
+        'FS': 'bg-gradient-to-br from-amber-600 to-amber-700',
+        'S': 'bg-gradient-to-br from-purple-500 to-purple-600',
+        'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600',
+        'FP': 'bg-gradient-to-br from-slate-500 to-slate-600',
+      };
+      return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
+    }
+    
+    return `status-${boat.status}`;
+  };
+
   const renderSlot = (row, col, isPerimeter = true) => {
     if (!isPerimeter && isUShape) {
       return <div key={`${row}-${col}`} className="aspect-square"></div>;
@@ -3477,6 +3535,59 @@ function MaximizedLocationModal({ location, boats, onSlotClick, onDragStart, onD
     const slotId = `${row}-${col}`;
     const boatId = location.boats?.[slotId];
     const boat = boats.find(b => b.id === boatId);
+
+    // Render content based on boat type
+    const renderSlotContent = () => {
+      if (!boat) {
+        return (
+          <div className="text-slate-400 pointer-events-none">
+            <div className="text-3xl mb-1">+</div>
+            <p className="text-sm">{row + 1}-{col + 1}</p>
+          </div>
+        );
+      }
+
+      if (boat.isInventory) {
+        const salesStatusShort = {
+          'HA': 'AVAIL', 'HS': 'SOLD', 'OA': 'ORDER', 'OS': 'ORD-S',
+          'FA': 'FUTURE', 'FS': 'FUT-S', 'S': 'SOLD', 'R': 'RSVD', 'FP': 'FP'
+        };
+        return (
+          <>
+            <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full">
+              {boat.name}
+            </p>
+            <p className="text-white/80 text-sm pointer-events-none truncate w-full mt-1">
+              {boat.year} {boat.model}
+            </p>
+            <div className="flex items-center gap-1 mt-2 pointer-events-none">
+              <span className="px-2 py-0.5 bg-white/20 rounded text-xs text-white font-bold">
+                {salesStatusShort[boat.salesStatus] || boat.salesStatus || 'INV'}
+              </span>
+            </div>
+          </>
+        );
+      }
+
+      // Regular boat
+      return (
+        <>
+          <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full">{boat.owner}</p>
+          {boat.workOrderNumber && (
+            <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full mt-1">
+              WO: {boat.workOrderNumber}
+            </p>
+          )}
+          <div className="flex gap-1.5 mt-2 pointer-events-none">
+            <Wrench className={`w-4 h-4 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} />
+            <Sparkles className={`w-4 h-4 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} />
+            <Layers className={`w-4 h-4 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} />
+            <Shield className={`w-4 h-4 ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} />
+          </div>
+          <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
+        </>
+      );
+    };
 
     return (
       <div
@@ -3498,34 +3609,13 @@ function MaximizedLocationModal({ location, boats, onSlotClick, onDragStart, onD
         }}
         className={`aspect-square border-2 rounded-xl p-3 flex flex-col items-center justify-center text-center transition-all ${
           boat 
-            ? `status-${boat.status} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-[1.02]` 
+            ? `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-[1.02]` 
             : isDragging 
               ? 'border-blue-400 bg-blue-50 cursor-pointer' 
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
         }`}
       >
-        {boat ? (
-          <>
-            <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full">{boat.owner}</p>
-            {boat.workOrderNumber && (
-              <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full mt-1">
-                WO: {boat.workOrderNumber}
-              </p>
-            )}
-            <div className="flex gap-1.5 mt-2 pointer-events-none">
-              <Wrench className={`w-4 h-4 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} />
-              <Sparkles className={`w-4 h-4 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} />
-              <Layers className={`w-4 h-4 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} />
-              <Shield className={`w-4 h-4 ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} />
-            </div>
-            <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
-          </>
-        ) : (
-          <div className="text-slate-400 pointer-events-none">
-            <div className="text-3xl mb-1">+</div>
-            <p className="text-sm">{row + 1}-{col + 1}</p>
-          </div>
-        )}
+        {renderSlotContent()}
       </div>
     );
   };
@@ -3701,17 +3791,34 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
                 onClick={() => onBoatClick(boat)}
                 className="p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all"
               >
-                <p className="font-semibold text-slate-900 text-sm truncate">{boat.owner}</p>
-                <p className="text-xs text-slate-600 truncate">{boat.name}</p>
-                {boat.workOrderNumber && (
-                  <p className="text-xs text-slate-500 font-mono mt-1">WO: {boat.workOrderNumber}</p>
+                {boat.isInventory ? (
+                  // Inventory boat display
+                  <>
+                    <p className="font-semibold text-slate-900 text-sm truncate">{boat.name}</p>
+                    <p className="text-xs text-slate-600 truncate">{boat.year} {boat.model}</p>
+                    <div className="flex items-center gap-1 mt-2">
+                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">
+                        {boat.salesStatus || 'INV'}
+                      </span>
+                      <span className="text-xs text-slate-500">Inventory</span>
+                    </div>
+                  </>
+                ) : (
+                  // Regular boat display
+                  <>
+                    <p className="font-semibold text-slate-900 text-sm truncate">{boat.owner}</p>
+                    <p className="text-xs text-slate-600 truncate">{boat.name}</p>
+                    {boat.workOrderNumber && (
+                      <p className="text-xs text-slate-500 font-mono mt-1">WO: {boat.workOrderNumber}</p>
+                    )}
+                    <div className="flex gap-1 mt-2">
+                      <Wrench className={`w-3 h-3 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                      <Sparkles className={`w-3 h-3 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                      <Layers className={`w-3 h-3 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                      <Shield className={`w-3 h-3 ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`} />
+                    </div>
+                  </>
                 )}
-                <div className="flex gap-1 mt-2">
-                  <Wrench className={`w-3 h-3 ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                  <Sparkles className={`w-3 h-3 ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                  <Layers className={`w-3 h-3 ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                  <Shield className={`w-3 h-3 ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`} />
-                </div>
               </div>
             ))}
           </div>
@@ -3868,9 +3975,15 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
                         </p>
                       )}
                     </div>
-                    <div className={`px-2.5 py-1 status-${boat.status} rounded-full text-xs font-medium text-white flex-shrink-0`}>
-                      {boat.status.replace(/-/g, ' ').substring(0, 12)}
-                    </div>
+                    {boat.isInventory ? (
+                      <div className="px-2.5 py-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full text-xs font-medium text-white flex-shrink-0">
+                        {boat.salesStatus || 'INV'}
+                      </div>
+                    ) : (
+                      <div className={`px-2.5 py-1 status-${boat.status} rounded-full text-xs font-medium text-white flex-shrink-0`}>
+                        {boat.status.replace(/-/g, ' ').substring(0, 12)}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}
@@ -6298,6 +6411,81 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
             const renderGrid = () => {
               const slots = [];
               
+              // Get slot styling based on boat type
+              const getSlotStyle = (boat) => {
+                if (!boat) return '';
+                
+                if (boat.isInventory) {
+                  const salesStatusColors = {
+                    'HA': 'bg-gradient-to-br from-green-500 to-green-600',
+                    'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700',
+                    'OA': 'bg-gradient-to-br from-blue-500 to-blue-600',
+                    'OS': 'bg-gradient-to-br from-blue-600 to-blue-700',
+                    'FA': 'bg-gradient-to-br from-amber-500 to-amber-600',
+                    'FS': 'bg-gradient-to-br from-amber-600 to-amber-700',
+                    'S': 'bg-gradient-to-br from-purple-500 to-purple-600',
+                    'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600',
+                    'FP': 'bg-gradient-to-br from-slate-500 to-slate-600',
+                  };
+                  return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
+                }
+                
+                return `status-${boat.status}`;
+              };
+
+              // Render slot content based on boat type
+              const renderSlotContent = (boat, row, col) => {
+                if (!boat) {
+                  return (
+                    <div className="text-slate-400 pointer-events-none">
+                      <div className="text-[clamp(1.25rem,2.5vw,2rem)] mb-0.5">+</div>
+                      <p className="text-[clamp(0.6rem,1.2vw,0.75rem)] leading-tight">{row + 1}-{col + 1}</p>
+                    </div>
+                  );
+                }
+
+                if (boat.isInventory) {
+                  const salesStatusShort = {
+                    'HA': 'AVAIL', 'HS': 'SOLD', 'OA': 'ORDER', 'OS': 'ORD-S',
+                    'FA': 'FUTURE', 'FS': 'FUT-S', 'S': 'SOLD', 'R': 'RSVD', 'FP': 'FP'
+                  };
+                  return (
+                    <>
+                      <p className="text-white font-bold text-[clamp(0.65rem,1.5vw,0.875rem)] leading-tight pointer-events-none truncate w-full px-1">
+                        {boat.name}
+                      </p>
+                      <p className="text-white/80 text-[clamp(0.55rem,1.1vw,0.75rem)] pointer-events-none truncate w-full">
+                        {boat.year} {boat.model}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1 pointer-events-none">
+                        <span className="px-1.5 py-0.5 bg-white/20 rounded text-[clamp(0.5rem,1vw,0.625rem)] text-white font-bold">
+                          {salesStatusShort[boat.salesStatus] || boat.salesStatus || 'INV'}
+                        </span>
+                      </div>
+                    </>
+                  );
+                }
+
+                // Regular boat
+                return (
+                  <>
+                    <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
+                    {boat.workOrderNumber && (
+                      <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full">
+                        WO: {boat.workOrderNumber}
+                      </p>
+                    )}
+                    <div className="flex gap-1 mt-1 pointer-events-none">
+                      <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+                      <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+                      <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+                      <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
+                    </div>
+                    <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
+                  </>
+                );
+              };
+              
               for (let row = 0; row < location.rows; row++) {
                 for (let col = 0; col < location.columns; col++) {
                   const isLeftEdge = col === 0;
@@ -6329,34 +6517,13 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                       onDrop={(e) => handleBoatDrop(e, location, row, col)}
                       className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
                         boat 
-                          ? `status-${boat.status} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
+                          ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105` 
                           : isDragging
                             ? 'border-blue-400 bg-blue-50 cursor-pointer'
                             : 'border-slate-300 bg-white hover:border-blue-400 cursor-pointer'
                       }`}
                     >
-                      {boat ? (
-                        <>
-                          <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
-                          {boat.workOrderNumber && (
-                            <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full">
-                              WO: {boat.workOrderNumber}
-                            </p>
-                          )}
-                          <div className="flex gap-1 mt-1 pointer-events-none">
-                            <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-                            <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-                            <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
-                            <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
-                          </div>
-                          <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5">{boat.name}</p>
-                        </>
-                      ) : (
-                        <div className="text-slate-400 pointer-events-none">
-                          <div className="text-[clamp(1.25rem,2.5vw,2rem)] mb-0.5">+</div>
-                          <p className="text-[clamp(0.6rem,1.2vw,0.75rem)] leading-tight">{row + 1}-{col + 1}</p>
-                        </div>
-                      )}
+                      {renderSlotContent(boat, row, col)}
                     </div>
                   );
                 }
