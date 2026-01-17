@@ -31,23 +31,58 @@ export const AuthProvider = ({ children }) => {
   // Check for existing session on mount
   useEffect(() => {
     // Check URL for recovery/invite tokens FIRST before checking session
-    const checkUrlForRecovery = () => {
+    const handleRecoveryFlow = async () => {
       const hash = window.location.hash
       const params = new URLSearchParams(window.location.search)
+      const pathname = window.location.pathname
+      
+      console.log('Checking for recovery flow...', { pathname, hash: hash?.substring(0, 50), search: window.location.search?.substring(0, 50) })
+      
+      // Check if we're on the /reset-password path
+      const isResetPasswordPath = pathname === '/reset-password' || pathname.includes('reset-password')
       
       // Check for recovery type in URL hash (e.g., #access_token=...&type=recovery)
+      let isRecoveryToken = false
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1))
         if (hashParams.get('type') === 'recovery') {
           console.log('Recovery token detected in URL hash')
-          setShowPasswordReset(true)
-          return true
+          isRecoveryToken = true
         }
       }
       
-      // Also check query params (some Supabase versions use this)
+      // Also check query params
       if (params.get('type') === 'recovery') {
         console.log('Recovery token detected in URL params')
+        isRecoveryToken = true
+      }
+      
+      // Check for PKCE code in URL (Supabase PKCE flow)
+      const code = params.get('code')
+      if (code && isResetPasswordPath) {
+        console.log('PKCE code detected on reset-password path, exchanging for session...')
+        try {
+          // Exchange the code for a session
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) {
+            console.error('Error exchanging code for session:', error)
+          } else {
+            console.log('Successfully exchanged code for session')
+            setSession(data.session)
+            setShowPasswordReset(true)
+            setLoading(false)
+            // Clean up URL
+            window.history.replaceState({}, document.title, '/reset-password')
+            return true
+          }
+        } catch (err) {
+          console.error('Exception exchanging code:', err)
+        }
+      }
+      
+      // If on reset-password path or has recovery token, show the form
+      if (isRecoveryToken || isResetPasswordPath) {
+        console.log('Activating password reset mode')
         setShowPasswordReset(true)
         return true
       }
@@ -55,24 +90,31 @@ export const AuthProvider = ({ children }) => {
       return false
     }
     
-    const isRecovery = checkUrlForRecovery()
-    
-    // Only check user session if not in recovery mode
-    if (!isRecovery) {
-      checkUser()
-    } else {
-      // In recovery mode, still need to process the token
-      checkUser()
+    const initAuth = async () => {
+      const isRecovery = await handleRecoveryFlow()
+      
+      // Always check for existing session
+      await checkUser()
+      
+      // If recovery flow was detected, ensure we show the reset form
+      if (isRecovery) {
+        setShowPasswordReset(true)
+      }
     }
+    
+    initAuth()
 
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth event:', event, 'Session:', session ? 'exists' : 'null')
         
-        // Check if this is a recovery sign-in (URL still has recovery type)
+        // Check if this is a recovery sign-in
         const hash = window.location.hash
-        const isRecoverySignIn = hash && hash.includes('type=recovery')
+        const pathname = window.location.pathname
+        const isRecoverySignIn = (hash && hash.includes('type=recovery')) || 
+                                  pathname === '/reset-password' || 
+                                  pathname.includes('reset-password')
         
         // Handle different auth events
         switch (event) {
@@ -82,6 +124,7 @@ export const AuthProvider = ({ children }) => {
               console.log('Recovery sign-in detected, showing password reset form')
               setSession(session)
               setShowPasswordReset(true)
+              setLoading(false)
               return // Don't load profile yet
             }
             // Fall through to normal sign-in handling
