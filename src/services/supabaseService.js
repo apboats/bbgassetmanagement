@@ -696,42 +696,56 @@ export const inventoryBoatsService = {
 
   // Remove from slot
   async removeFromSlot(boatId) {
+    console.log('[removeFromSlot] Starting removal for boat:', boatId)
     const boat = await this.getById(boatId)
+    console.log('[removeFromSlot] Boat data:', { id: boat.id, location: boat.location, slot: boat.slot })
 
     // If boat has a location, remove it from the location's boats/pool_boats
     if (boat.location) {
+      console.log('[removeFromSlot] Boat has location, fetching location data...')
       const { data: locations } = await supabase
         .from('locations')
         .select('*')
         .eq('name', boat.location)
+
+      console.log('[removeFromSlot] Found locations:', locations)
 
       if (locations && locations.length > 0) {
         const location = locations[0]
 
         if (location.type === 'pool') {
           // Pool location - remove from pool_boats array
+          console.log('[removeFromSlot] Removing from pool location')
           const updatedPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
           await supabase
             .from('locations')
             .update({ pool_boats: updatedPoolBoats })
             .eq('id', location.id)
+          console.log('[removeFromSlot] Updated pool_boats:', updatedPoolBoats)
         } else if (boat.slot) {
           // Grid location - remove from boats object
+          console.log('[removeFromSlot] Removing from grid location, slot:', boat.slot)
           const updatedBoats = { ...location.boats }
           delete updatedBoats[boat.slot]
           await supabase
             .from('locations')
             .update({ boats: updatedBoats })
             .eq('id', location.id)
+          console.log('[removeFromSlot] Updated boats object')
         }
       }
+    } else {
+      console.log('[removeFromSlot] Boat has no location set')
     }
 
     // Always clear the boat's location and slot fields
-    return this.update(boatId, {
+    console.log('[removeFromSlot] Clearing boat location and slot fields')
+    const result = await this.update(boatId, {
       location: null,
       slot: null,
     })
+    console.log('[removeFromSlot] Removal complete:', result)
+    return result
   },
 
   // Move to slot
