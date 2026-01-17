@@ -698,36 +698,36 @@ export const inventoryBoatsService = {
   async removeFromSlot(boatId) {
     const boat = await this.getById(boatId)
 
-    if (!boat.location || !boat.slot) {
-      return boat
-    }
+    // If boat has a location, remove it from the location's boats/pool_boats
+    if (boat.location) {
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('name', boat.location)
 
-    const { data: locations } = await supabase
-      .from('locations')
-      .select('*')
-      .eq('name', boat.location)
+      if (locations && locations.length > 0) {
+        const location = locations[0]
 
-    if (locations && locations.length > 0) {
-      const location = locations[0]
-
-      if (location.type === 'pool') {
-        // Pool location - remove from pool_boats array
-        const updatedPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
-        await supabase
-          .from('locations')
-          .update({ pool_boats: updatedPoolBoats })
-          .eq('id', location.id)
-      } else {
-        // Grid location - remove from boats object
-        const updatedBoats = { ...location.boats }
-        delete updatedBoats[boat.slot]
-        await supabase
-          .from('locations')
-          .update({ boats: updatedBoats })
-          .eq('id', location.id)
+        if (location.type === 'pool') {
+          // Pool location - remove from pool_boats array
+          const updatedPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
+          await supabase
+            .from('locations')
+            .update({ pool_boats: updatedPoolBoats })
+            .eq('id', location.id)
+        } else if (boat.slot) {
+          // Grid location - remove from boats object
+          const updatedBoats = { ...location.boats }
+          delete updatedBoats[boat.slot]
+          await supabase
+            .from('locations')
+            .update({ boats: updatedBoats })
+            .eq('id', location.id)
+        }
       }
     }
 
+    // Always clear the boat's location and slot fields
     return this.update(boatId, {
       location: null,
       slot: null,
