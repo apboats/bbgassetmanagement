@@ -1885,8 +1885,9 @@ function InventoryBoatCard({ boat, onView, locations = [] }) {
 
   const statusInfo = salesStatusLabels[boat.salesStatus] || { label: boat.salesStatus || 'Unknown', color: 'bg-slate-400' };
 
-  // Use shared hook for consistent location display
-  const { displayLocation, displaySlot } = useBoatLocation(boat, locations);
+  // Use centralized location finding logic
+  const { enrichedBoat } = findBoatLocationData(boat, locations);
+  const { displayLocation, displaySlot } = useBoatLocation(enrichedBoat, locations);
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
@@ -1912,7 +1913,7 @@ function InventoryBoatCard({ boat, onView, locations = [] }) {
           </div>
           
           {/* Location if assigned */}
-          {boat.location && (
+          {enrichedBoat.location && (
             <div className="flex items-center gap-2 text-slate-600">
               <Map className="w-4 h-4" />
               <span>
@@ -3124,13 +3125,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
                 onDragEnd={handleDragEnd}
                 isDragging={!!draggingBoat}
                 onBoatClick={(boat) => {
-                  const poolBoatIds = pool.pool_boats || pool.poolBoats || [];
-                  setViewingBoat({
-                    ...boat,
-                    currentLocation: pool,
-                    currentSlot: 'pool',
-                    location: pool.name
-                  });
+                  // Modal will handle finding location data - just pass the boat
+                  setViewingBoat(boat);
                 }}
                 onAddBoat={() => {
                   setSelectedLocation(pool);
@@ -4907,8 +4903,11 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
+  // Enrich boat with location data if missing (centralized logic)
+  const { enrichedBoat } = findBoatLocationData(boat, locations);
+
   // Use the shared hook for consistent location display
-  const { displayLocation, displaySlot } = useBoatLocation(boat, locations);
+  const { displayLocation, displaySlot } = useBoatLocation(enrichedBoat, locations);
 
   const salesStatusLabels = {
     'HA': 'On Hand Available',
@@ -4993,7 +4992,7 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
               <div>
                 <p className="text-sm font-medium text-slate-700">Current Location</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {boat.location ? (
+                  {enrichedBoat.location ? (
                     <>
                       {displayLocation}
                       {displaySlot && (
@@ -5013,7 +5012,7 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
                   onClick={() => setShowLocationPicker(true)}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  {boat.location ? 'Move' : 'Assign'}
+                  {enrichedBoat.location ? 'Move' : 'Assign'}
                 </button>
               )}
             </div>
@@ -6429,18 +6428,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
             // Handle pool-type locations differently
             if (location.type === 'pool') {
               const poolBoats = (location.pool_boats || [])
-                .map(id => {
-                  const boat = boats.find(b => b.id === id);
-                  if (boat) {
-                    // Ensure boat has location and slot set for proper display
-                    return {
-                      ...boat,
-                      location: boat.location || location.name,
-                      slot: boat.slot || 'pool'
-                    };
-                  }
-                  return null;
-                })
+                .map(id => boats.find(b => b.id === id))
                 .filter(Boolean);
 
               return (
@@ -6799,14 +6787,8 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
   };
 
   const handleViewBoat = (boat) => {
-    const location = boat.location ? locations.find(l => l.name === boat.location) : null;
-    const slotId = location ? Object.keys(location.boats).find(key => location.boats[key] === boat.id) : null;
-    
-    setViewingBoat({
-      ...boat,
-      currentLocation: location,
-      currentSlot: slotId
-    });
+    // Modal will handle finding location data - just pass the boat
+    setViewingBoat(boat);
   };
 
   const handleUpdateBoatFromModal = async (updatedBoat) => {
