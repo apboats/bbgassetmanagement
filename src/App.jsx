@@ -6423,7 +6423,18 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
             // Handle pool-type locations differently
             if (location.type === 'pool') {
               const poolBoats = (location.pool_boats || [])
-                .map(id => boats.find(b => b.id === id))
+                .map(id => {
+                  const boat = boats.find(b => b.id === id);
+                  if (boat) {
+                    // Ensure boat has location and slot set for proper display
+                    return {
+                      ...boat,
+                      location: boat.location || location.name,
+                      slot: boat.slot || 'pool'
+                    };
+                  }
+                  return null;
+                })
                 .filter(Boolean);
 
               return (
