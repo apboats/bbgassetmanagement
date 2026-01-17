@@ -1870,7 +1870,7 @@ function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
 // Card for inventory boats - shows sales status, no work phases
 // ============================================================================
 
-function InventoryBoatCard({ boat, onView }) {
+function InventoryBoatCard({ boat, onView, locations = [] }) {
   const salesStatusLabels = {
     'HA': { label: 'On Hand Available', color: 'bg-green-500' },
     'HS': { label: 'On Hand Sold', color: 'bg-emerald-600' },
@@ -1884,6 +1884,9 @@ function InventoryBoatCard({ boat, onView }) {
   };
 
   const statusInfo = salesStatusLabels[boat.salesStatus] || { label: boat.salesStatus || 'Unknown', color: 'bg-slate-400' };
+
+  // Use shared hook for consistent location display
+  const { displayLocation, displaySlot } = useBoatLocation(boat, locations);
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
@@ -1912,7 +1915,10 @@ function InventoryBoatCard({ boat, onView }) {
           {boat.location && (
             <div className="flex items-center gap-2 text-slate-600">
               <Map className="w-4 h-4" />
-              <span>{boat.location} ({boat.slot === 'pool' ? 'pool' : boat.slot})</span>
+              <span>
+                {displayLocation}
+                {displaySlot && ` • ${displaySlot}`}
+              </span>
             </div>
           )}
           
@@ -7166,10 +7172,11 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBoats.map(boat => (
-            <InventoryBoatCard 
+            <InventoryBoatCard
               key={boat.id}
-              boat={boat} 
+              boat={boat}
               onView={() => handleViewBoat(boat)}
+              locations={locations}
             />
           ))}
         </div>
