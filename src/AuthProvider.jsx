@@ -5,7 +5,7 @@
 // Handles login, logout, session management, and user state
 // ============================================================================
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { authService } from './services/supabaseService'
 
@@ -27,6 +27,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
+
+  // Use ref to prevent duplicate profile loads (doesn't trigger re-renders)
+  const loadingProfileRef = useRef(false)
 
   // Check for existing session on mount
   useEffect(() => {
@@ -153,11 +156,12 @@ export const AuthProvider = ({ children }) => {
           case 'INITIAL_SESSION':
             // Initial session check on page load
             setSession(session)
-            if (session?.user) {
+            // Only load if user not already loaded (prevents duplicate with SIGNED_IN)
+            if (session?.user && !user) {
               await loadUserProfile(session.user.id)
             }
             break
-            
+
           default:
             // For unknown events, only clear if explicitly no session
             if (session) {
@@ -183,10 +187,13 @@ export const AuthProvider = ({ children }) => {
       const session = await authService.getSession()
       console.log('Session found:', session ? 'Yes' : 'No')
       setSession(session)
-      
-      if (session?.user) {
+
+      // Only load if user not already loaded (auth event handler may have already loaded it)
+      if (session?.user && !user) {
         console.log('Loading user profile from session...')
         await loadUserProfile(session.user.id)
+      } else if (session?.user && user) {
+        console.log('User profile already loaded, skipping')
       } else {
         console.log('No active session')
       }
@@ -200,46 +207,61 @@ export const AuthProvider = ({ children }) => {
 
   // Load user profile from database
   const loadUserProfile = async (authId, retryCount = 0) => {
+    // Skip if already loading (prevents race conditions from multiple auth events)
+    if (loadingProfileRef.current) {
+      console.log('Profile load already in progress, skipping duplicate request')
+      return user
+    }
+
+    // Skip if user already loaded for this auth_id
+    if (user && user.auth_id === authId) {
+      console.log('Profile already loaded for this auth_id')
+      return user
+    }
+
     console.log('Loading user profile for auth_id:', authId)
-    
+    loadingProfileRef.current = true
+
     try {
-      // Add timeout to prevent hanging forever
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('User profile load timeout after 15 seconds')), 15000)
+      // Reduced timeout from 15s to 5s - Supabase queries should be fast
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('User profile load timeout after 5 seconds')), 5000)
       )
-      
+
       const queryPromise = supabase
         .from('users')
         .select('*')
         .eq('auth_id', authId)
         .single()
-      
+
       const { data, error } = await Promise.race([queryPromise, timeoutPromise])
 
       if (error) {
         console.error('Error loading user profile:', error)
         throw error
       }
-      
+
       console.log('✓ User profile loaded:', data)
       setUser(data)
+      loadingProfileRef.current = false
       return data
     } catch (error) {
       console.error('Failed to load user profile:', error)
-      
-      // Retry up to 3 times for timeout/network errors
-      if (retryCount < 3 && (error.message?.includes('timeout') || error.code === 'PGRST000')) {
-        console.log(`Retrying user profile load (attempt ${retryCount + 2}/4)...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+      loadingProfileRef.current = false
+
+      // Retry up to 2 times for timeout/network errors (reduced from 3)
+      if (retryCount < 2 && (error.message?.includes('timeout') || error.code === 'PGRST000')) {
+        console.log(`Retrying user profile load (attempt ${retryCount + 2}/3)...`)
+        await new Promise(resolve => setTimeout(resolve, 1000))
         return loadUserProfile(authId, retryCount + 1)
       }
-      
+
       // Profile doesn't exist - database trigger should have created it
       // This might happen if trigger failed or user was created before trigger existed
       if (error.code === 'PGRST116') {
         console.error('User profile not found. Please contact an administrator.')
       }
-      
+
       // Don't log out for temporary errors - keep session but show limited access
       console.warn('Could not load user profile')
       return null
