@@ -4901,6 +4901,9 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
+  // Use the shared hook for consistent location display
+  const { displayLocation, displaySlot } = useBoatLocation(boat, locations);
+
   const salesStatusLabels = {
     'HA': 'On Hand Available',
     'HS': 'On Hand Sold',
@@ -4984,7 +4987,19 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
               <div>
                 <p className="text-sm font-medium text-slate-700">Current Location</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {boat.location ? `${boat.location} • Slot ${boat.slot}` : 'Unassigned'}
+                  {boat.location ? (
+                    <>
+                      {displayLocation}
+                      {displaySlot && (
+                        <>
+                          <span className="text-slate-400 mx-2">•</span>
+                          {displaySlot}
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    'Unassigned'
+                  )}
                 </p>
               </div>
               {locations.length > 0 && (
