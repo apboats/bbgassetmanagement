@@ -136,12 +136,15 @@ export const AuthProvider = ({ children }) => {
             break
 
           case 'TOKEN_REFRESHED':
-          case 'USER_UPDATED':
+            // Token refresh doesn't change user data, just update session
             setSession(session)
-            if (session?.user) {
-              console.log('Auth state changed, loading user profile...')
-              await loadUserProfile(session.user.id)
-            }
+            break
+
+          case 'USER_UPDATED':
+            // User update (like password change) doesn't change our users table data
+            // Just update the session, don't reload profile to avoid unnecessary queries
+            console.log('User updated (password/email change), updating session only')
+            setSession(session)
             break
             
           case 'SIGNED_OUT':
