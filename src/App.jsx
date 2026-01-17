@@ -2818,10 +2818,23 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
 
     setIsProcessing(true);
 
-    // Remove boat from location
+    // For inventory boats, use AppContainer's handleMoveBoat to properly update database
+    if (viewingBoat.isInventory && onMoveBoatFromContainer) {
+      try {
+        await onMoveBoatFromContainer(viewingBoat.id, null, null, true);
+        setViewingBoat(null);
+      } catch (error) {
+        console.error('Error removing inventory boat:', error);
+        alert('Failed to remove boat. Please try again.');
+      }
+      setIsProcessing(false);
+      return;
+    }
+
+    // For regular boats, continue with existing logic
     // Check if this is a pool location
     const isPool = viewingBoat.currentLocation.type === 'pool';
-    
+
     let updatedLocation;
     if (isPool) {
       // Remove from pool_boats array
@@ -2838,7 +2851,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       };
       delete updatedLocation.boats[viewingBoat.currentSlot];
     }
-    
+
     const updatedLocations = locations.map(l => l.id === viewingBoat.currentLocation.id ? updatedLocation : l);
 
     // Update boat to have no location
