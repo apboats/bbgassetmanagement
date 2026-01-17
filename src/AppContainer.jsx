@@ -380,19 +380,9 @@ function AppContainer() {
           // Find the target location
           const targetLocation = locations.find(l => l.name === updates.location);
           if (targetLocation) {
-            // The slot should already be in internal format (e.g., "0-0", "2-0")
-            // Only convert if it looks like display format (all positive numbers that are >= 1)
-            let slotId = updates.slot;
-            if (updates.slot !== 'pool' && updates.slot.includes('-')) {
-              const parts = updates.slot.split('-').map(n => parseInt(n));
-              // If both parts are >= 1, it might be display format, convert it
-              // If any part is 0 or the result would be negative, it's already internal format
-              if (parts.length === 2 && parts[0] >= 1 && parts[1] >= 1) {
-                slotId = `${parts[0] - 1}-${parts[1] - 1}`;
-              }
-              // Otherwise, keep as-is (already internal format)
-            }
-            console.log('Moving inventory boat to slot:', slotId, 'from updates.slot:', updates.slot);
+            // Slot is already in internal format (e.g., "0-0", "2-0")
+            const slotId = updates.slot;
+            console.log('Moving inventory boat to slot:', slotId);
             await inventoryBoatsService.moveToSlot(boatId, targetLocation.id, slotId);
             await loadInventoryBoats();
             await loadLocations();

@@ -2675,21 +2675,38 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       updatedBoat = {
         ...boat,
         location: selectedLocation.name,
-        slot: `${selectedSlot.row + 1}-${selectedSlot.col + 1}`
+        slot: selectedSlot.slotId // Use internal format directly (e.g., "2-0")
       };
     }
 
-    const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
+    // Check if this is an inventory boat
+    const isInventory = boat.isInventory === true;
+    
+    if (isInventory) {
+      // For inventory boats, only update the boat - let handleUpdateInventoryBoat handle locations
+      const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
+      try {
+        await onUpdateBoats(updatedBoats);
+      } catch (error) {
+        console.error('Error assigning boat:', error);
+        alert('Failed to assign boat. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+    } else {
+      // For regular boats, update both
+      const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
 
-    // Await both updates
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error assigning boat:', error);
-      alert('Failed to assign boat. Please try again.');
-      setIsProcessing(false);
-      return;
+      // Await both updates
+      try {
+        await onUpdateLocations(updatedLocations);
+        await onUpdateBoats(updatedBoats);
+      } catch (error) {
+        console.error('Error assigning boat:', error);
+        alert('Failed to assign boat. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
     }
 
     setShowBoatAssignModal(false);
@@ -2756,50 +2773,19 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
     setIsProcessing(true);
-    let updatedLocations = [...locations];
     
-    // Remove from current location
-    if (boat.location) {
-      const currentLoc = locations.find(l => l.name === boat.location);
-      if (currentLoc) {
-        if (currentLoc.type === 'pool') {
-          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
-          const updatedLoc = {
-            ...currentLoc,
-            pool_boats: poolBoats.filter(id => id !== boat.id),
-          };
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        } else {
-          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
-          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
-          if (slotKey) delete updatedLoc.boats[slotKey];
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        }
-      }
-    }
+    // Check if this is an inventory boat
+    const isInventory = boat.isInventory === true;
     
-    // Add to new location
+    // Update boat's location/slot - use internal format
     let updatedBoat = { ...boat };
     if (targetLocation) {
       if (targetLocation.type === 'pool') {
-        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
-        const updatedLoc = {
-          ...targetLocation,
-          pool_boats: [...poolBoats, boat.id],
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
         updatedBoat.location = targetLocation.name;
         updatedBoat.slot = 'pool';
       } else {
-        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
-        const updatedLoc = {
-          ...currentTargetLoc,
-          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        const [row, col] = targetSlot.split('-').map(Number);
         updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = `${row + 1}-${col + 1}`;
+        updatedBoat.slot = targetSlot; // Keep internal format (e.g., "2-0")
       }
     } else {
       updatedBoat.location = null;
@@ -2807,11 +2793,58 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     }
     
     try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+      if (isInventory) {
+        // For inventory boats, only update the boat - let handleUpdateInventoryBoat handle locations
+        await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+      } else {
+        // For regular boats, update both locations and boats
+        let updatedLocations = [...locations];
+        
+        // Remove from current location
+        if (boat.location) {
+          const currentLoc = locations.find(l => l.name === boat.location);
+          if (currentLoc) {
+            if (currentLoc.type === 'pool') {
+              const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
+              const updatedLoc = {
+                ...currentLoc,
+                pool_boats: poolBoats.filter(id => id !== boat.id),
+              };
+              updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+            } else {
+              const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
+              const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
+              if (slotKey) delete updatedLoc.boats[slotKey];
+              updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
+            }
+          }
+        }
+        
+        // Add to new location
+        if (targetLocation) {
+          if (targetLocation.type === 'pool') {
+            const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
+            const updatedLoc = {
+              ...targetLocation,
+              pool_boats: [...poolBoats, boat.id],
+            };
+            updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+          } else {
+            const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
+            const updatedLoc = {
+              ...currentTargetLoc,
+              boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
+            };
+            updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
+          }
+        }
+        
+        await onUpdateLocations(updatedLocations);
+        await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
+      }
       
       // Update viewing boat with new location info
-      const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
+      const newLocation = targetLocation ? locations.find(l => l.id === targetLocation.id) : null;
       setViewingBoat({
         ...updatedBoat,
         currentLocation: newLocation,
@@ -6168,9 +6201,9 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
         updatedBoat.location = targetLocation.name;
         updatedBoat.slot = 'pool';
       } else {
-        const [row, col] = targetSlot.split('-').map(Number);
+        // Keep slot in internal format (0-indexed) - don't convert to display format
         updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = `${row + 1}-${col + 1}`;
+        updatedBoat.slot = targetSlot; // Already in internal format like "2-0"
       }
     } else {
       updatedBoat.location = null;
