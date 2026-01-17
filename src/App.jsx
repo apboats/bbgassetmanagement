@@ -3767,7 +3767,7 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
       )}
 
       {/* Drop Zone / Boat List */}
-      <div 
+      <div
         className={`p-4 min-h-[150px] ${isDragging ? 'bg-teal-50 border-2 border-dashed border-teal-400' : 'bg-slate-50'}`}
         onDragOver={handleDragOver}
         onDrop={handleDropOnPool}
@@ -3778,7 +3778,7 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
             <p className="text-sm">
               {isDragging ? 'Drop boat here' : poolBoats.length === 0 ? 'No boats in pool' : 'No matches'}
             </p>
-            {!isDragging && poolBoats.length === 0 && (
+            {!isDragging && (
               <button
                 onClick={onAddBoat}
                 className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium"
@@ -3788,8 +3788,9 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {filteredBoats.map(boat => (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {filteredBoats.map(boat => (
               <div
                 key={boat.id}
                 draggable
@@ -3829,6 +3830,17 @@ function PoolLocation({ location, boats, onEdit, onDelete, onDragStart, onDrop, 
               </div>
             ))}
           </div>
+          {!isDragging && (
+            <div className="flex justify-center mt-3">
+              <button
+                onClick={onAddBoat}
+                className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+              >
+                + Add boat
+              </button>
+            </div>
+          )}
+        </>
         )}
       </div>
 
