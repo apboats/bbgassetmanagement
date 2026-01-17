@@ -418,29 +418,29 @@ export default function BoatsByGeorgeAssetManager({
       {/* Navigation Bar */}
       <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+          <div className="flex justify-between items-center h-14 lg:h-16">
+            <div className="flex items-center gap-2 lg:gap-3 min-w-0">
               <img
                 src="/images/favicon.png"
                 alt="Boats by George"
-                className="w-10 h-10 object-contain flex-shrink-0"
+                className="w-8 h-8 lg:w-10 lg:h-10 object-contain flex-shrink-0"
                 onError={(e) => {
                   // Fallback to package icon if favicon not found
                   e.target.style.display = 'none';
                   e.target.nextElementSibling.style.display = 'flex';
                 }}
               />
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center flex-shrink-0" style={{display: 'none'}}>
-                <Package className="w-6 h-6 text-white" />
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center flex-shrink-0" style={{display: 'none'}}>
+                <Package className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
               </div>
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <h1 className="text-xl font-bold text-slate-900">Boats By George</h1>
                 <p className="text-xs text-slate-500">Asset Management System</p>
               </div>
             </div>
 
-            {/* Desktop Navigation - Hidden on mobile */}
-            <div className="hidden md:flex items-center gap-2">
+            {/* Desktop Navigation - Only show on large screens (1024px+) */}
+            <div className="hidden lg:flex items-center gap-2">
               <NavButton icon={Home} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
               <NavButton icon={User} label="My View" active={currentView === 'myview'} onClick={() => setCurrentView('myview')} />
               <NavButton icon={Map} label="Locations" active={currentView === 'locations'} onClick={() => setCurrentView('locations')} />
@@ -460,32 +460,32 @@ export default function BoatsByGeorgeAssetManager({
               </div>
             </div>
 
-            {/* Mobile Menu Button - Only visible on mobile */}
-            <div className="flex md:hidden items-center gap-2">
+            {/* Mobile/Tablet Menu Button - Show on all screens smaller than 1024px */}
+            <div className="flex lg:hidden items-center gap-2">
               <button
                 onClick={handleLogout}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Logout"
               >
-                <LogOut className="w-5 h-5 text-slate-600" />
+                <LogOut className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600" />
               </button>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Menu"
               >
-                <Menu className="w-6 h-6 text-slate-600" />
+                <Menu className="w-5 h-5 lg:w-6 lg:h-6 text-slate-600" />
               </button>
             </div>
           </div>
 
-          {/* Mobile Navigation Menu - Slide down on mobile */}
+          {/* Mobile/Tablet Navigation Menu - Show on screens smaller than 1024px */}
           {showMobileMenu && (
-            <div className="md:hidden border-t border-slate-200 py-2 bg-white">
+            <div className="lg:hidden border-t border-slate-200 py-2 bg-white">
               <div className="flex flex-col gap-1">
                 <button
                   onClick={() => { setCurrentView('dashboard'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -494,7 +494,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('myview'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'myview' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -503,7 +503,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('locations'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'locations' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -512,7 +512,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('boats'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'boats' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -521,7 +521,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('inventory'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'inventory' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -530,7 +530,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('shows'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'shows' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -539,7 +539,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('scan'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'scan' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
@@ -548,7 +548,7 @@ export default function BoatsByGeorgeAssetManager({
                 </button>
                 <button
                   onClick={() => { setCurrentView('settings'); setShowMobileMenu(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     currentView === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
