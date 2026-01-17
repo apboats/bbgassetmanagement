@@ -801,6 +801,21 @@ function NavButton({ icon: Icon, label, active, onClick }) {
 function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
+  // Sync viewingBoat with boats array when it updates (real-time changes)
+  useEffect(() => {
+    if (viewingBoat) {
+      const updatedBoat = boats.find(b => b.id === viewingBoat.id);
+      if (updatedBoat && JSON.stringify(updatedBoat) !== JSON.stringify(viewingBoat)) {
+        // Preserve the enriched properties (currentLocation, currentSlot)
+        setViewingBoat({
+          ...updatedBoat,
+          currentLocation: viewingBoat.currentLocation,
+          currentSlot: viewingBoat.currentSlot
+        });
+      }
+    }
+  }, [boats]);
+
   const statusCounts = {
     needsApproval: boats.filter(b => b.status === 'needs-approval').length,
     needsParts: boats.filter(b => b.status === 'needs-parts').length,
@@ -2544,6 +2559,21 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
   const [isDraggingActive, setIsDraggingActive] = useState(false);
   const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
+
+  // Sync viewingBoat with boats array when it updates (real-time changes)
+  useEffect(() => {
+    if (viewingBoat) {
+      const updatedBoat = boats.find(b => b.id === viewingBoat.id);
+      if (updatedBoat && JSON.stringify(updatedBoat) !== JSON.stringify(viewingBoat)) {
+        // Preserve the enriched properties (currentLocation, currentSlot)
+        setViewingBoat({
+          ...updatedBoat,
+          currentLocation: viewingBoat.currentLocation,
+          currentSlot: viewingBoat.currentSlot
+        });
+      }
+    }
+  }, [boats]);
 
   // Track mouse position continuously
   useEffect(() => {
@@ -6056,6 +6086,21 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [viewingBoat, setViewingBoat] = useState(null);
   const mouseYRef = useRef(0);
+
+  // Sync viewingBoat with boats array when it updates (real-time changes)
+  useEffect(() => {
+    if (viewingBoat) {
+      const updatedBoat = boats.find(b => b.id === viewingBoat.id);
+      if (updatedBoat && JSON.stringify(updatedBoat) !== JSON.stringify(viewingBoat)) {
+        // Preserve the enriched properties (currentLocation, currentSlot)
+        setViewingBoat({
+          ...updatedBoat,
+          currentLocation: viewingBoat.currentLocation,
+          currentSlot: viewingBoat.currentSlot
+        });
+      }
+    }
+  }, [boats]);
 
   // Track mouse position continuously
   useEffect(() => {
