@@ -135,30 +135,11 @@ serve(async (req) => {
     const workOrdersList = await listResponse.json()
     console.log('Work orders list count:', workOrdersList?.length)
     console.log('Looking for boatId:', boatId)
-    
-    // Log the first few work orders to see the boat field format
-    if (workOrdersList?.length > 0) {
-      console.log('Sample work orders:', workOrdersList.slice(0, 3).map((wo: any) => ({
-        id: wo.id,
-        boat: wo.boat,
-        customer: wo.customer
-      })))
-    }
 
-    // Filter by boat ID if provided (API returns boat ID in the "boat" field)
-    let filteredWorkOrders = workOrdersList || []
-    if (boatId && filteredWorkOrders.length > 0) {
-      const normalizedBoatId = String(boatId).trim()
-      filteredWorkOrders = filteredWorkOrders.filter((wo: any) => {
-        const woBoatId = String(wo.boat || '').trim()
-        const matches = woBoatId === normalizedBoatId
-        console.log(`Comparing WO boat "${woBoatId}" with target "${normalizedBoatId}": ${matches}`)
-        return matches
-      })
-      console.log(`Filtered to ${filteredWorkOrders.length} work orders for boat ID: ${boatId}`)
-    }
+    // Note: ListForCustomer doesn't return boat ID, so we get all and filter after detail fetch
+    let workOrdersToFetch = workOrdersList || []
 
-    if (filteredWorkOrders.length === 0) {
+    if (workOrdersToFetch.length === 0) {
       // Clear any old cached work orders for this boat
       if (boatUuid) {
         await supabase
@@ -173,11 +154,10 @@ serve(async (req) => {
       )
     }
 
-    // Step 2: Get detailed info for each work order
+    // Step 2: Get detailed info for each work order and filter by boatId
     const detailedWorkOrders = await Promise.all(
-      filteredWorkOrders.map(async (wo: any) => {
+      workOrdersToFetch.map(async (wo: any) => {
         const detailUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/Retrieve?Id=${wo.id}&Detail=true`
-        console.log('Fetching work order detail:', detailUrl)
 
         try {
           const detailResponse = await fetch(detailUrl, {
@@ -191,6 +171,20 @@ serve(async (req) => {
           }
 
           const detail = await detailResponse.json()
+          
+          // Get the boat ID from the detail response
+          const detailBoatId = String(detail.boatId || '').trim()
+          console.log(`WO ${wo.id} detail - boatId: "${detailBoatId}", looking for: "${boatId}"`)
+          
+          // Filter: only return work orders for the specific boat we're looking for
+          if (boatId) {
+            const targetBoatId = String(boatId).trim()
+            if (detailBoatId !== targetBoatId) {
+              console.log(`Skipping WO ${wo.id} - boat "${detailBoatId}" doesn't match "${targetBoatId}"`)
+              return null
+            }
+            console.log(`WO ${wo.id} matches boat ${targetBoatId}`)
+          }
           
           return {
             id: detail.id,
@@ -218,8 +212,9 @@ serve(async (req) => {
       })
     )
 
-    // Filter out any failed fetches
+    // Filter out any failed fetches and non-matching boats
     const validWorkOrders = detailedWorkOrders.filter(wo => wo !== null)
+    console.log(`Valid work orders after filtering: ${validWorkOrders.length}`)
 
     // Step 3: Save to database (upsert work orders, replace operations)
     if (boatUuid && validWorkOrders.length > 0) {
