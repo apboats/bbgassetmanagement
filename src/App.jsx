@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
+import { boatsService, inventoryBoatsService } from './services/supabaseService';
 import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation, BoatStatusIcons, InventoryBadge, findBoatLocationData } from './components/BoatComponents';
 
 // Touch drag polyfill - makes draggable work on touch devices
@@ -5480,71 +5482,174 @@ function EditLocationModal({ location, onSave, onCancel }) {
 }
 
 function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
-  const [scannedCode, setScannedCode] = useState('');
-  const [foundBoat, setFoundBoat] = useState(null);
+  const [selectedBoat, setSelectedBoat] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
-  const [showCamera, setShowCamera] = useState(false);
-  const [showAssignTag, setShowAssignTag] = useState(false);
-  const [scannedTag, setScannedTag] = useState('');
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
-  // NFC URL parameter detection
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const nfcId = urlParams.get('id');
-    
-    if (nfcId) {
-      // Clean URL without reloading
-      window.history.replaceState({}, '', window.location.pathname);
-      
-      // Check if this tag is already assigned to a boat
-      const boatWithTag = boats.find(b => b.nfcTag === nfcId);
-      
-      if (boatWithTag) {
-        // Tag is assigned - load the boat
-        setScannedCode(nfcId);
-        setFoundBoat(boatWithTag);
-      } else {
-        // Tag is not assigned - show assignment modal
-        setScannedTag(nfcId);
-        setShowAssignTag(true);
+  // Camera and OCR states
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
+  const [ocrConfidence, setOcrConfidence] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Manual search states
+  const [showManualSearch, setShowManualSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  // Refs for camera
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  // Camera functions
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera on mobile
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsCameraActive(true);
       }
-    }
-  }, [boats]);
-
-  const handleScan = () => {
-    const boat = boats.find(b => b.qrCode === scannedCode || b.nfcTag === scannedCode);
-    if (boat) {
-      setFoundBoat(boat);
-    } else {
-      alert('No boat found with this code. If this is an NFC tag, you need to assign it to a boat first.');
-      setScannedCode('');
+    } catch (error) {
+      console.error('Camera access error:', error);
+      alert('Camera access denied. Please check your browser permissions.');
     }
   };
 
-  const handleAssignTag = (boatId) => {
-    const boat = boats.find(b => b.id === boatId);
-    if (!boat) return;
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      setIsCameraActive(false);
+    }
+  };
 
-    // Check if tag is already assigned to another boat
-    const existingBoat = boats.find(b => b.nfcTag === scannedTag);
-    if (existingBoat && existingBoat.id !== boatId) {
-      alert(`This tag is already assigned to ${existingBoat.name}. Please release it first.`);
+  const captureImage = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (video && canvas) {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageDataUrl = canvas.toDataURL('image/png');
+      setCapturedImage(imageDataUrl);
+      stopCamera();
+      processImage(imageDataUrl);
+    }
+  };
+
+  // OCR processing
+  const processImage = async (imageDataUrl) => {
+    setIsProcessing(true);
+    setOcrResult('');
+
+    try {
+      const worker = await Tesseract.createWorker('eng', 1, {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        }
+      });
+
+      const { data } = await worker.recognize(imageDataUrl);
+      await worker.terminate();
+
+      // Extract alphanumeric text, remove special characters
+      const cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+      setOcrResult(cleanedText);
+      setOcrConfidence(data.confidence);
+
+      // Search for boat with this Hull ID
+      if (cleanedText.length >= 8) {
+        await searchBoatByHullId(cleanedText);
+      } else {
+        alert('Could not read a valid Hull ID. Please try again or use manual search.');
+        setShowManualSearch(true);
+      }
+    } catch (error) {
+      console.error('OCR error:', error);
+      alert('Failed to process image. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Search by Hull ID
+  const searchBoatByHullId = async (hullId) => {
+    try {
+      setIsLoading(true);
+
+      // Search in customer boats
+      let foundBoat = await boatsService.getByHullId(hullId);
+
+      // If not found, search in inventory boats
+      if (!foundBoat) {
+        foundBoat = await inventoryBoatsService.getByHullId(hullId);
+      }
+
+      if (foundBoat) {
+        // Found boat - show location picker
+        setSelectedBoat(foundBoat);
+        setShowLocationPicker(true);
+        setOcrResult(`✓ Found: ${foundBoat.name}`);
+      } else {
+        // Not found - show manual search
+        alert(`No boat found with Hull ID: ${hullId}\nUse manual search below.`);
+        setShowManualSearch(true);
+        setSearchQuery(hullId);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Error searching for boat. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Manual search
+  const searchBoatsManually = () => {
+    const query = searchQuery.toLowerCase().trim();
+
+    if (!query) {
+      alert('Please enter a search term');
       return;
     }
 
-    // Assign tag to boat
-    const updatedBoat = { ...boat, nfcTag: scannedTag };
-    onUpdateBoats(boats.map(b => b.id === boatId ? updatedBoat : b));
-    
-    // Load the boat
-    setFoundBoat(updatedBoat);
-    setShowAssignTag(false);
-    setScannedTag('');
+    // Search across all boats
+    const results = boats.filter(boat =>
+      boat.name?.toLowerCase().includes(query) ||
+      boat.owner?.toLowerCase().includes(query) ||
+      boat.hullId?.toLowerCase().includes(query) ||
+      boat.model?.toLowerCase().includes(query)
+    );
+
+    setSearchResults(results);
+  };
+
+  const selectBoatFromSearch = (boat) => {
+    setSelectedBoat(boat);
+    setShowLocationPicker(true);
+    setShowManualSearch(false);
+    setSearchResults([]);
+    setSearchQuery('');
   };
 
   const handleLocationMove = async () => {
-    if (!foundBoat || !selectedLocation) {
+    if (!selectedBoat || !selectedLocation) {
       alert('Please select a location');
       return;
     }
@@ -5553,14 +5658,14 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     if (!location) return;
 
     // Remove from old location if exists
-    if (foundBoat.location) {
-      const oldLocation = locations.find(l => l.name === foundBoat.location);
-      if (oldLocation && foundBoat.slot) {
+    if (selectedBoat.location) {
+      const oldLocation = locations.find(l => l.name === selectedBoat.location);
+      if (oldLocation && selectedBoat.slot) {
         const updatedOldLocation = {
           ...oldLocation,
           boats: { ...oldLocation.boats }
         };
-        delete updatedOldLocation.boats[foundBoat.slot];
+        delete updatedOldLocation.boats[selectedBoat.slot];
         await onUpdateLocations(locations.map(l => l.id === oldLocation.id ? updatedOldLocation : l));
       }
     }
@@ -5606,184 +5711,182 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       ...location,
       boats: {
         ...location.boats,
-        [finalSlot]: foundBoat.id
+        [finalSlot]: selectedBoat.id
       }
     };
 
     // Update boat with new location
     const updatedBoat = {
-      ...foundBoat,
+      ...selectedBoat,
       location: location.name,
       slot: finalSlot
     };
 
     await onUpdateLocations(locations.map(l => l.id === location.id ? updatedLocation : l));
-    onUpdateBoats(boats.map(b => b.id === foundBoat.id ? updatedBoat : b));
+    onUpdateBoats(boats.map(b => b.id === selectedBoat.id ? updatedBoat : b));
 
     // Show success and reset
-    alert(`✓ ${foundBoat.name} moved to ${location.name} (${finalSlot})`);
+    alert(`✓ ${selectedBoat.name} moved to ${location.name} (${finalSlot})`);
     handleReset();
   };
 
   const handleReset = () => {
-    setScannedCode('');
-    setFoundBoat(null);
+    setSelectedBoat(null);
     setSelectedLocation('');
     setSelectedSlot('');
+    setShowLocationPicker(false);
+    setCapturedImage(null);
+    setOcrResult('');
+    setOcrConfidence(0);
+    setSearchResults([]);
   };
 
   return (
     <div className="space-y-6 animate-slide-in">
       <div>
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">Scan & Move Boats</h2>
-        <p className="text-slate-600">For boat movers: Tap NFC tag and update location</p>
+        <h2 className="text-3xl font-bold text-slate-900 mb-2">Scan Hull ID Tag</h2>
+        <p className="text-slate-600">Use your camera to scan the boat's Hull ID tag</p>
       </div>
 
-      {/* NFC Tag Assignment Modal */}
-      {showAssignTag && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-slide-in max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Assign NFC Tag to Boat</h3>
-                <p className="text-sm text-slate-600 mt-1">Tag ID: <span className="font-mono font-bold text-purple-600">{scannedTag}</span></p>
-              </div>
+      {!showLocationPicker && (
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          {/* Camera View - Initial State */}
+          {!capturedImage && !isCameraActive && (
+            <div className="text-center py-8">
+              <Camera className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+              <p className="text-slate-600 mb-6">
+                Point your camera at the boat's Hull ID tag
+              </p>
               <button
-                onClick={() => {
-                  setShowAssignTag(false);
-                  setScannedTag('');
-                }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={startCamera}
+                disabled={isLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 transition-colors"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                Open Camera
               </button>
             </div>
+          )}
 
-            <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <p className="text-sm text-purple-800">
-                <strong>First-time tag detected!</strong> This NFC tag hasn't been assigned to a boat yet. 
-                Select which boat this tag belongs to.
-              </p>
-            </div>
-
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {boats.filter(b => b.status !== 'archived').map(boat => (
+          {/* Active Camera with Capture Button */}
+          {isCameraActive && (
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full rounded-lg"
+              />
+              <div className="mt-4 flex gap-2 justify-center">
                 <button
-                  key={boat.id}
-                  onClick={() => handleAssignTag(boat.id)}
-                  className="w-full p-4 border-2 border-slate-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+                  onClick={captureImage}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
+                  Capture Hull ID
+                </button>
+                <button
+                  onClick={stopCamera}
+                  className="px-6 py-3 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Processing Indicator */}
+          {isProcessing && (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-600">Reading Hull ID...</p>
+            </div>
+          )}
+
+          {/* Captured Image Preview with OCR Result */}
+          {capturedImage && !isProcessing && (
+            <div>
+              <img src={capturedImage} alt="Captured" className="w-full rounded-lg mb-4" />
+              {ocrResult && (
+                <div className="bg-slate-50 p-4 rounded-lg mb-4">
+                  <p className="text-sm text-slate-600">Detected Hull ID:</p>
+                  <p className="text-2xl font-mono font-bold text-slate-900">{ocrResult}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Confidence: {Math.round(ocrConfidence)}%
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setCapturedImage(null);
+                  setOcrResult('');
+                  startCamera();
+                }}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Scan Again
+              </button>
+            </div>
+          )}
+
+          {/* Manual Search Fallback */}
+          {showManualSearch && (
+            <div className="mt-6 border-t border-slate-200 pt-6">
+              <h3 className="text-lg font-semibold mb-3">Manual Search</h3>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
+                  placeholder="Search by name, owner, or Hull ID..."
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={searchBoatsManually}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+              {searchResults.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {searchResults.map(boat => (
+                    <button
+                      key={boat.id}
+                      onClick={() => selectBoatFromSearch(boat)}
+                      className="w-full p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+                    >
                       <p className="font-bold text-slate-900">{boat.name}</p>
                       <p className="text-sm text-slate-600">{boat.model} • {boat.owner}</p>
-                      {boat.nfcTag && (
-                        <p className="text-xs text-orange-600 mt-1">
-                          ⚠️ Already has tag: {boat.nfcTag}
-                        </p>
+                      {boat.hullId && (
+                        <p className="text-xs text-slate-500 font-mono mt-1">Hull ID: {boat.hullId}</p>
                       )}
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                  </div>
-                </button>
-              ))}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Hidden canvas for image processing */}
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
       )}
 
-      {!foundBoat ? (
-        <div className="bg-white rounded-xl shadow-md p-8 border border-slate-200">
-          <div className="max-w-md mx-auto">
-            <div className="text-center mb-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Tap NFC Tag on Boat</h3>
-              <p className="text-slate-600">Tap your phone to the NFC tag on the boat's transom</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>📱 How it works:</strong> Just tap your iPhone or Android phone to the NFC tag. 
-                  Your phone will automatically open this page with the boat loaded.
-                </p>
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">Or enter manually</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">NFC Tag ID</label>
-                <input
-                  type="text"
-                  value={scannedCode}
-                  onChange={(e) => setScannedCode(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleScan()}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-center text-lg font-mono uppercase"
-                  placeholder="BBG-0001"
-                  autoFocus
-                />
-              </div>
-
-              <button
-                onClick={handleScan}
-                disabled={!scannedCode}
-                className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-md"
-              >
-                Find Boat
-              </button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">Quick Access (Testing)</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-lg">
-                {boats.filter(b => b.status !== 'archived' && b.nfcTag).map(boat => (
-                  <button
-                    key={boat.id}
-                    onClick={() => {
-                      setScannedCode(boat.nfcTag);
-                      setTimeout(() => handleScan(), 100);
-                    }}
-                    className="p-2 bg-white border border-slate-200 rounded hover:border-purple-500 hover:bg-purple-50 transition-colors text-left"
-                  >
-                    <p className="font-mono text-sm font-semibold text-purple-900">{boat.nfcTag}</p>
-                    <p className="text-xs text-slate-600 truncate">{boat.name}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
+      {/* Location Picker Modal */}
+      {showLocationPicker && selectedBoat && (
         <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-          <div className={`status-${foundBoat.status} p-6`}>
+          <div className={`status-${selectedBoat.status} p-6`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
                   <Package className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-1">{foundBoat.name}</h3>
+                  <h3 className="text-2xl font-bold text-white mb-1">{selectedBoat.name}</h3>
                   <p className="text-white/90">
-                    {foundBoat.model}
-                    {foundBoat.nfcTag && (
-                      <> • <span className="font-mono">{foundBoat.nfcTag}</span></>
+                    {selectedBoat.model}
+                    {selectedBoat.hullId && (
+                      <> • <span className="font-mono text-sm">Hull: {selectedBoat.hullId}</span></>
                     )}
                   </p>
                 </div>
@@ -5803,8 +5906,8 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
               <div className="p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
                 <p className="text-sm text-slate-600 mb-1">Currently At</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {foundBoat.location ? (
-                    <>{foundBoat.location} <span className="text-slate-600">• Slot {foundBoat.slot}</span></>
+                  {selectedBoat.location ? (
+                    <>{selectedBoat.location} <span className="text-slate-600">• Slot {selectedBoat.slot}</span></>
                   ) : (
                     <span className="text-orange-600">Not Assigned</span>
                   )}
@@ -5814,7 +5917,7 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
 
             <div>
               <h4 className="text-lg font-bold text-slate-900 mb-4">Move To New Location</h4>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Select Location</label>
@@ -5822,18 +5925,18 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                     value={selectedLocation}
                     onChange={(e) => {
                       setSelectedLocation(e.target.value);
-                      setSelectedSlot(''); // Reset slot when location changes
+                      setSelectedSlot('');
                     }}
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                   >
                     <option value="">Choose a location...</option>
                     {locations.map(loc => {
                       const occupiedSlots = Object.keys(loc.boats).length;
-                      const totalSlots = loc.layout === 'u-shaped' 
-                        ? (loc.rows * 2) + loc.columns 
+                      const totalSlots = loc.layout === 'u-shaped'
+                        ? (loc.rows * 2) + loc.columns
                         : loc.rows * loc.columns;
                       const available = totalSlots - occupiedSlots;
-                      
+
                       return (
                         <option key={loc.id} value={loc.name}>
                           {loc.name} ({available} slots available)
@@ -5846,14 +5949,14 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                 {selectedLocation && (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      💡 <strong>Tip:</strong> Leave slot empty to auto-assign to first available slot, or you can assign in the Locations tab later.
+                      💡 <strong>Tip:</strong> Slot will be auto-assigned to first available position.
                     </p>
                   </div>
                 )}
 
                 <button
                   onClick={handleLocationMove}
-                  disabled={!selectedLocation}
+                  disabled={!selectedLocation || isLoading}
                   className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-lg transition-colors shadow-md"
                 >
                   ✓ Confirm Move to {selectedLocation || 'Location'}
@@ -5866,11 +5969,11 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-slate-600">Owner</p>
-                  <p className="font-semibold text-slate-900">{foundBoat.owner}</p>
+                  <p className="font-semibold text-slate-900">{selectedBoat.owner}</p>
                 </div>
                 <div>
                   <p className="text-slate-600">Status</p>
-                  <p className="font-semibold text-slate-900 capitalize">{foundBoat.status.replace(/-/g, ' ')}</p>
+                  <p className="font-semibold text-slate-900 capitalize">{selectedBoat.status.replace(/-/g, ' ')}</p>
                 </div>
               </div>
             </div>
