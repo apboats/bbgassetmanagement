@@ -33,6 +33,17 @@ export const authService = {
     return authData
   },
 
+  // Resend confirmation email
+  async resendConfirmationEmail(email) {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    })
+
+    if (error) throw error
+    return data
+  },
+
   // Sign in existing user
   async signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({
