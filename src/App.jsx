@@ -1914,7 +1914,6 @@ function InventoryBoatCard({ boat, onView }) {
     </div>
   );
 }
-}
 
 function BoatModal({ boat, locations, onSave, onCancel }) {
   // ====================================================================
