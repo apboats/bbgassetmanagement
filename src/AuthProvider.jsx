@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
           case 'TOKEN_REFRESHED':
           case 'USER_UPDATED':
             setSession(session)
-            if (session?.user && !profileLoading) {
+            if (session?.user && !profileLoadingRef.current) {
               console.log('Auth state changed, loading user profile...')
               await loadUserProfile(session.user.id)
             }

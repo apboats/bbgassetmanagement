@@ -173,10 +173,13 @@ export default function BoatsByGeorgeAssetManager({
   };
 
   const saveInventoryBoats = async (newInventoryBoats, changedBoatId = null) => {
+    console.log('saveInventoryBoats called - changedBoatId:', changedBoatId, 'count:', newInventoryBoats?.length);
+    
     // If a specific boat ID was changed, only update that one
     if (changedBoatId) {
       const changedBoat = newInventoryBoats.find(b => b.id === changedBoatId);
       if (changedBoat) {
+        console.log('Updating specific boat:', changedBoat.id, changedBoat.name);
         await onUpdateInventoryBoat(changedBoat.id, changedBoat);
       }
       return;
@@ -186,6 +189,7 @@ export default function BoatsByGeorgeAssetManager({
     for (const newBoat of newInventoryBoats) {
       const oldBoat = inventoryBoats.find(b => b.id === newBoat.id);
       if (oldBoat && JSON.stringify(oldBoat) !== JSON.stringify(newBoat)) {
+        console.log('Inventory boat changed:', newBoat.name, 'old location:', oldBoat.location, oldBoat.slot, 'new location:', newBoat.location, newBoat.slot);
         await onUpdateInventoryBoat(newBoat.id, newBoat);
       }
     }
@@ -2413,6 +2417,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
 
     // Check if this is an inventory boat
     const isInventory = draggingBoat.isInventory === true;
+    console.log('handleDrop - isInventory:', isInventory, 'boat:', draggingBoat.name, 'from:', draggingBoat.location, draggingBoat.slot, 'to:', targetLocation.name, newSlotId);
 
     // Update boat's location
     const updatedBoat = {
@@ -2424,6 +2429,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
     try {
       if (isInventory) {
         // For inventory boats, just update the boat - handleUpdateInventoryBoat will handle the location update
+        console.log('Inventory boat - only updating boat, not locations directly');
         const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
         await onUpdateBoats(updatedBoats);
       } else {
