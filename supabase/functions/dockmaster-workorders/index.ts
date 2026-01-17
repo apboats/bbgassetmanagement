@@ -134,12 +134,29 @@ serve(async (req) => {
 
     const workOrdersList = await listResponse.json()
     console.log('Work orders list count:', workOrdersList?.length)
+    console.log('Looking for boatId:', boatId)
+    
+    // Log the first few work orders to see the boat field format
+    if (workOrdersList?.length > 0) {
+      console.log('Sample work orders:', workOrdersList.slice(0, 3).map((wo: any) => ({
+        id: wo.id,
+        boat: wo.boat,
+        customer: wo.customer
+      })))
+    }
 
-    // Note: The API returns boat NAME in the "boat" field, not boat ID
-    // Since we're already filtering by customer ID, we'll return all work orders for that customer
-    // The UI can filter by boat if needed
+    // Filter by boat ID if provided (API returns boat ID in the "boat" field)
     let filteredWorkOrders = workOrdersList || []
-    console.log('Work orders count:', filteredWorkOrders.length)
+    if (boatId && filteredWorkOrders.length > 0) {
+      const normalizedBoatId = String(boatId).trim()
+      filteredWorkOrders = filteredWorkOrders.filter((wo: any) => {
+        const woBoatId = String(wo.boat || '').trim()
+        const matches = woBoatId === normalizedBoatId
+        console.log(`Comparing WO boat "${woBoatId}" with target "${normalizedBoatId}": ${matches}`)
+        return matches
+      })
+      console.log(`Filtered to ${filteredWorkOrders.length} work orders for boat ID: ${boatId}`)
+    }
 
     if (filteredWorkOrders.length === 0) {
       // Clear any old cached work orders for this boat
