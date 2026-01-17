@@ -3990,7 +3990,9 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
   const filteredBoats = boats.filter(boat => {
     const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          boat.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase());
+                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (boat.hullId && boat.hullId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (boat.dockmasterId && boat.dockmasterId.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesSearch;
   });
 
@@ -4073,7 +4075,7 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search boats by name, model, or owner..."
+              placeholder="Search by name, model, owner, Hull ID, or Dockmaster ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -4116,6 +4118,18 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
                       </div>
                       <p className="text-sm text-slate-600 truncate">{boat.model}</p>
                       <p className="text-xs text-slate-500 truncate">Owner: {boat.owner}</p>
+                      <div className="flex gap-3 mt-1">
+                        {boat.hullId && (
+                          <p className="text-xs text-slate-600">
+                            <span className="font-medium">Hull ID:</span> {boat.hullId}
+                          </p>
+                        )}
+                        {boat.dockmasterId && (
+                          <p className="text-xs text-slate-600">
+                            <span className="font-medium">DM ID:</span> {boat.dockmasterId}
+                          </p>
+                        )}
+                      </div>
                       {boat.location && (
                         <p className="text-xs text-orange-600 mt-1">
                           Currently at: {boat.location} ({boat.slot})
