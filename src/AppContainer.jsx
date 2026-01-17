@@ -368,42 +368,6 @@ function AppContainer() {
 
   const handleUpdateInventoryBoat = async (boatId, updates) => {
     try {
-      console.log('handleUpdateInventoryBoat called:', boatId, 'updates:', JSON.stringify(updates, null, 2));
-      
-      // Check if location/slot is changing - if so, we need to update locations too
-      const locationChanging = 'location' in updates || 'slot' in updates;
-      console.log('Location changing?', locationChanging);
-      
-      if (locationChanging) {
-        // Get the current boat to see its old location
-        const currentBoat = inventoryBoats.find(b => b.id === boatId);
-        console.log('Current boat in state:', currentBoat?.name, 'location:', currentBoat?.location, 'slot:', currentBoat?.slot);
-        
-        // If there's a new location, use the proper assign/move methods
-        if (updates.location && updates.slot) {
-          // Find the target location
-          const targetLocation = locations.find(l => l.name === updates.location);
-          if (targetLocation) {
-            // Slot is already in internal format (e.g., "0-0", "2-0")
-            const slotId = updates.slot;
-            console.log('Moving inventory boat to slot:', slotId, 'in location:', targetLocation.name);
-            console.log('Target location boats BEFORE:', JSON.stringify(targetLocation.boats));
-            await inventoryBoatsService.moveToSlot(boatId, targetLocation.id, slotId);
-            console.log('moveToSlot completed, reloading data...');
-            await loadInventoryBoats();
-            await loadLocations();
-            console.log('Data reloaded');
-            return;
-          }
-        } else if (!updates.location) {
-          // Removing from location
-          await inventoryBoatsService.removeFromSlot(boatId);
-          await loadInventoryBoats();
-          await loadLocations();
-          return;
-        }
-      }
-      
       // Filter out fields that don't belong in database
       const { 
         isInventory,
@@ -450,6 +414,10 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
+      
+      // Include location/slot if they're being updated
+      if ('location' in updates) updateData.location = updates.location;
+      if ('slot' in updates) updateData.slot = updates.slot;
       
       console.log('Inventory boat update - sending to DB:', updateData);
       
