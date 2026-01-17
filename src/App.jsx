@@ -2411,53 +2411,62 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       return;
     }
 
-    let updatedLocations = [...locations];
+    // Check if this is an inventory boat
+    const isInventory = draggingBoat.isInventory === true;
 
-    // ALWAYS remove boat from old location if it's currently assigned somewhere
-    // This handles both dragging from within a location AND dragging from elsewhere
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        const updatedOldLocation = {
-          ...oldLocation,
-          boats: { ...oldLocation.boats }
-        };
-        // Find and remove the boat from its current slot
-        const oldSlotId = Object.keys(updatedOldLocation.boats).find(
-          key => updatedOldLocation.boats[key] === draggingBoat.id
-        );
-        if (oldSlotId) {
-          delete updatedOldLocation.boats[oldSlotId];
-        }
-        
-        updatedLocations = updatedLocations.map(l => 
-          l.id === oldLocation.id ? updatedOldLocation : l
-        );
-      }
-    }
-
-    // Add boat to new location - use the already updated locations array
-    const currentTargetLocation = updatedLocations.find(l => l.id === targetLocation.id);
-    const updatedNewLocation = {
-      ...currentTargetLocation,
-      boats: { ...currentTargetLocation.boats, [newSlotId]: draggingBoat.id }
-    };
-    updatedLocations = updatedLocations.map(l => 
-      l.id === targetLocation.id ? updatedNewLocation : l
-    );
-
-    // Update boat's location (display format with +1)
+    // Update boat's location
     const updatedBoat = {
       ...draggingBoat,
       location: targetLocation.name,
-      slot: newSlotId // Store as-is for consistency
+      slot: newSlotId
     };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
 
-    // Update both locations and boats
     try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
+      if (isInventory) {
+        // For inventory boats, just update the boat - handleUpdateInventoryBoat will handle the location update
+        const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+        await onUpdateBoats(updatedBoats);
+      } else {
+        // For regular boats, update both locations and boats
+        let updatedLocations = [...locations];
+
+        // Remove boat from old location if it's currently assigned somewhere
+        if (draggingBoat.location) {
+          const oldLocation = locations.find(l => l.name === draggingBoat.location);
+          if (oldLocation) {
+            const updatedOldLocation = {
+              ...oldLocation,
+              boats: { ...oldLocation.boats }
+            };
+            // Find and remove the boat from its current slot
+            const oldSlotId = Object.keys(updatedOldLocation.boats).find(
+              key => updatedOldLocation.boats[key] === draggingBoat.id
+            );
+            if (oldSlotId) {
+              delete updatedOldLocation.boats[oldSlotId];
+            }
+            
+            updatedLocations = updatedLocations.map(l => 
+              l.id === oldLocation.id ? updatedOldLocation : l
+            );
+          }
+        }
+
+        // Add boat to new location
+        const currentTargetLocation = updatedLocations.find(l => l.id === targetLocation.id);
+        const updatedNewLocation = {
+          ...currentTargetLocation,
+          boats: { ...currentTargetLocation.boats, [newSlotId]: draggingBoat.id }
+        };
+        updatedLocations = updatedLocations.map(l => 
+          l.id === targetLocation.id ? updatedNewLocation : l
+        );
+
+        const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+
+        await onUpdateLocations(updatedLocations);
+        await onUpdateBoats(updatedBoats);
+      }
     } catch (error) {
       console.error('Error updating boat location:', error);
       alert('Failed to update boat location. Please try again.');
@@ -2480,52 +2489,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       return;
     }
 
-    let updatedLocations = [...locations];
-
-    // Remove from old location if it had one
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        if (oldLocation.type === 'pool') {
-          // Remove from old pool
-          const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
-          const updatedOldPool = {
-            ...oldLocation,
-            pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
-          };
-          updatedLocations = updatedLocations.map(l => 
-            l.id === oldLocation.id ? updatedOldPool : l
-          );
-        } else {
-          // Remove from old grid slot
-          const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
-          const oldSlotId = Object.keys(oldLocation.boats).find(
-            key => oldLocation.boats[key] === draggingBoat.id
-          );
-          if (oldSlotId) {
-            delete updatedOldLocation.boats[oldSlotId];
-          }
-          updatedLocations = updatedLocations.map(l => 
-            l.id === oldLocation.id ? updatedOldLocation : l
-          );
-        }
-      }
-    }
-
-    // Add to new pool
-    const currentPool = updatedLocations.find(l => l.id === poolId);
-    const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
-    
-    // Don't add if already in this pool
-    if (!currentPoolBoats.includes(draggingBoat.id)) {
-      const updatedPool = {
-        ...currentPool,
-        pool_boats: [...currentPoolBoats, draggingBoat.id],
-      };
-      updatedLocations = updatedLocations.map(l => 
-        l.id === poolId ? updatedPool : l
-      );
-    }
+    // Check if this is an inventory boat
+    const isInventory = draggingBoat.isInventory === true;
 
     // Update boat's location reference
     const updatedBoat = {
@@ -2533,12 +2498,66 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats }) {
       location: targetPool.name,
       slot: 'pool'
     };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
 
-    // Save changes
     try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
+      if (isInventory) {
+        // For inventory boats, just update the boat - handleUpdateInventoryBoat will handle the location update
+        const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+        await onUpdateBoats(updatedBoats);
+      } else {
+        // For regular boats, update both locations and boats
+        let updatedLocations = [...locations];
+
+        // Remove from old location if it had one
+        if (draggingBoat.location) {
+          const oldLocation = locations.find(l => l.name === draggingBoat.location);
+          if (oldLocation) {
+            if (oldLocation.type === 'pool') {
+              // Remove from old pool
+              const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
+              const updatedOldPool = {
+                ...oldLocation,
+                pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
+              };
+              updatedLocations = updatedLocations.map(l => 
+                l.id === oldLocation.id ? updatedOldPool : l
+              );
+            } else {
+              // Remove from old grid slot
+              const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
+              const oldSlotId = Object.keys(oldLocation.boats).find(
+                key => oldLocation.boats[key] === draggingBoat.id
+              );
+              if (oldSlotId) {
+                delete updatedOldLocation.boats[oldSlotId];
+              }
+              updatedLocations = updatedLocations.map(l => 
+                l.id === oldLocation.id ? updatedOldLocation : l
+              );
+            }
+          }
+        }
+
+        // Add to new pool
+        const currentPool = updatedLocations.find(l => l.id === poolId);
+        const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
+        
+        // Don't add if already in this pool
+        if (!currentPoolBoats.includes(draggingBoat.id)) {
+          const updatedPool = {
+            ...currentPool,
+            pool_boats: [...currentPoolBoats, draggingBoat.id],
+          };
+          updatedLocations = updatedLocations.map(l => 
+            l.id === poolId ? updatedPool : l
+          );
+        }
+
+        const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+
+        await onUpdateLocations(updatedLocations);
+        await onUpdateBoats(updatedBoats);
+      }
     } catch (error) {
       console.error('Error updating boat location:', error);
       alert('Failed to update boat location. Please try again.');
