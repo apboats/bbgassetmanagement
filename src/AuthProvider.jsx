@@ -130,7 +130,11 @@ export const AuthProvider = ({ children }) => {
               setLoading(false)
               return // Don't load profile yet
             }
-            // Fall through to normal sign-in handling
+            // For normal sign-in, just set session - INITIAL_SESSION will load profile
+            console.log('Sign-in detected, waiting for INITIAL_SESSION to load profile')
+            setSession(session)
+            break
+
           case 'TOKEN_REFRESHED':
           case 'USER_UPDATED':
             setSession(session)
