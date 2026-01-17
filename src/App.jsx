@@ -1293,7 +1293,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               </div>
             </div>
             <p className="text-2xl font-bold text-slate-900">
-              {boats.filter(b => !b.mechanicalsComplete).length}
+              {boats.filter(b => b.status !== 'archived' && !b.mechanicalsComplete).length}
             </p>
           </button>
 
@@ -1314,7 +1314,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               </div>
             </div>
             <p className="text-2xl font-bold text-slate-900">
-              {boats.filter(b => !b.cleanComplete).length}
+              {boats.filter(b => b.status !== 'archived' && !b.cleanComplete).length}
             </p>
           </button>
 
@@ -1335,7 +1335,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               </div>
             </div>
             <p className="text-2xl font-bold text-slate-900">
-              {boats.filter(b => !b.fiberglassComplete).length}
+              {boats.filter(b => b.status !== 'archived' && !b.fiberglassComplete).length}
             </p>
           </button>
 
@@ -1354,7 +1354,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
               </div>
             </div>
             <p className="text-2xl font-bold text-slate-900">
-              {boats.filter(b => !b.warrantyComplete).length}
+              {boats.filter(b => b.status !== 'archived' && !b.warrantyComplete).length}
             </p>
           </button>
         </div>
