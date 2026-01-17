@@ -569,11 +569,15 @@ function AppContainer() {
   }
 
   const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
+    console.log('[AppContainer.handleMoveBoat] Called with:', { boatId, toLocationId, toSlotId, isInventory })
     try {
       // If toLocationId is null, this is a removal
       if (!toLocationId) {
+        console.log('[AppContainer.handleMoveBoat] Removing boat from location')
         if (isInventory) {
+          console.log('[AppContainer.handleMoveBoat] Calling inventoryBoatsService.removeFromSlot')
           await inventoryBoatsService.removeFromSlot(boatId)
+          console.log('[AppContainer.handleMoveBoat] Reloading inventory boats')
           await loadInventoryBoats()
         } else {
           await boatsService.removeFromSlot(boatId)
@@ -581,6 +585,7 @@ function AppContainer() {
         }
       } else {
         // Normal move
+        console.log('[AppContainer.handleMoveBoat] Moving boat to new location')
         if (isInventory) {
           await inventoryBoatsService.moveToSlot(boatId, toLocationId, toSlotId)
           await loadInventoryBoats()
@@ -589,7 +594,9 @@ function AppContainer() {
           await loadBoats()
         }
       }
+      console.log('[AppContainer.handleMoveBoat] Reloading locations')
       await loadLocations()
+      console.log('[AppContainer.handleMoveBoat] Complete')
     } catch (error) {
       console.error('Error moving boat:', error)
       throw error

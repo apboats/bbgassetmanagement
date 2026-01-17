@@ -4491,8 +4491,13 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
   };
 
   const handleMove = async (targetLocation, targetSlot) => {
+    console.log('[InventoryBoatDetailsModal.handleMove] Called with:', { targetLocation: targetLocation?.id, targetSlot });
     if (onMoveBoat) {
+      console.log('[InventoryBoatDetailsModal.handleMove] Calling onMoveBoat with boat:', boat.id);
       await onMoveBoat(boat, targetLocation, targetSlot);
+      console.log('[InventoryBoatDetailsModal.handleMove] onMoveBoat complete');
+    } else {
+      console.log('[InventoryBoatDetailsModal.handleMove] No onMoveBoat handler!');
     }
     setShowLocationPicker(false);
     setSelectedMoveLocation(null);
