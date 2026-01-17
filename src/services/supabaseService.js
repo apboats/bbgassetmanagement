@@ -680,28 +680,25 @@ export const inventoryBoatsService = {
 
     const boat = await this.getById(boatId)
 
-    // Remove from old location if exists
-    if (boat.location) {
-      const { data: oldLocations } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('name', boat.location)
-
-      if (oldLocations && oldLocations.length > 0) {
-        const oldLocation = oldLocations[0]
-        const updatedOldBoats = { ...oldLocation.boats }
-        
-        // Find the slot by boat ID (more reliable than using boat.slot which might be corrupted)
-        const oldSlotKey = Object.keys(updatedOldBoats).find(key => updatedOldBoats[key] === boatId)
-        if (oldSlotKey) {
-          delete updatedOldBoats[oldSlotKey]
-          console.log('Removing boat from old slot:', oldSlotKey)
+    // Remove from ALL locations where this boat might exist (more robust than relying on boat.location)
+    const { data: allLocations } = await supabase
+      .from('locations')
+      .select('*')
+    
+    if (allLocations) {
+      for (const loc of allLocations) {
+        if (loc.boats) {
+          const slotKey = Object.keys(loc.boats).find(key => loc.boats[key] === boatId)
+          if (slotKey) {
+            console.log('Found boat in location:', loc.name, 'slot:', slotKey, '- removing it')
+            const updatedBoats = { ...loc.boats }
+            delete updatedBoats[slotKey]
+            await supabase
+              .from('locations')
+              .update({ boats: updatedBoats })
+              .eq('id', loc.id)
+          }
         }
-
-        await supabase
-          .from('locations')
-          .update({ boats: updatedOldBoats })
-          .eq('id', oldLocation.id)
       }
     }
 
