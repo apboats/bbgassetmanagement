@@ -736,6 +736,7 @@ export const inventoryBoatsService = {
 
   // Move to slot
   async moveToSlot(boatId, toLocationId, toSlotId) {
+    // First, fetch target location to validate it exists
     const { data: toLocation, error: locError } = await supabase
       .from('locations')
       .select('*')
@@ -747,66 +748,92 @@ export const inventoryBoatsService = {
     const boat = await this.getById(boatId)
 
     // Remove from ALL locations where this boat might exist (more robust than relying on boat.location)
+    // Force fresh data by using order() which bypasses some caching
     const { data: allLocations } = await supabase
       .from('locations')
       .select('*')
+      .order('id', { ascending: true })
 
     if (allLocations) {
       for (const loc of allLocations) {
+        let needsUpdate = false
+        let updatedLocation = { ...loc }
+
         // Handle grid-type locations
         if (loc.boats) {
           const slotKey = Object.keys(loc.boats).find(key => loc.boats[key] === boatId)
           if (slotKey) {
-            console.log('Found boat in grid location:', loc.name, 'slot:', slotKey, '- removing it')
-            const updatedBoats = { ...loc.boats }
-            delete updatedBoats[slotKey]
-            await supabase
-              .from('locations')
-              .update({ boats: updatedBoats })
-              .eq('id', loc.id)
+            console.log('[Inventory] Found boat in grid location:', loc.name, 'slot:', slotKey, '- removing it')
+            updatedLocation.boats = { ...loc.boats }
+            delete updatedLocation.boats[slotKey]
+            needsUpdate = true
           }
         }
 
         // Handle pool-type locations
         if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.includes(boatId)) {
-          console.log('Found boat in pool location:', loc.name, '- removing it')
-          const updatedPoolBoats = loc.pool_boats.filter(id => id !== boatId)
+          console.log('[Inventory] Found boat in pool location:', loc.name, '- removing it')
+          updatedLocation.pool_boats = loc.pool_boats.filter(id => id !== boatId)
+          needsUpdate = true
+        }
+
+        // Only update if changes were made
+        if (needsUpdate) {
+          const updateData = {}
+          if (updatedLocation.boats) updateData.boats = updatedLocation.boats
+          if (updatedLocation.pool_boats) updateData.pool_boats = updatedLocation.pool_boats
+
           await supabase
             .from('locations')
-            .update({ pool_boats: updatedPoolBoats })
+            .update(updateData)
             .eq('id', loc.id)
         }
       }
     }
 
+    // Refetch target location to get fresh data after removals
+    const { data: freshToLocation, error: refetchError } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('id', toLocationId)
+      .single()
+
+    if (refetchError) throw refetchError
+
     // Add to target location based on type
-    if (toLocation.type === 'pool') {
+    if (freshToLocation.type === 'pool') {
       // Pool location - add to pool_boats array
-      const currentPoolBoats = toLocation.pool_boats || []
-      const updatedPoolBoats = [...currentPoolBoats, boatId]
-      await supabase
-        .from('locations')
-        .update({ pool_boats: updatedPoolBoats })
-        .eq('id', toLocationId)
+      const currentPoolBoats = freshToLocation.pool_boats || []
+
+      // Only add if not already present (safety check)
+      if (!currentPoolBoats.includes(boatId)) {
+        const updatedPoolBoats = [...currentPoolBoats, boatId]
+        await supabase
+          .from('locations')
+          .update({ pool_boats: updatedPoolBoats })
+          .eq('id', toLocationId)
+      } else {
+        console.log('[Inventory] Boat already in target pool, skipping add')
+      }
 
       return this.update(boatId, {
-        location: toLocation.name,
+        location: freshToLocation.name,
         slot: 'pool',
       })
     } else {
       // Grid location - check slot availability and add to boats object
-      if (toLocation.boats && toLocation.boats[toSlotId]) {
+      if (freshToLocation.boats && freshToLocation.boats[toSlotId]) {
         throw new Error('Target slot is already occupied')
       }
 
-      const updatedNewBoats = { ...toLocation.boats, [toSlotId]: boatId }
+      const updatedNewBoats = { ...freshToLocation.boats, [toSlotId]: boatId }
       await supabase
         .from('locations')
         .update({ boats: updatedNewBoats })
         .eq('id', toLocationId)
 
       return this.update(boatId, {
-        location: toLocation.name,
+        location: freshToLocation.name,
         slot: toSlotId,
       })
     }
