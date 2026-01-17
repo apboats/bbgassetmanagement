@@ -4501,6 +4501,12 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
     }
     setShowLocationPicker(false);
     setSelectedMoveLocation(null);
+
+    // If removing from location (targetLocation is null), close the modal
+    if (!targetLocation) {
+      console.log('[InventoryBoatDetailsModal.handleMove] Closing modal after removal');
+      onClose();
+    }
   };
 
   return (
