@@ -900,7 +900,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {boats.slice(0, 6).map(boat => (
             <div key={boat.id} onClick={() => handleViewBoat(boat)} className="cursor-pointer hover:scale-[1.02] transition-transform">
-              <BoatCard boat={boat} onEdit={() => {}} onDelete={() => {}} compact={true} />
+              <CustomerBoatCard boat={boat} onEdit={() => {}} onDelete={() => {}} compact={true} />
             </div>
           ))}
         </div>
@@ -1684,9 +1684,9 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBoats.map(boat => (
-            <BoatCard 
-              key={boat.id} 
-              boat={boat} 
+            <CustomerBoatCard
+              key={boat.id}
+              boat={boat}
               onEdit={() => handleViewBoat(boat)}
               onDelete={() => handleDeleteBoat(boat.id)}
             />
@@ -1724,7 +1724,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   );
 }
 
-function BoatCard({ boat, onEdit, onDelete, compact }) {
+function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
   const statusLabels = {
     'needs-approval': 'Needs Approval',
     'needs-parts': 'Needs Parts',
