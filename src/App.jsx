@@ -7136,8 +7136,14 @@ function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, users, onUp
   const [activeTab, setActiveTab] = useState('profile');
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
+  const { updatePassword } = useAuth();
 
   const handleSave = async () => {
     await onSaveConfig(formData);
@@ -7165,6 +7171,39 @@ function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, users, onUp
     }
     if (confirm('Are you sure you want to delete this user?')) {
       onUpdateUsers(users.filter(u => u.id !== userId));
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    try {
+      const { error } = await updatePassword(newPassword);
+      if (error) {
+        setPasswordError(error.message || 'Failed to update password');
+      } else {
+        setPasswordSuccess(true);
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => {
+          setShowChangePassword(false);
+          setPasswordSuccess(false);
+        }, 2000);
+      }
+    } catch (error) {
+      setPasswordError('An error occurred while updating password');
     }
   };
 
@@ -7229,6 +7268,91 @@ function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, users, onUp
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                   <p className="text-sm text-slate-600 mb-1">Role</p>
                   <p className="font-semibold text-slate-900 capitalize">{currentUser.role}</p>
+                </div>
+
+                {/* Password Change Section */}
+                <div className="mt-8 pt-8 border-t border-slate-200">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4">Change Password</h4>
+
+                  {!showChangePassword ? (
+                    <button
+                      onClick={() => setShowChangePassword(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Change Password
+                    </button>
+                  ) : (
+                    <form onSubmit={handlePasswordChange} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter new password"
+                          required
+                          minLength={6}
+                          disabled={passwordSuccess}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Minimum 6 characters</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Confirm Password
+                        </label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Confirm new password"
+                          required
+                          minLength={6}
+                          disabled={passwordSuccess}
+                        />
+                      </div>
+
+                      {passwordError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-700">{passwordError}</p>
+                        </div>
+                      )}
+
+                      {passwordSuccess && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm text-green-700">Password updated successfully!</p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <button
+                          type="submit"
+                          disabled={passwordSuccess}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Update Password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowChangePassword(false);
+                            setNewPassword('');
+                            setConfirmPassword('');
+                            setPasswordError('');
+                            setPasswordSuccess(false);
+                          }}
+                          disabled={passwordSuccess}
+                          className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>
