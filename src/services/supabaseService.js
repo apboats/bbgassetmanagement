@@ -153,6 +153,17 @@ export const boatsService = {
     return data && data.length > 0 ? data[0] : null
   },
 
+  // Get boat by Hull ID
+  async getByHullId(hullId) {
+    const { data, error } = await supabase
+      .from('boats')
+      .select('*')
+      .eq('hull_id', hullId)
+
+    if (error) throw error
+    return data && data.length > 0 ? data[0] : null
+  },
+
   // Create new boat
   async create(boatData) {
     const { data, error } = await supabase
@@ -475,6 +486,17 @@ export const inventoryBoatsService = {
       .from('inventory_boats')
       .select('*')
       .eq('dockmaster_id', dockmasterId)
+
+    if (error) throw error
+    return data && data.length > 0 ? data[0] : null
+  },
+
+  // Get boat by Hull ID
+  async getByHullId(hullId) {
+    const { data, error } = await supabase
+      .from('inventory_boats')
+      .select('*')
+      .eq('hull_id', hullId)
 
     if (error) throw error
     return data && data.length > 0 ? data[0] : null
