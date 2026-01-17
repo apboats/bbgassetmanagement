@@ -22,7 +22,7 @@ export function useBoatLocation(boat, locations = []) {
   }
 
   const location = locations.find(l => l.name === boat.location);
-  const isInPool = location?.type === 'pool';
+  const isInPool = location?.type === 'pool' || boat.slot === 'pool';
 
   return {
     location,
