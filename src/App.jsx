@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy } from 'lucide-react';
-import { boatShowsService } from './supabaseService';
+import { supabase } from '../supabaseClient';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -7545,6 +7545,138 @@ function UserModal({ user, onSave, onCancel }) {
 // ============================================================================
 // BOAT SHOW LAYOUT PLANNER COMPONENT
 // ============================================================================
+
+// Supabase-based boat shows service
+const boatShowsService = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .select('*')
+      .order('show_date', { ascending: true, nullsFirst: false });
+    if (error) throw error;
+    return data || [];
+  },
+  async create(show) {
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .insert([{
+        name: show.name,
+        venue: show.venue || null,
+        show_date: show.showDate || null,
+        width_ft: show.widthFt || 100,
+        height_ft: show.heightFt || 80,
+        notes: show.notes || null,
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...data, widthFt: data.width_ft, heightFt: data.height_ft, showDate: data.show_date };
+  },
+  async update(id, updates) {
+    const dbUpdates = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.venue !== undefined) dbUpdates.venue = updates.venue;
+    if (updates.showDate !== undefined) dbUpdates.show_date = updates.showDate;
+    if (updates.widthFt !== undefined) dbUpdates.width_ft = updates.widthFt;
+    if (updates.heightFt !== undefined) dbUpdates.height_ft = updates.heightFt;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    const { data, error } = await supabase
+      .from('boat_shows')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...data, widthFt: data.width_ft, heightFt: data.height_ft, showDate: data.show_date };
+  },
+  async delete(id) {
+    const { error } = await supabase.from('boat_shows').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+  async getItems(showId) {
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .select('*, inventory_boat:inventory_boats(*)')
+      .eq('show_id', showId)
+      .order('z_index', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(item => ({
+      ...item,
+      widthFt: item.width_ft,
+      heightFt: item.height_ft,
+      itemType: item.item_type,
+      inventoryBoatId: item.inventory_boat_id,
+      zIndex: item.z_index,
+      boat: item.inventory_boat ? {
+        ...item.inventory_boat,
+        length: item.inventory_boat.length,
+        beam: item.inventory_boat.beam,
+      } : null,
+    }));
+  },
+  async addItem(showId, item) {
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .insert([{
+        show_id: showId,
+        item_type: item.itemType,
+        inventory_boat_id: item.inventoryBoatId || null,
+        x: item.x || 0,
+        y: item.y || 0,
+        rotation: item.rotation || 0,
+        width_ft: item.widthFt || null,
+        height_ft: item.heightFt || null,
+        label: item.label || null,
+        color: item.color || null,
+        z_index: item.zIndex || 0,
+      }])
+      .select('*, inventory_boat:inventory_boats(*)')
+      .single();
+    if (error) throw error;
+    return {
+      ...data,
+      widthFt: data.width_ft,
+      heightFt: data.height_ft,
+      itemType: data.item_type,
+      inventoryBoatId: data.inventory_boat_id,
+      zIndex: data.z_index,
+      boat: data.inventory_boat,
+    };
+  },
+  async updateItem(itemId, updates) {
+    const dbUpdates = {};
+    if (updates.x !== undefined) dbUpdates.x = updates.x;
+    if (updates.y !== undefined) dbUpdates.y = updates.y;
+    if (updates.rotation !== undefined) dbUpdates.rotation = updates.rotation;
+    if (updates.widthFt !== undefined) dbUpdates.width_ft = updates.widthFt;
+    if (updates.heightFt !== undefined) dbUpdates.height_ft = updates.heightFt;
+    if (updates.label !== undefined) dbUpdates.label = updates.label;
+    if (updates.color !== undefined) dbUpdates.color = updates.color;
+    if (updates.zIndex !== undefined) dbUpdates.z_index = updates.zIndex;
+    const { data, error } = await supabase
+      .from('boat_show_items')
+      .update(dbUpdates)
+      .eq('id', itemId)
+      .select('*, inventory_boat:inventory_boats(*)')
+      .single();
+    if (error) throw error;
+    return {
+      ...data,
+      widthFt: data.width_ft,
+      heightFt: data.height_ft,
+      itemType: data.item_type,
+      inventoryBoatId: data.inventory_boat_id,
+      zIndex: data.z_index,
+      boat: data.inventory_boat,
+    };
+  },
+  async removeItem(itemId) {
+    const { error } = await supabase.from('boat_show_items').delete().eq('id', itemId);
+    if (error) throw error;
+    return true;
+  }
+};
 
 const SHOW_ITEM_TYPES = {
   boat: { label: 'Boat', icon: Anchor, color: '#3b82f6' },
