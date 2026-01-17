@@ -17,26 +17,18 @@ export const authService = {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: userData.username,
+          name: userData.name,
+        }
+      }
     })
 
     if (authError) throw authError
 
-    // Create user profile in users table
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([
-          {
-            auth_id: authData.user.id,
-            username: userData.username,
-            name: userData.name,
-            email: email,
-            role: 'user', // Default role, admin can change later
-          },
-        ])
-
-      if (profileError) throw profileError
-    }
+    // User profile is created automatically by database trigger on auth.users insert
+    // The trigger reads from auth.users.raw_user_meta_data to populate username and name
 
     return authData
   },
