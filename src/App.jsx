@@ -4756,22 +4756,28 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
               {!selectedMoveLocation ? (
                 // Step 1: Select location
                 <div className="space-y-2">
-                  {/* Unassigned option */}
+                  {/* Remove from location option - shown prominently at top */}
                   {boat.location && (
-                    <button
-                      onClick={async () => {
-                        if (onMoveBoat) {
-                          await onMoveBoat(boat, null, null);
-                          setShowLocationPicker(false);
-                        }
-                      }}
-                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 transition-colors"
-                    >
-                      <p className="font-semibold text-slate-900">Unassigned</p>
-                      <p className="text-xs text-slate-500">Remove from current location</p>
-                    </button>
+                    <>
+                      <button
+                        onClick={async () => {
+                          if (onMoveBoat) {
+                            await onMoveBoat(boat, null, null);
+                            setShowLocationPicker(false);
+                          }
+                        }}
+                        className="w-full p-4 text-left rounded-lg border-2 border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <X className="w-4 h-4 text-red-600" />
+                          <p className="font-bold text-red-900">Remove from Location</p>
+                        </div>
+                        <p className="text-xs text-red-700">Remove boat from {boat.location} and mark as unassigned</p>
+                      </button>
+                      <div className="border-t border-slate-200 my-3" />
+                    </>
                   )}
-                  
+
                   {/* Pool locations */}
                   {locations.filter(l => l.type === 'pool').map(loc => (
                     <button
