@@ -4954,6 +4954,12 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
   // Camera functions
   const startCamera = async () => {
     try {
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access is not supported on this browser. Please use a modern browser like Chrome, Safari, or Firefox.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment', // Use back camera on mobile
@@ -4968,7 +4974,25 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       }
     } catch (error) {
       console.error('Camera access error:', error);
-      alert('Camera access denied. Please check your browser permissions.');
+
+      // Provide specific error messages based on error type
+      let errorMessage = 'Camera access failed. ';
+
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage += 'Permission denied. Please allow camera access in your browser settings.';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage += 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage += 'Camera is already in use by another application.';
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage += 'Camera does not meet the requirements.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage += 'Camera access requires HTTPS connection.';
+      } else {
+        errorMessage += 'Please check your browser permissions and try again.';
+      }
+
+      alert(errorMessage);
     }
   };
 
