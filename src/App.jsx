@@ -559,6 +559,7 @@ export default function BoatsByGeorgeAssetManager({
             onSyncNow={syncInventoryBoats}
             onUpdateInventoryBoats={saveInventoryBoats}
             onUpdateSingleBoat={onUpdateInventoryBoat}
+            onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
           />
         )}
@@ -4606,6 +4607,253 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
   );
 }
 
+// ============================================================================
+// INVENTORY BOAT DETAILS MODAL
+// ============================================================================
+// Simplified modal for inventory boats - read-only info from Dockmaster
+// with location assignment capability
+// ============================================================================
+
+function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }) {
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
+
+  const salesStatusLabels = {
+    'HA': 'On Hand Available',
+    'HS': 'On Hand Sold',
+    'OA': 'On Order Available',
+    'OS': 'On Order Sold',
+    'FA': 'Future Available',
+    'FS': 'Future Sold',
+    'S': 'Sold',
+    'R': 'Reserved',
+    'FP': 'Floor Planned'
+  };
+
+  const handleMove = async (targetLocation, targetSlot) => {
+    if (onMoveBoat) {
+      await onMoveBoat(boat, targetLocation, targetSlot);
+    }
+    setShowLocationPicker(false);
+    setSelectedMoveLocation(null);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 bg-blue-500 rounded text-xs font-medium">INVENTORY</span>
+              </div>
+              <h3 className="text-xl font-bold truncate">{boat.name}</h3>
+              <p className="text-blue-100 text-sm truncate">{boat.year} {boat.make} {boat.model}</p>
+            </div>
+            <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded transition-colors flex-shrink-0 ml-2">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 overflow-y-auto flex-1 space-y-4">
+          {/* Sales Status - Prominent */}
+          {boat.salesStatus && (
+            <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <p className="text-sm text-blue-700 font-medium">Sales Status</p>
+              </div>
+              <p className="text-lg font-bold text-blue-900">
+                {salesStatusLabels[boat.salesStatus] || boat.salesStatus}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">Code: {boat.salesStatus}</p>
+            </div>
+          )}
+
+          {/* Boat Info Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Hull ID</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.hullId || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Dockmaster ID</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.dockmasterId || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Length</p>
+              <p className="text-sm font-semibold text-slate-900">{boat.length || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Beam</p>
+              <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
+            </div>
+          </div>
+
+          {/* Location Assignment */}
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-medium text-slate-700">Current Location</p>
+                <p className="text-lg font-bold text-slate-900">
+                  {boat.location ? `${boat.location} • Slot ${boat.slot}` : 'Unassigned'}
+                </p>
+              </div>
+              {locations.length > 0 && (
+                <button
+                  onClick={() => setShowLocationPicker(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {boat.location ? 'Move' : 'Assign'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sync Info */}
+          <div className="text-xs text-slate-400 text-center">
+            <p>Last synced: {boat.lastSynced ? new Date(boat.lastSynced).toLocaleString() : 'Unknown'}</p>
+            <p className="mt-1">Data synced from Dockmaster • Read-only</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-200 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h4 className="font-bold text-slate-900">
+                  {selectedMoveLocation ? 'Select Slot' : 'Select Location'}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {selectedMoveLocation ? `in ${selectedMoveLocation.name}` : 'Choose where to place this boat'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLocationPicker(false);
+                  setSelectedMoveLocation(null);
+                }}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              {!selectedMoveLocation ? (
+                // Step 1: Select location
+                <div className="space-y-2">
+                  {/* Unassign option */}
+                  {boat.location && (
+                    <button
+                      onClick={() => handleMove(null, null)}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 transition-colors"
+                    >
+                      <p className="font-semibold text-slate-900">Remove from Location</p>
+                      <p className="text-xs text-slate-500">Unassign from current slot</p>
+                    </button>
+                  )}
+                  
+                  {/* Pool locations */}
+                  {locations.filter(l => l.type === 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={() => handleMove(loc, 'pool')}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-teal-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Pool location</p>
+                    </button>
+                  ))}
+                  
+                  {/* Grid locations */}
+                  {locations.filter(l => l.type !== 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={() => setSelectedMoveLocation(loc)}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                // Step 2: Select slot in grid
+                <div>
+                  <button
+                    onClick={() => setSelectedMoveLocation(null)}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back to locations
+                  </button>
+                  
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${selectedMoveLocation.columns}, 1fr)` }}>
+                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
+                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
+                        const slotId = `${row}-${col}`;
+                        const occupyingBoatId = selectedMoveLocation.boats?.[slotId];
+                        const isOccupied = occupyingBoatId && occupyingBoatId !== boat.id;
+                        const isCurrent = occupyingBoatId === boat.id;
+                        
+                        return (
+                          <button
+                            key={slotId}
+                            onClick={() => !isOccupied && handleMove(selectedMoveLocation, slotId)}
+                            disabled={isOccupied}
+                            className={`aspect-square rounded flex items-center justify-center text-xs font-medium transition-colors ${
+                              isCurrent
+                                ? 'bg-blue-500 text-white'
+                                : isOccupied
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700'
+                            }`}
+                          >
+                            {row + 1}-{col + 1}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditLocationModal({ location, onSave, onCancel }) {
   const [formData, setFormData] = useState(location || {
     name: '',
@@ -6045,7 +6293,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
  * - Include last_synced_at timestamp
  * - Mark as active/inactive based on Status field rather than deleting
  */
-function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat }) {
+function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -6121,46 +6369,38 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
   const handleRemoveBoatFromLocation = async () => {
     if (!viewingBoat) return;
     
-    const updatedBoat = {
-      ...viewingBoat,
-      location: null,
-      slot: null
-    };
-    
-    if (onUpdateSingleBoat) {
-      await onUpdateSingleBoat(viewingBoat.id, updatedBoat);
+    // Use the move callback with null location to remove from slot
+    if (onMoveBoat) {
+      await onMoveBoat(viewingBoat.id, null, null, true);
     }
     setViewingBoat(null);
   };
 
-  // Note: For inventory boats, we only update the boat's location reference
-  // We don't update the locations array itself since inventory boats aren't stored there
+  // Use the proper move callback from AppContainer which handles both tables correctly
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
-    let updatedBoat = { ...boat };
-    
-    if (targetLocation) {
-      if (targetLocation.type === 'pool') {
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = 'pool';
+    if (onMoveBoat) {
+      // Use AppContainer's handleMoveBoat which properly updates both inventory_boats and locations tables
+      await onMoveBoat(boat.id, targetLocation?.id || null, targetSlot || null, true);
+      
+      // Update viewing boat state
+      if (targetLocation) {
+        setViewingBoat({
+          ...boat,
+          location: targetLocation.name,
+          slot: targetSlot,
+          currentLocation: targetLocation,
+          currentSlot: targetSlot
+        });
       } else {
-        const [row, col] = targetSlot.split('-').map(Number);
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = `${row + 1}-${col + 1}`;
+        setViewingBoat({
+          ...boat,
+          location: null,
+          slot: null,
+          currentLocation: null,
+          currentSlot: null
+        });
       }
-    } else {
-      updatedBoat.location = null;
-      updatedBoat.slot = null;
     }
-    
-    if (onUpdateSingleBoat) {
-      await onUpdateSingleBoat(boat.id, updatedBoat);
-    }
-    
-    setViewingBoat({
-      ...updatedBoat,
-      currentLocation: targetLocation,
-      currentSlot: targetSlot
-    });
   };
 
   const isConfigured = dockmasterConfig && dockmasterConfig.username;
@@ -6491,13 +6731,11 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
         </div>
       )}
 
-      {/* Boat Details Modal */}
+      {/* Inventory Boat Details Modal */}
       {viewingBoat && (
-        <BoatDetailsModal
+        <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          onRemove={handleRemoveBoatFromLocation}
-          onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />

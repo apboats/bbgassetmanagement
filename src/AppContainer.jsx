@@ -400,6 +400,9 @@ function AppContainer() {
         hull_id,
         sales_status,
         last_synced,
+        // Don't update location/slot here - use handleMoveBoat for that
+        location,
+        slot,
         ...cleanUpdates 
       } = updates
       
@@ -415,14 +418,12 @@ function AppContainer() {
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       
-      // Include location/slot if they're being updated
-      if ('location' in updates) updateData.location = updates.location;
-      if ('slot' in updates) updateData.slot = updates.slot;
-      
-      console.log('Inventory boat update - sending to DB:', updateData);
-      
-      await inventoryBoatsService.update(boatId, updateData)
-      await loadInventoryBoats()
+      // Only update if there are fields to update
+      if (Object.keys(updateData).length > 0) {
+        console.log('Inventory boat update - sending to DB:', updateData);
+        await inventoryBoatsService.update(boatId, updateData)
+        await loadInventoryBoats()
+      }
     } catch (error) {
       console.error('Error updating inventory boat:', error)
       throw error
@@ -569,12 +570,24 @@ function AppContainer() {
 
   const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
     try {
-      if (isInventory) {
-        await inventoryBoatsService.moveToSlot(boatId, toLocationId, toSlotId)
-        await loadInventoryBoats()
+      // If toLocationId is null, this is a removal
+      if (!toLocationId) {
+        if (isInventory) {
+          await inventoryBoatsService.removeFromSlot(boatId)
+          await loadInventoryBoats()
+        } else {
+          await boatsService.removeFromSlot(boatId)
+          await loadBoats()
+        }
       } else {
-        await boatsService.moveToSlot(boatId, toLocationId, toSlotId)
-        await loadBoats()
+        // Normal move
+        if (isInventory) {
+          await inventoryBoatsService.moveToSlot(boatId, toLocationId, toSlotId)
+          await loadInventoryBoats()
+        } else {
+          await boatsService.moveToSlot(boatId, toLocationId, toSlotId)
+          await loadBoats()
+        }
       }
       await loadLocations()
     } catch (error) {
