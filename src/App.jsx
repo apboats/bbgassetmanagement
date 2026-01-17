@@ -5705,7 +5705,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
   };
 
   const handleAssignBoat = async (boatId) => {
-    if (!selectedLocation || !selectedSlot || isProcessing) return;
+    if (!selectedLocation || isProcessing) return;
 
     setIsProcessing(true);
 
@@ -5717,36 +5717,104 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     }
 
     let updatedLocations = [...locations];
+    let updatedBoat;
 
-    // Remove boat from old location if it has one
-    if (boat.location) {
-      const oldLocation = locations.find(l => l.name === boat.location);
-      if (oldLocation && boat.slot) {
-        const updatedOldLocation = {
-          ...oldLocation,
-          boats: { ...oldLocation.boats }
-        };
-        delete updatedOldLocation.boats[boat.slot];
-        updatedLocations = updatedLocations.map(l => 
-          l.id === oldLocation.id ? updatedOldLocation : l
-        );
+    // Check if this is a pool location
+    if (selectedLocation.type === 'pool') {
+      // Remove boat from old location if it has one
+      if (boat.location) {
+        const oldLocation = locations.find(l => l.name === boat.location);
+        if (oldLocation) {
+          if (oldLocation.type === 'pool') {
+            // Remove from old pool
+            const currentPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
+            const updatedOldLocation = {
+              ...oldLocation,
+              pool_boats: currentPoolBoats.filter(id => id !== boatId)
+            };
+            updatedLocations = updatedLocations.map(l =>
+              l.id === oldLocation.id ? updatedOldLocation : l
+            );
+          } else if (boat.slot) {
+            // Remove from old grid location
+            const updatedOldLocation = {
+              ...oldLocation,
+              boats: { ...oldLocation.boats }
+            };
+            delete updatedOldLocation.boats[boat.slot];
+            updatedLocations = updatedLocations.map(l =>
+              l.id === oldLocation.id ? updatedOldLocation : l
+            );
+          }
+        }
       }
+
+      // Add to new pool
+      const currentSelectedLocation = updatedLocations.find(l => l.id === selectedLocation.id);
+      const currentPoolBoats = currentSelectedLocation.pool_boats || currentSelectedLocation.poolBoats || [];
+      const updatedLocation = {
+        ...currentSelectedLocation,
+        pool_boats: [...currentPoolBoats, boatId]
+      };
+      updatedLocations = updatedLocations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
+
+      // Update boat
+      updatedBoat = {
+        ...boat,
+        location: selectedLocation.name,
+        slot: 'pool'
+      };
+    } else {
+      // Grid assignment
+      if (!selectedSlot) {
+        setIsProcessing(false);
+        return;
+      }
+
+      // Remove boat from old location if it has one
+      if (boat.location) {
+        const oldLocation = locations.find(l => l.name === boat.location);
+        if (oldLocation) {
+          if (oldLocation.type === 'pool') {
+            // Remove from old pool
+            const currentPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
+            const updatedOldLocation = {
+              ...oldLocation,
+              pool_boats: currentPoolBoats.filter(id => id !== boatId)
+            };
+            updatedLocations = updatedLocations.map(l =>
+              l.id === oldLocation.id ? updatedOldLocation : l
+            );
+          } else if (boat.slot) {
+            // Remove from old grid location
+            const updatedOldLocation = {
+              ...oldLocation,
+              boats: { ...oldLocation.boats }
+            };
+            delete updatedOldLocation.boats[boat.slot];
+            updatedLocations = updatedLocations.map(l =>
+              l.id === oldLocation.id ? updatedOldLocation : l
+            );
+          }
+        }
+      }
+
+      // Add boat to new grid location
+      const currentSelectedLocation = updatedLocations.find(l => l.id === selectedLocation.id);
+      const updatedLocation = {
+        ...currentSelectedLocation,
+        boats: { ...currentSelectedLocation.boats, [selectedSlot]: boatId }
+      };
+      updatedLocations = updatedLocations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
+
+      // Update boat
+      updatedBoat = {
+        ...boat,
+        location: selectedLocation.name,
+        slot: selectedSlot
+      };
     }
 
-    // Add boat to new location
-    const currentSelectedLocation = updatedLocations.find(l => l.id === selectedLocation.id);
-    const updatedLocation = {
-      ...currentSelectedLocation,
-      boats: { ...currentSelectedLocation.boats, [selectedSlot.slotId]: boatId }
-    };
-    updatedLocations = updatedLocations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
-
-    // Update boat
-    const updatedBoat = {
-      ...boat,
-      location: selectedLocation.name,
-      slot: selectedSlot.slotId
-    };
     const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
 
     try {
