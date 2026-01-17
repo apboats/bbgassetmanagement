@@ -6405,9 +6405,58 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
           </div>
           
           {myViewLocations.map(location => {
+            // Handle pool-type locations differently
+            if (location.type === 'pool') {
+              const poolBoats = (location.pool_boats || [])
+                .map(id => boats.find(b => b.id === id))
+                .filter(Boolean);
+
+              return (
+                <div key={location.id} className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+                  <div className="p-4 bg-gradient-to-r from-teal-500 to-teal-600 border-b border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-lg font-bold text-white">{location.name}</h4>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <p className="text-teal-100">Pool • Flexible Layout</p>
+                      <p className="text-white font-medium">{poolBoats.length} boat{poolBoats.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 min-h-[150px]">
+                    {poolBoats.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+                        <Package className="w-10 h-10 mb-2 opacity-50" />
+                        <p className="text-sm">No boats in pool</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {poolBoats.map(boat => (
+                          <BoatCard
+                            key={boat.id}
+                            boat={boat}
+                            onClick={setViewingBoat}
+                            draggable={false}
+                            locations={locations}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-4 py-2 bg-slate-100 border-t border-slate-200">
+                    <p className="text-xs text-slate-500 text-center">
+                      💡 Pool boats shown here
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Grid-type locations
             const isUShape = location.layout === 'u-shaped';
-            const totalSlots = isUShape 
-              ? (location.rows * 2) + location.columns 
+            const totalSlots = isUShape
+              ? (location.rows * 2) + location.columns
               : location.rows * location.columns;
             const occupiedSlots = Object.keys(location.boats).length;
             const occupancyRate = Math.round((occupiedSlots / totalSlots) * 100);
