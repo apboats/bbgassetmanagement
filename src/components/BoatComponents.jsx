@@ -8,6 +8,54 @@ import React from 'react';
 import { Wrench, Sparkles, Layers, Shield } from 'lucide-react';
 
 // ============================================================================
+// UTILITY: findBoatLocationData
+// ============================================================================
+// Centralized logic for finding boat location data
+// Returns enriched boat object with location and slot information
+export function findBoatLocationData(boat, locations = []) {
+  let location = boat.location ? locations.find(l => l.name === boat.location) : null;
+  let slotId = boat.slot;
+
+  // If boat.location isn't set, search for it in all locations
+  if (!location || !slotId) {
+    for (const loc of locations) {
+      // Check pool_boats array
+      if (loc.type === 'pool' && loc.pool_boats?.includes(boat.id)) {
+        location = loc;
+        slotId = 'pool';
+        break;
+      }
+      // Check boats object (grid slots)
+      if (loc.boats) {
+        const foundSlot = Object.keys(loc.boats).find(key => loc.boats[key] === boat.id);
+        if (foundSlot) {
+          location = loc;
+          slotId = foundSlot;
+          break;
+        }
+      }
+    }
+  } else if (location && !slotId) {
+    // Location is known but slot isn't - find the slot
+    if (location.type === 'pool' && location.pool_boats?.includes(boat.id)) {
+      slotId = 'pool';
+    } else if (location.boats) {
+      slotId = Object.keys(location.boats).find(key => location.boats[key] === boat.id) || null;
+    }
+  }
+
+  return {
+    location,
+    slotId,
+    enrichedBoat: {
+      ...boat,
+      location: location?.name || boat.location,
+      slot: slotId || boat.slot
+    }
+  };
+}
+
+// ============================================================================
 // CUSTOM HOOK: useBoatLocation
 // ============================================================================
 // Returns formatted location information for a boat
