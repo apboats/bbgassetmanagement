@@ -4953,6 +4953,7 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
 
   // Camera functions
   const startCamera = async () => {
+    console.log('[Camera] Starting camera...');
     try {
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4960,6 +4961,7 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
         return;
       }
 
+      console.log('[Camera] Requesting camera permission...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment', // Use back camera on mobile
@@ -4968,9 +4970,29 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
         }
       });
 
+      console.log('[Camera] Stream obtained:', stream);
+      console.log('[Camera] Video tracks:', stream.getVideoTracks());
+
       if (videoRef.current) {
+        console.log('[Camera] Setting video source...');
         videoRef.current.srcObject = stream;
-        setIsCameraActive(true);
+
+        // Wait for video to be ready before setting state
+        videoRef.current.onloadedmetadata = () => {
+          console.log('[Camera] Video metadata loaded, playing...');
+          videoRef.current.play()
+            .then(() => {
+              console.log('[Camera] Video playing successfully');
+              setIsCameraActive(true);
+            })
+            .catch(err => {
+              console.error('[Camera] Video play error:', err);
+              alert('Failed to start video playback: ' + err.message);
+            });
+        };
+      } else {
+        console.error('[Camera] videoRef.current is null!');
+        alert('Camera initialization error. Please refresh and try again.');
       }
     } catch (error) {
       console.error('Camera access error:', error);
@@ -4989,7 +5011,7 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       } else if (error.name === 'NotSupportedError') {
         errorMessage += 'Camera access requires HTTPS connection.';
       } else {
-        errorMessage += 'Please check your browser permissions and try again.';
+        errorMessage += 'Please check your browser permissions and try again. Error: ' + error.message;
       }
 
       alert(errorMessage);
@@ -5247,11 +5269,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                 playsInline
                 muted
                 className="w-full rounded-lg"
-                onLoadedMetadata={() => {
-                  if (videoRef.current) {
-                    videoRef.current.play().catch(err => console.error('Video play error:', err));
-                  }
-                }}
               />
               <div className="mt-4 flex gap-2 justify-center">
                 <button
