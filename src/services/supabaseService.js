@@ -266,7 +266,7 @@ export const boatsService = {
   // Release boat (archive + remove from location)
   async release(boatId) {
     const boat = await this.getById(boatId)
-    
+
     // Remove from location if assigned
     if (boat.location && boat.slot) {
       const { data: locations } = await supabase
@@ -288,6 +288,36 @@ export const boatsService = {
 
     // Archive the boat
     return this.archive(boatId)
+  },
+
+  // Import a boat from Dockmaster search results
+  async importFromDockmaster(dockmasterBoat) {
+    // Check if boat with this hull_id already exists
+    if (dockmasterBoat.serialNumber || dockmasterBoat.hullId) {
+      const hullId = dockmasterBoat.serialNumber || dockmasterBoat.hullId
+      const existing = await this.getByHullId(hullId)
+      if (existing) {
+        // Return existing boat instead of creating duplicate
+        return existing
+      }
+    }
+
+    // Transform Dockmaster data to our boat format
+    const boatData = {
+      name: dockmasterBoat.name || dockmasterBoat.description ||
+            `${dockmasterBoat.boatModelInfo?.vendorName || ''} ${dockmasterBoat.boatModelInfo?.modelNumber || ''}`.trim() ||
+            'Unknown Boat',
+      model: dockmasterBoat.model || dockmasterBoat.boatModelInfo?.modelNumber || '',
+      hull_id: dockmasterBoat.serialNumber || dockmasterBoat.hullId || null,
+      owner: dockmasterBoat.owner || dockmasterBoat.custName || '',
+      customer_id: dockmasterBoat.custId || null,
+      dockmaster_boat_id: dockmasterBoat.id || dockmasterBoat.dockmasterId || null,
+      status: 'active',
+      location: null,
+      slot: null,
+    }
+
+    return this.create(boatData)
   },
 
   // Assign boat to location slot (updates both boat and location)
