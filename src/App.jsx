@@ -2841,8 +2841,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
 
   const handleSlotClick = (location, row, col) => {
     const slotId = `${row}-${col}`;
-    const boatId = location.boats[slotId];
-    
+    const boatId = location.boats ? location.boats[slotId] : null;
+
     if (boatId) {
       // Occupied slot - show boat details
       const boat = boats.find(b => b.id === boatId);
@@ -5775,8 +5775,8 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
 
   const handleSlotClick = (location, row, col) => {
     const slotId = `${row}-${col}`;
-    const boatId = location.boats[slotId];
-    
+    const boatId = location.boats ? location.boats[slotId] : null;
+
     if (boatId) {
       // Occupied slot - show boat details
       const boat = boats.find(b => b.id === boatId);
