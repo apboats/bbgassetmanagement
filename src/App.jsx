@@ -620,7 +620,7 @@ export default function BoatsByGeorgeAssetManager({
             boats={boats}
             locations={locations}
             onUpdateBoats={saveBoats}
-            onMoveBoat={handleMoveBoat}
+            onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
           />
         )}
@@ -3234,6 +3234,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
   const [updatingFromDockmaster, setUpdatingFromDockmaster] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const statusLabels = {
     'needs-approval': 'Needs Approval',
