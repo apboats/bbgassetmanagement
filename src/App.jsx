@@ -5955,6 +5955,84 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     setIsProcessing(false);
   };
 
+  // Handle dropping boat into a pool location
+  const handlePoolDrop = async (poolId) => {
+    if (!draggingBoat || isProcessing) return;
+
+    setIsProcessing(true);
+
+    const targetPool = locations.find(l => l.id === poolId);
+    if (!targetPool) {
+      setIsProcessing(false);
+      return;
+    }
+
+    let updatedLocations = [...locations];
+
+    // Remove from old location if it had one
+    if (draggingBoat.location) {
+      const oldLocation = locations.find(l => l.name === draggingBoat.location);
+      if (oldLocation) {
+        if (oldLocation.type === 'pool') {
+          // Remove from old pool
+          const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
+          const updatedOldPool = {
+            ...oldLocation,
+            pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
+          };
+          updatedLocations = updatedLocations.map(l =>
+            l.id === oldLocation.id ? updatedOldPool : l
+          );
+        } else {
+          // Remove from old grid slot
+          const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
+          const oldSlotId = Object.keys(oldLocation.boats || {}).find(
+            key => oldLocation.boats[key] === draggingBoat.id
+          );
+          if (oldSlotId) {
+            delete updatedOldLocation.boats[oldSlotId];
+          }
+          updatedLocations = updatedLocations.map(l =>
+            l.id === oldLocation.id ? updatedOldLocation : l
+          );
+        }
+      }
+    }
+
+    // Add to new pool
+    const currentPool = updatedLocations.find(l => l.id === poolId);
+    const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
+    const updatedPool = {
+      ...currentPool,
+      pool_boats: [...currentPoolBoats, draggingBoat.id]
+    };
+    updatedLocations = updatedLocations.map(l =>
+      l.id === poolId ? updatedPool : l
+    );
+
+    // Update boat's location
+    const updatedBoat = {
+      ...draggingBoat,
+      location: targetPool.name,
+      slot: 'pool'
+    };
+    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
+
+    // Update both locations and boats
+    try {
+      await onUpdateLocations(updatedLocations);
+      await onUpdateBoats(updatedBoats);
+    } catch (error) {
+      console.error('Error updating boat location:', error);
+      alert('Failed to update boat location. Please try again.');
+    }
+
+    setDraggingBoat(null);
+    setDraggingFrom(null);
+    setIsDragging(false);
+    setIsProcessing(false);
+  };
+
   // Get unassigned boats (not in any location slot)
   const assignedBoatIds = new Set();
   locations.forEach(loc => {
@@ -6123,11 +6201,11 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                     setSelectedSlot('pool');
                     setShowBoatAssignModal(true);
                   }}
-                  isDragging={false}
-                  onDragStart={() => {}}
-                  onDragEnd={() => {}}
+                  isDragging={isDragging}
+                  onDragStart={(e, boat) => handleBoatDragStart(e, boat, location, 'pool')}
+                  onDragEnd={handleBoatDragEnd}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {}}
+                  onDrop={() => handlePoolDrop(location.id)}
                 />
               );
             }
@@ -6154,10 +6232,10 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                     currentSlot: boatSlot        // The actual slot ID from location.boats
                   });
                 }}
-                draggingBoat={null}
-                onDragStart={() => {}}
-                onDragEnd={() => {}}
-                onDrop={() => {}}
+                draggingBoat={draggingBoat}
+                onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, location, slotId)}
+                onDragEnd={handleBoatDragEnd}
+                onDrop={(e, loc, row, col) => handleBoatDrop(e, location, row, col)}
                 onMaximize={null}
               />
             );
