@@ -581,7 +581,7 @@ export default function BoatsByGeorgeAssetManager({
               // If same ID exists in both, keep the inventory version
               const seen = {};
               const combined = [];
-              
+
               // Add regular boats first
               boats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -589,7 +589,7 @@ export default function BoatsByGeorgeAssetManager({
                   combined.push(boat);
                 }
               });
-              
+
               // Add inventory boats (will replace duplicates)
               inventoryBoats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -601,7 +601,7 @@ export default function BoatsByGeorgeAssetManager({
                   if (index !== -1) combined[index] = boat;
                 }
               });
-              
+
               return combined;
             })()}
             onUpdateLocations={saveLocations}
@@ -613,6 +613,7 @@ export default function BoatsByGeorgeAssetManager({
               saveInventoryBoats(invBoats);
             }}
             onMoveBoat={onMoveBoat}
+            currentUser={currentUser}
           />
         )}
         {currentView === 'boats' && (
@@ -2525,7 +2526,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
@@ -3084,6 +3085,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
 
@@ -3280,7 +3282,7 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
   );
 }
 
-function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat }) {
+function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat, currentUser }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
@@ -3358,6 +3360,17 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
     }
 
     const updatedBoat = { ...boat, status: newStatus };
+
+    // Record who marked the boat as complete and when
+    if (newStatus === 'all-work-complete' && currentUser) {
+      updatedBoat.completedBy = currentUser.name || currentUser.username;
+      updatedBoat.completedAt = new Date().toISOString();
+    } else if (newStatus !== 'all-work-complete') {
+      // Clear completedBy if status is changed away from complete
+      updatedBoat.completedBy = null;
+      updatedBoat.completedAt = null;
+    }
+
     onUpdateBoat(updatedBoat);
   };
 
@@ -3811,19 +3824,29 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                 disabled={!allWorkPhasesComplete}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   boat.status === 'all-work-complete'
-                    ? 'status-all-work-complete border-transparent text-white font-semibold shadow-md' 
+                    ? 'status-all-work-complete border-transparent text-white font-semibold shadow-md'
                     : allWorkPhasesComplete
                       ? 'border-slate-300 bg-white hover:border-slate-400 text-slate-700'
                       : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`}
                 title={!allWorkPhasesComplete ? 'Complete all work phases first' : ''}
               >
-                Complete
+                <span>Complete</span>
+                {boat.status === 'all-work-complete' && boat.completedBy && (
+                  <span className="block text-xs mt-1 opacity-90">
+                    by {boat.completedBy}
+                  </span>
+                )}
               </button>
             </div>
             {!allWorkPhasesComplete && (
               <p className="text-sm text-orange-600 mt-2">
                 ⚠️ All work phases must be completed before marking as complete
+              </p>
+            )}
+            {boat.status === 'all-work-complete' && boat.completedBy && boat.completedAt && (
+              <p className="text-sm text-green-600 mt-2">
+                Marked complete by {boat.completedBy} on {new Date(boat.completedAt).toLocaleDateString()}
               </p>
             )}
           </div>
