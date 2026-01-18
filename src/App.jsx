@@ -3090,7 +3090,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       {/* Maximized Location Modal */}
       {maximizedLocation && (
         <MaximizedLocationModal
-          location={maximizedLocation}
+          location={locations.find(l => l.id === maximizedLocation.id) || maximizedLocation}
           boats={boats}
           onSlotClick={handleSlotClick}
           onBoatClick={(boat) => setViewingBoat(boat)}
