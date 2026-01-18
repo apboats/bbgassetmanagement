@@ -3200,6 +3200,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           locations={racks}
           boats={boats}
           onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
@@ -3218,6 +3219,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           locations={parking}
           boats={boats}
           onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
@@ -3236,6 +3238,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           locations={workshops}
           boats={boats}
           onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
