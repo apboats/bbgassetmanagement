@@ -3619,10 +3619,22 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
         setIsProcessing(true);
 
         // If boat is in a location, remove it from location data first
-        // The removeBoat hook will handle this gracefully even if location data is missing
         if (boat.location || boat.currentLocation) {
           console.log('[Release] Removing boat from location before archiving');
-          await onRemove(); // Uses unified removeBoat hook which delegates to service layer
+
+          // Ensure onRemove is defined before calling it
+          if (onRemove) {
+            try {
+              await onRemove();
+              console.log('[Release] Boat removed from location successfully');
+            } catch (removeError) {
+              console.error('[Release] Error removing boat from location:', removeError);
+              // Continue with archival even if removal fails - the location fields will be nulled
+              // This handles cases where the location data might be out of sync
+            }
+          } else {
+            console.warn('[Release] onRemove callback not provided, skipping location removal');
+          }
         }
 
         // Archive the boat (status change happens after removal)
@@ -3635,14 +3647,16 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
         };
 
         // Update the boat record with archived status
-        onUpdateBoat(updatedBoat);
+        await onUpdateBoat(updatedBoat);
 
-        // Close modal immediately
+        console.log('[Release] Boat archived successfully');
+
+        // Close modal
         onClose();
         setIsProcessing(false);
       } catch (error) {
-        console.error('Error releasing boat:', error);
-        alert('Failed to release boat. Please try again.');
+        console.error('[Release] Error releasing boat:', error);
+        alert(`Failed to release boat: ${error.message}`);
         setIsProcessing(false);
       }
     }
