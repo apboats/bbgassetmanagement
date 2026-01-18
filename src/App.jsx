@@ -1463,7 +1463,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
             <div className="flex-1">
               <p className="text-sm font-medium text-slate-900">Unassigned</p>
               <p className="text-xs text-slate-500">
-                {boats.filter(b => !b.location).length} boats
+                {boats.filter(b => !b.location && b.status !== 'archived').length} boats
               </p>
             </div>
           </label>
