@@ -3093,6 +3093,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           location={maximizedLocation}
           boats={boats}
           onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
@@ -3519,7 +3520,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 md:p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 md:p-4 z-[60]">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col animate-slide-in">
         {/* Fixed Header */}
         <div className={`status-${boat.status} p-4 md:p-6 rounded-t-xl flex-shrink-0`}>
@@ -4101,7 +4102,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 
       {/* Work Orders Modal */}
       {showWorkOrders && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-slide-in">
             <div className="p-4 border-b border-slate-200 flex-shrink-0">
               <div className="flex items-center justify-between">
