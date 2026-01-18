@@ -1274,16 +1274,6 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
     await onUpdateBoats(boats.map(b => b.id === updatedBoat.id ? updatedBoat : b));
   };
 
-  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
-    // Delegate to AppContainer's onMoveBoat for consistency
-    if (onMoveBoat) {
-      await onMoveBoat(boat.id, targetLocation?.id || null, targetSlot || null, boat.isInventory || false);
-
-      // Keep modal open (existing BoatsView behavior)
-      // The viewing boat will be updated via the useEffect that syncs with fresh data
-    }
-  };
-
   return (
     <div className="space-y-6 animate-slide-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1766,7 +1756,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
           locations={locations}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
-          onMoveBoat={handleMoveBoat}
+          onMoveBoat={onMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
