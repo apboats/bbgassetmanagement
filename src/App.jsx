@@ -3501,6 +3501,9 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [autocompleteResults, setAutocompleteResults] = useState([]);
+  const [isSearchingDockmaster, setIsSearchingDockmaster] = useState(false);
+  const [dockmasterSearchResults, setDockmasterSearchResults] = useState([]);
 
   // Refs for camera
   const videoRef = useRef(null);
@@ -3641,51 +3644,186 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     }
   };
 
-  // OCR processing
+  // Image preprocessing utilities for better OCR on metallic/engraved surfaces
+  const preprocessImage = (canvas, mode) => {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    if (mode === 'grayscale') {
+      // Convert to grayscale
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        data[i] = data[i + 1] = data[i + 2] = gray;
+      }
+    } else if (mode === 'invert') {
+      // Invert colors (helps with shiny metal where letters appear darker)
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 255 - data[i];
+        data[i + 1] = 255 - data[i + 1];
+        data[i + 2] = 255 - data[i + 2];
+      }
+    } else if (mode === 'highContrast') {
+      // High contrast with adaptive threshold
+      // First convert to grayscale
+      const grayValues = [];
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        grayValues.push(gray);
+      }
+      // Calculate mean for threshold
+      const mean = grayValues.reduce((a, b) => a + b, 0) / grayValues.length;
+      // Apply threshold with some tolerance
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = grayValues[i / 4];
+        const value = gray > mean - 20 ? 255 : 0; // Slight bias toward white
+        data[i] = data[i + 1] = data[i + 2] = value;
+      }
+    } else if (mode === 'edgeEnhance') {
+      // Edge enhancement for engraved text
+      const width = canvas.width;
+      const height = canvas.height;
+      const copy = new Uint8ClampedArray(data);
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          // Sobel-like edge detection
+          const gx =
+            -copy[idx - 4 - width * 4] + copy[idx + 4 - width * 4] +
+            -2 * copy[idx - 4] + 2 * copy[idx + 4] +
+            -copy[idx - 4 + width * 4] + copy[idx + 4 + width * 4];
+          const gy =
+            -copy[idx - width * 4 - 4] - 2 * copy[idx - width * 4] - copy[idx - width * 4 + 4] +
+            copy[idx + width * 4 - 4] + 2 * copy[idx + width * 4] + copy[idx + width * 4 + 4];
+          const edge = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+          // Combine original with edge
+          const gray = 0.299 * copy[idx] + 0.587 * copy[idx + 1] + 0.114 * copy[idx + 2];
+          const enhanced = Math.min(255, gray + edge * 0.5);
+          data[idx] = data[idx + 1] = data[idx + 2] = enhanced > 128 ? 255 : 0;
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+  };
+
+  // OCR processing with multiple passes
   const processImage = async (imageDataUrl) => {
     setIsProcessing(true);
-    setOcrResult('');
+    setOcrResult('Processing...');
 
     try {
+      // Create a canvas to work with the image
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageDataUrl;
+      });
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      // Define preprocessing modes to try
+      const modes = [
+        { name: 'original', process: false },
+        { name: 'inverted', process: 'invert' },
+        { name: 'highContrast', process: 'highContrast' },
+        { name: 'edgeEnhance', process: 'edgeEnhance' },
+      ];
+
+      let bestResult = { text: '', confidence: 0, mode: '' };
+
+      // Create a single worker to reuse
       const worker = await Tesseract.createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+            // Only log occasionally to avoid spam
+            if (Math.round(m.progress * 100) % 25 === 0) {
+              console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
+            }
           }
         }
       });
 
-      // Set Tesseract parameters for better HIN recognition
       await worker.setParameters({
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
         tessedit_pageseg_mode: '7', // Treat image as single text line
       });
 
-      const { data } = await worker.recognize(imageDataUrl);
-      await worker.terminate();
+      // Try each preprocessing mode
+      for (const mode of modes) {
+        console.log(`[OCR] Trying ${mode.name} mode...`);
+        setOcrResult(`Trying ${mode.name}...`);
 
-      // Extract alphanumeric text, remove special characters
-      let cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        // Draw original image
+        tempCtx.drawImage(img, 0, 0);
 
-      // Strip "US" prefix if present (common on Hull ID plates)
-      if (cleanedText.startsWith('US')) {
-        cleanedText = cleanedText.substring(2);
-        console.log('[OCR] Stripped US prefix, result:', cleanedText);
+        // Apply preprocessing if needed
+        let processedImage = imageDataUrl;
+        if (mode.process) {
+          processedImage = preprocessImage(tempCanvas, mode.process);
+        }
+
+        try {
+          const { data } = await worker.recognize(processedImage);
+
+          // Clean the result
+          let cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+          // Strip "US" prefix if present
+          if (cleanedText.startsWith('US')) {
+            cleanedText = cleanedText.substring(2);
+          }
+
+          console.log(`[OCR] ${mode.name}: "${cleanedText}" (confidence: ${data.confidence}%)`);
+
+          // Keep the best result (prioritize longer valid text with decent confidence)
+          const isValidLength = cleanedText.length >= 8 && cleanedText.length <= 20;
+          const currentBestValid = bestResult.text.length >= 8 && bestResult.text.length <= 20;
+
+          if (isValidLength) {
+            if (!currentBestValid || data.confidence > bestResult.confidence) {
+              bestResult = { text: cleanedText, confidence: data.confidence, mode: mode.name };
+              console.log(`[OCR] New best result from ${mode.name}: "${cleanedText}"`);
+            }
+          } else if (!currentBestValid && cleanedText.length > bestResult.text.length) {
+            // If we don't have a valid result yet, keep the longest one
+            bestResult = { text: cleanedText, confidence: data.confidence, mode: mode.name };
+          }
+
+          // If we get a high confidence valid result, stop early
+          if (isValidLength && data.confidence > 80) {
+            console.log(`[OCR] High confidence result found, stopping early`);
+            break;
+          }
+        } catch (err) {
+          console.error(`[OCR] Error with ${mode.name} mode:`, err);
+        }
       }
 
-      setOcrResult(cleanedText);
-      setOcrConfidence(data.confidence);
+      await worker.terminate();
+
+      // Use the best result
+      setOcrResult(bestResult.text || 'No text detected');
+      setOcrConfidence(bestResult.confidence);
+
+      console.log(`[OCR] Final result: "${bestResult.text}" from ${bestResult.mode} (confidence: ${bestResult.confidence}%)`);
 
       // Search for boat with this Hull ID
-      if (cleanedText.length >= 8) {
-        await searchBoatByHullId(cleanedText);
+      if (bestResult.text.length >= 8) {
+        await searchBoatByHullId(bestResult.text);
       } else {
-        alert('Could not read a valid Hull ID. Please try again or use manual search.');
         setShowManualSearch(true);
       }
     } catch (error) {
       console.error('OCR error:', error);
-      alert('Failed to process image. Please try again.');
+      alert('Failed to process image. Please try again or use manual entry.');
+      setShowManualSearch(true);
     } finally {
       setIsProcessing(false);
     }
@@ -3723,6 +3861,29 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     }
   };
 
+  // Autocomplete - provides suggestions as user types
+  const handleSearchInputChange = (value) => {
+    setSearchQuery(value);
+    setDockmasterSearchResults([]); // Clear Dockmaster results when typing
+
+    if (value.length < 2) {
+      setAutocompleteResults([]);
+      return;
+    }
+
+    const query = value.toLowerCase().trim();
+
+    // Search across all boats for autocomplete
+    const matches = boats.filter(boat =>
+      boat.name?.toLowerCase().includes(query) ||
+      boat.owner?.toLowerCase().includes(query) ||
+      boat.hullId?.toLowerCase().includes(query) ||
+      boat.model?.toLowerCase().includes(query)
+    ).slice(0, 5); // Limit to 5 suggestions
+
+    setAutocompleteResults(matches);
+  };
+
   // Manual search
   const searchBoatsManually = () => {
     const query = searchQuery.toLowerCase().trim();
@@ -3731,6 +3892,8 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       alert('Please enter a search term');
       return;
     }
+
+    setAutocompleteResults([]); // Clear autocomplete when doing full search
 
     // Search across all boats
     const results = boats.filter(boat =>
@@ -3741,6 +3904,103 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     );
 
     setSearchResults(results);
+  };
+
+  // Search Dockmaster for boats not yet imported
+  const searchDockmaster = async () => {
+    const query = searchQuery.trim();
+
+    if (!query) {
+      alert('Please enter a Hull ID to search Dockmaster');
+      return;
+    }
+
+    setIsSearchingDockmaster(true);
+    setDockmasterSearchResults([]);
+
+    try {
+      // Call the existing Dockmaster search edge function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ searchString: query }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+
+      const data = await response.json();
+
+      // Dockmaster returns an array of boats directly
+      const boats = Array.isArray(data) ? data : (data.boats || []);
+
+      if (boats.length > 0) {
+        // Transform Dockmaster response to our format
+        // Handle both raw Dockmaster API format and pre-transformed format
+        const transformedBoats = boats.map((boat) => ({
+          id: boat.id,
+          name: boat.name || boat.description ||
+                `${boat.boatModelInfo?.year || boat.year || ''} ${boat.boatModelInfo?.vendorName || boat.make || ''} ${boat.boatModelInfo?.modelNumber || boat.model || ''}`.trim() ||
+                'Unknown',
+          year: boat.boatModelInfo?.year || boat.year,
+          make: boat.boatModelInfo?.vendorName || boat.make,
+          model: boat.boatModelInfo?.modelNumber || boat.model,
+          hullId: boat.serialNumber || boat.hin || boat.hullId,
+          serialNumber: boat.serialNumber || boat.hin || boat.hullId,
+          owner: boat.custName || boat.customerName || boat.owner,
+          custId: boat.custId,
+          custName: boat.custName,
+          dockmasterId: boat.id,
+          // Pass through the raw boat data for import
+          boatModelInfo: boat.boatModelInfo,
+        }));
+        setDockmasterSearchResults(transformedBoats);
+      } else {
+        alert(`No boats found in Dockmaster matching: ${query}`);
+      }
+    } catch (error) {
+      console.error('Dockmaster search error:', error);
+      alert('Failed to search Dockmaster. Please try again.');
+    } finally {
+      setIsSearchingDockmaster(false);
+    }
+  };
+
+  // Import a boat from Dockmaster search results
+  const importFromDockmaster = async (dockmasterBoat) => {
+    try {
+      setIsLoading(true);
+
+      // Import the boat using existing service
+      const importedBoat = await boatsService.importFromDockmaster(dockmasterBoat);
+
+      if (importedBoat) {
+        // Add to local boats list and select it
+        setSelectedBoat(importedBoat);
+        setShowLocationPicker(true);
+        setShowManualSearch(false);
+        setDockmasterSearchResults([]);
+        setSearchQuery('');
+
+        // Refresh boats list
+        if (onUpdateBoats) {
+          const updatedBoats = [...boats, importedBoat];
+          onUpdateBoats(updatedBoats);
+        }
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('Failed to import boat from Dockmaster. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectBoatFromSearch = (boat) => {
@@ -3972,24 +4232,50 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
           {showManualSearch && (
             <div className="mt-6 border-t border-slate-200 pt-6">
               <h3 className="text-lg font-semibold mb-3">Manual Search</h3>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
-                  placeholder="Search by name, owner, or Hull ID..."
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={searchBoatsManually}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Search
-                </button>
+              <div className="relative">
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearchInputChange(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
+                    placeholder="Search by name, owner, or Hull ID..."
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={searchBoatsManually}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Search
+                  </button>
+                </div>
+
+                {/* Autocomplete dropdown */}
+                {autocompleteResults.length > 0 && (
+                  <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                    {autocompleteResults.map(boat => (
+                      <button
+                        key={boat.id}
+                        onClick={() => {
+                          selectBoatFromSearch(boat);
+                          setAutocompleteResults([]);
+                        }}
+                        className="w-full p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-b-0"
+                      >
+                        <p className="font-medium text-slate-900">{boat.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {boat.model} {boat.hullId && <span className="font-mono">• {boat.hullId}</span>}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Local search results */}
               {searchResults.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+                  <p className="text-sm text-slate-500 mb-2">Found {searchResults.length} boat(s):</p>
                   {searchResults.map(boat => (
                     <button
                       key={boat.id}
@@ -4003,6 +4289,69 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                       )}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* No results - show Dockmaster search option */}
+              {searchResults.length === 0 && searchQuery.length >= 3 && (
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 mb-3">
+                    No boats found locally. Search Dockmaster for boats not yet imported?
+                  </p>
+                  <button
+                    onClick={searchDockmaster}
+                    disabled={isSearchingDockmaster}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-400 transition-colors"
+                  >
+                    {isSearchingDockmaster ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4" />
+                        Search Dockmaster
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Dockmaster search results */}
+              {dockmasterSearchResults.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-2">
+                    Found in Dockmaster ({dockmasterSearchResults.length}):
+                  </p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {dockmasterSearchResults.map((boat, idx) => (
+                      <div
+                        key={boat.id || idx}
+                        className="p-3 border border-amber-200 bg-amber-50 rounded-lg"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-bold text-slate-900">{boat.name || 'Unknown'}</p>
+                            <p className="text-sm text-slate-600">
+                              {boat.year} {boat.make} {boat.model}
+                            </p>
+                            {boat.hullId && (
+                              <p className="text-xs text-slate-500 font-mono mt-1">Hull ID: {boat.hullId}</p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">Owner: {boat.owner || 'Unknown'}</p>
+                          </div>
+                          <button
+                            onClick={() => importFromDockmaster(boat)}
+                            disabled={isLoading}
+                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-green-400 transition-colors"
+                          >
+                            {isLoading ? 'Importing...' : 'Import'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
