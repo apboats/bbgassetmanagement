@@ -158,12 +158,12 @@ export function LocationGrid({
               if (onDrop) onDrop(e, location, row, col);
             }}
             onClick={(e) => {
-              if (!isDragging) {
-                if (boat && onBoatClick) {
-                  onBoatClick(boat);
-                } else if (!boat && onSlotClick) {
-                  onSlotClick(slotId);
-                }
+              // Allow clicks even during drag operations on mobile
+              e.stopPropagation();
+              if (boat && onBoatClick) {
+                onBoatClick(boat);
+              } else if (!boat && onSlotClick) {
+                onSlotClick(slotId);
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
@@ -208,12 +208,12 @@ export function LocationGrid({
               if (onDrop) onDrop(e, location, row, col);
             }}
             onClick={(e) => {
-              if (!isDragging) {
-                if (boat && onBoatClick) {
-                  onBoatClick(boat);
-                } else if (!boat && onSlotClick) {
-                  onSlotClick(slotId);
-                }
+              // Allow clicks even during drag operations on mobile
+              e.stopPropagation();
+              if (boat && onBoatClick) {
+                onBoatClick(boat);
+              } else if (!boat && onSlotClick) {
+                onSlotClick(slotId);
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
