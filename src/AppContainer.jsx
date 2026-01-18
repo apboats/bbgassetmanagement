@@ -492,22 +492,33 @@ function AppContainer() {
   // LOCATIONS OPERATIONS
   // ============================================================================
 
+  // Helper to check if current user has location management permissions
+  const canManageLocations = () => {
+    return user?.role === 'admin' || user?.role === 'manager'
+  }
+
   const handleAddLocation = async (locationData) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Location management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
     try {
       // Remove id if present - let database auto-generate UUID
       // Also remove poolBoats (camelCase) and undefined values
       const { id, poolBoats, pool_boats, ...dataToSave } = locationData
-      
+
       const cleanData = {
         ...dataToSave,
         boats: dataToSave.boats || {},
       }
-      
+
       // Only include pool_boats for pool type locations
       if (locationData.type === 'pool') {
         cleanData.pool_boats = pool_boats || []
       }
-      
+
       await locationsService.create(cleanData)
       await loadLocations()
     } catch (error) {
@@ -517,6 +528,12 @@ function AppContainer() {
   }
 
   const handleUpdateLocation = async (locationId, updates) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Location management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
     try {
       await locationsService.update(locationId, updates)
       await loadLocations()
@@ -527,6 +544,12 @@ function AppContainer() {
   }
 
   const handleDeleteLocation = async (locationId) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Location management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
     try {
       await locationsService.delete(locationId)
       await loadLocations()

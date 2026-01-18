@@ -2529,6 +2529,9 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
 }
 
 function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
+  // Role check for location management permissions
+  const isManagerOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
@@ -2906,13 +2909,15 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Storage Locations</h2>
           <p className="text-slate-600">Manage boat storage facilities and assignments</p>
         </div>
-        <button
-          onClick={() => setShowAddLocation(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
-        >
-          <Plus className="w-5 h-5" />
-          Add Location
-        </button>
+        {isManagerOrAdmin && (
+          <button
+            onClick={() => setShowAddLocation(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
+          >
+            <Plus className="w-5 h-5" />
+            Add Location
+          </button>
+        )}
       </div>
 
       {/* Instructions Banner */}
@@ -2944,8 +2949,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           boats={boats}
           onSlotClick={handleSlotClick}
           onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
+          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
@@ -2963,8 +2968,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           boats={boats}
           onSlotClick={handleSlotClick}
           onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
+          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
@@ -2982,8 +2987,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           boats={boats}
           onSlotClick={handleSlotClick}
           onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
+          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
@@ -3007,8 +3012,8 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
                 key={pool.id}
                 location={pool}
                 boats={boats}
-                onEdit={() => setEditingLocation(pool)}
-                onDelete={() => handleDeleteLocation(pool.id)}
+                onEdit={isManagerOrAdmin ? () => setEditingLocation(pool) : undefined}
+                onDelete={isManagerOrAdmin ? () => handleDeleteLocation(pool.id) : undefined}
                 onDragStart={handleDragStart}
                 onDrop={handlePoolDrop}
                 onDragEnd={handleDragEnd}
@@ -3032,12 +3037,16 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
           <Map className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500 mb-4">No storage locations yet</p>
-          <button
-            onClick={() => setShowAddLocation(true)}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-          >
-            Create First Location
-          </button>
+          {isManagerOrAdmin ? (
+            <button
+              onClick={() => setShowAddLocation(true)}
+              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Create First Location
+            </button>
+          ) : (
+            <p className="text-sm text-slate-400">Contact a manager to create locations</p>
+          )}
         </div>
       )}
 
