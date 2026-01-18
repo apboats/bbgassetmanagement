@@ -106,7 +106,6 @@ export default function BoatsByGeorgeAssetManager({
   const [currentView, setCurrentView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [dockmasterToken, setDockmasterToken] = useState(null);
 
   // Data is now loaded by AppContainer - no need for local data loading
 
@@ -621,11 +620,8 @@ export default function BoatsByGeorgeAssetManager({
             boats={boats}
             locations={locations}
             onUpdateBoats={saveBoats}
-            onUpdateLocations={saveLocations}
             onMoveBoat={handleMoveBoat}
             dockmasterConfig={dockmasterConfig}
-            dockmasterToken={dockmasterToken}
-            setDockmasterToken={setDockmasterToken}
           />
         )}
         {currentView === 'scan' && (
@@ -1091,7 +1087,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmasterConfig, dockmasterToken, setDockmasterToken, onMoveBoat }) {
+function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1279,66 +1275,13 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
-    let updatedLocations = [...locations];
-    
-    // Remove from current location
-    if (boat.location) {
-      const currentLoc = locations.find(l => l.name === boat.location);
-      if (currentLoc) {
-        if (currentLoc.type === 'pool') {
-          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
-          const updatedLoc = {
-            ...currentLoc,
-            pool_boats: poolBoats.filter(id => id !== boat.id),
-          };
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        } else {
-          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
-          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
-          if (slotKey) delete updatedLoc.boats[slotKey];
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        }
-      }
+    // Delegate to AppContainer's onMoveBoat for consistency
+    if (onMoveBoat) {
+      await onMoveBoat(boat.id, targetLocation?.id || null, targetSlot || null, boat.isInventory || false);
+
+      // Keep modal open (existing BoatsView behavior)
+      // The viewing boat will be updated via the useEffect that syncs with fresh data
     }
-    
-    // Add to new location
-    let updatedBoat = { ...boat };
-    if (targetLocation) {
-      if (targetLocation.type === 'pool') {
-        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
-        const updatedLoc = {
-          ...targetLocation,
-          pool_boats: [...poolBoats, boat.id],
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = 'pool';
-      } else {
-        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
-        const updatedLoc = {
-          ...currentTargetLoc,
-          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        const [row, col] = targetSlot.split('-').map(Number);
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = `${row + 1}-${col + 1}`;
-      }
-    } else {
-      updatedBoat.location = null;
-      updatedBoat.slot = null;
-    }
-    
-    await onUpdateLocations(updatedLocations);
-    await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
-    
-    // Update viewing boat with new location info
-    const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
-    setViewingBoat({
-      ...updatedBoat,
-      currentLocation: newLocation,
-      currentSlot: targetSlot
-    });
   };
 
   return (
