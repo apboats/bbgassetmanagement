@@ -53,8 +53,8 @@ export function LocationSection({
             onDragEnd={onDragEnd}
             onDrop={onDrop}
             onMaximize={() => onMaximize(location)}
-            onEdit={() => onEdit(location)}
-            onDelete={() => onDelete(location.id)}
+            onEdit={onEdit ? () => onEdit(location) : undefined}
+            onDelete={onDelete ? () => onDelete(location.id) : undefined}
           />
         ))}
       </div>
