@@ -4893,9 +4893,31 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
 
     if (video && canvas) {
       const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Calculate scan box region (80% width, 80px height, centered)
+      // These match the overlay dimensions
+      const scanBoxWidthPercent = 0.80;
+      const scanBoxHeight = 80;
+
+      // Video dimensions
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+
+      // Calculate the scan box region in video coordinates
+      const scanBoxWidth = videoWidth * scanBoxWidthPercent;
+      const scanBoxX = (videoWidth - scanBoxWidth) / 2;
+      const scanBoxY = (videoHeight - scanBoxHeight) / 2;
+
+      // Set canvas to scan box dimensions only
+      canvas.width = scanBoxWidth;
+      canvas.height = scanBoxHeight;
+
+      // Draw only the scan box region to the canvas
+      context.drawImage(
+        video,
+        scanBoxX, scanBoxY, scanBoxWidth, scanBoxHeight,  // Source region
+        0, 0, scanBoxWidth, scanBoxHeight                  // Destination
+      );
 
       const imageDataUrl = canvas.toDataURL('image/png');
       setCapturedImage(imageDataUrl);
@@ -4918,11 +4940,23 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
         }
       });
 
+      // Set Tesseract parameters for better HIN recognition
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+        tessedit_pageseg_mode: '7', // Treat image as single text line
+      });
+
       const { data } = await worker.recognize(imageDataUrl);
       await worker.terminate();
 
       // Extract alphanumeric text, remove special characters
-      const cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      let cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+      // Strip "US" prefix if present (common on Hull ID plates)
+      if (cleanedText.startsWith('US')) {
+        cleanedText = cleanedText.substring(2);
+        console.log('[OCR] Stripped US prefix, result:', cleanedText);
+      }
 
       setOcrResult(cleanedText);
       setOcrConfidence(data.confidence);
@@ -5122,7 +5156,7 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
             </div>
           )}
 
-          {/* Active Camera with Capture Button */}
+          {/* Active Camera with Scan Box Overlay */}
           {isCameraActive && (
             <div className="relative">
               <video
@@ -5132,6 +5166,35 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                 muted
                 className="w-full rounded-lg"
               />
+              {/* Scan Box Overlay */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Dark overlay outside scan box */}
+                <div className="absolute inset-0 bg-black/50" />
+                {/* Clear scan box in center */}
+                <div
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-transparent"
+                  style={{
+                    width: '80%',
+                    height: '80px',
+                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
+                  }}
+                >
+                  {/* Scan box border */}
+                  <div className="absolute inset-0 border-2 border-green-400 rounded-lg">
+                    {/* Corner markers */}
+                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl" />
+                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr" />
+                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl" />
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br" />
+                  </div>
+                </div>
+                {/* Instructions */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-4 text-center">
+                  <p className="text-white text-sm font-medium bg-black/60 px-3 py-1 rounded-full">
+                    Position Hull ID inside the box
+                  </p>
+                </div>
+              </div>
               <div className="mt-4 flex gap-2 justify-center">
                 <button
                   onClick={captureImage}
