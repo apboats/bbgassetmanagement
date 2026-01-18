@@ -8,6 +8,7 @@ import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation
 import { PoolLocation } from './components/locations/PoolLocation';
 import { LocationGrid } from './components/locations/LocationGrid';
 import { LocationSection } from './components/locations/LocationSection';
+import { useRemoveBoat } from './hooks/useRemoveBoat';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -614,11 +615,12 @@ export default function BoatsByGeorgeAssetManager({
           />
         )}
         {currentView === 'boats' && (
-          <BoatsView 
-            boats={boats} 
-            locations={locations} 
+          <BoatsView
+            boats={boats}
+            locations={locations}
             onUpdateBoats={saveBoats}
             onUpdateLocations={saveLocations}
+            onMoveBoat={handleMoveBoat}
             dockmasterConfig={dockmasterConfig}
             dockmasterToken={dockmasterToken}
             setDockmasterToken={setDockmasterToken}
@@ -804,6 +806,12 @@ function NavButton({ icon: Icon, label, active, onClick }) {
 function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
+  // Use unified remove boat hook
+  const { removeBoat } = useRemoveBoat({
+    onMoveBoat: onMoveBoatFromContainer,
+    onSuccess: () => setViewingBoat(null)
+  });
+
   // Sync viewingBoat with boats array when it updates (real-time changes)
   useEffect(() => {
     if (viewingBoat) {
@@ -950,18 +958,6 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
     });
   };
 
-  const handleRemoveBoatFromLocation = () => {
-    if (!viewingBoat) return;
-    
-    const updatedBoat = {
-      ...viewingBoat,
-      location: null,
-      slot: null
-    };
-    onUpdateBoats(boats.map(b => b.id === viewingBoat.id ? updatedBoat : b));
-    setViewingBoat(null);
-  };
-
   return (
     <div className="space-y-8 animate-slide-in">
       <div>
@@ -1047,7 +1043,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          onRemove={handleRemoveBoatFromLocation}
+          onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
@@ -1093,7 +1089,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmasterConfig, dockmasterToken, setDockmasterToken }) {
+function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmasterConfig, dockmasterToken, setDockmasterToken, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1104,6 +1100,14 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   const [viewingBoat, setViewingBoat] = useState(null);
   const [showBoatTypeSelector, setShowBoatTypeSelector] = useState(false);
   const [showDockmasterSearch, setShowDockmasterSearch] = useState(false);
+
+  // Use unified remove boat hook
+  const { removeBoat } = useRemoveBoat({
+    onMoveBoat,
+    onSuccess: () => {
+      // Keep modal open for chained operations (existing behavior)
+    }
+  });
 
   // Sync viewingBoat with fresh data when boats array updates
   useEffect(() => {
@@ -1267,36 +1271,9 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   const handleUpdateBoatFromModal = async (updatedBoat) => {
     // Immediately update the modal to show the user's changes
     setViewingBoat(updatedBoat);
-    
+
     // Save to database in the background
     await onUpdateBoats(boats.map(b => b.id === updatedBoat.id ? updatedBoat : b));
-  };
-
-  const handleRemoveBoatFromLocation = async () => {
-    if (!viewingBoat || !viewingBoat.currentLocation) return;
-
-    // Remove boat from location
-    const updatedLocation = {
-      ...viewingBoat.currentLocation,
-      boats: { ...viewingBoat.currentLocation.boats }
-    };
-    delete updatedLocation.boats[viewingBoat.currentSlot];
-    
-    // Update boat to have no location
-    const updatedBoat = {
-      ...viewingBoat,
-      location: null,
-      slot: null
-    };
-    
-    // Update both locations and boats
-    if (onUpdateLocations) {
-      await onUpdateLocations(locations.map(l => l.id === viewingBoat.currentLocation.id ? updatedLocation : l));
-    }
-    await onUpdateBoats(boats.map(b => b.id === viewingBoat.id ? updatedBoat : b));
-    
-    // Don't close modal here - let the caller decide
-    // This allows handleReleaseBoat to remove from location, then archive, then close
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
@@ -1842,7 +1819,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          onRemove={handleRemoveBoatFromLocation}
+          onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
@@ -2563,6 +2540,12 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
   const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
 
+  // Use unified remove boat hook
+  const { removeBoat, isRemoving } = useRemoveBoat({
+    onMoveBoat: onMoveBoatFromContainer,
+    onSuccess: () => setViewingBoat(null)
+  });
+
   // Sync viewingBoat with boats array when it updates (real-time changes)
   useEffect(() => {
     if (viewingBoat) {
@@ -2986,91 +2969,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
     setIsProcessing(false);
   };
 
-  const handleRemoveBoatFromLocation = async () => {
-    if (!viewingBoat || !viewingBoat.currentLocation || isProcessing) return;
-
-    console.log('[Remove] Starting removal for boat:', viewingBoat.id, 'from location:', viewingBoat.currentLocation.name);
-    setIsProcessing(true);
-
-    // For inventory boats, use AppContainer's handleMoveBoat to properly update database
-    if (viewingBoat.isInventory && onMoveBoatFromContainer) {
-      try {
-        console.log('[Remove] Using inventory boat removal');
-        await onMoveBoatFromContainer(viewingBoat.id, null, null, true);
-        setViewingBoat(null);
-      } catch (error) {
-        console.error('Error removing inventory boat:', error);
-        alert('Failed to remove boat. Please try again.');
-      }
-      setIsProcessing(false);
-      return;
-    }
-
-    // For regular boats, continue with existing logic
-    // Check if this is a pool location
-    const isPool = viewingBoat.currentLocation.type === 'pool';
-    console.log('[Remove] Location type:', isPool ? 'pool' : 'grid', 'Slot:', viewingBoat.currentSlot);
-
-    let updatedLocation;
-    if (isPool) {
-      // Remove from pool_boats array
-      const currentPoolBoats = viewingBoat.currentLocation.pool_boats || viewingBoat.currentLocation.poolBoats || [];
-      console.log('[Remove] Current pool boats:', currentPoolBoats);
-      console.log('[Remove] Removing boat ID:', viewingBoat.id);
-      updatedLocation = {
-        ...viewingBoat.currentLocation,
-        pool_boats: currentPoolBoats.filter(id => id !== viewingBoat.id),
-      };
-      console.log('[Remove] Updated pool boats:', updatedLocation.pool_boats);
-    } else {
-      // Remove from grid slot - also remove ALL instances of this boat from any slot (cleanup duplicates)
-      const boats = { ...viewingBoat.currentLocation.boats };
-      console.log('[Remove] Current boats object:', boats);
-      console.log('[Remove] Removing from slot:', viewingBoat.currentSlot, 'Boat ID:', viewingBoat.id);
-
-      // Remove from the specified slot
-      delete boats[viewingBoat.currentSlot];
-
-      // Also clean up any duplicate instances of this boat in other slots
-      Object.keys(boats).forEach(slot => {
-        if (boats[slot] === viewingBoat.id) {
-          console.log('[Remove] Found duplicate in slot:', slot, '- removing');
-          delete boats[slot];
-        }
-      });
-
-      updatedLocation = {
-        ...viewingBoat.currentLocation,
-        boats
-      };
-      console.log('[Remove] Updated boats object:', updatedLocation.boats);
-    }
-
-    const updatedLocations = locations.map(l => l.id === viewingBoat.currentLocation.id ? updatedLocation : l);
-
-    // Update boat to have no location
-    const updatedBoat = {
-      ...viewingBoat,
-      location: null,
-      slot: null
-    };
-    const updatedBoats = boats.map(b => b.id === viewingBoat.id ? updatedBoat : b);
-
-    // Await both updates
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error removing boat:', error);
-      alert('Failed to remove boat. Please try again.');
-      setIsProcessing(false);
-      return;
-    }
-
-    setViewingBoat(null);
-    setIsProcessing(false);
-  };
-
   const handleUpdateBoatFromModal = (updatedBoat) => {
     onUpdateBoats(boats.map(b => b.id === updatedBoat.id ? updatedBoat : b));
     setViewingBoat(updatedBoat);
@@ -3384,13 +3282,13 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          onRemove={handleRemoveBoatFromLocation}
+          onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
-      
+
       {/* Maximized Location Modal */}
       {maximizedLocation && (
         <MaximizedLocationModal
@@ -5635,6 +5533,12 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
   const [viewingBoat, setViewingBoat] = useState(null);
   const mouseYRef = useRef(0);
 
+  // Use unified remove boat hook
+  const { removeBoat } = useRemoveBoat({
+    onMoveBoat: onMoveBoatFromContainer,
+    onSuccess: () => setViewingBoat(null)
+  });
+
   // Sync viewingBoat with boats array when it updates (real-time changes)
   useEffect(() => {
     if (viewingBoat) {
@@ -5985,30 +5889,6 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     }
 
     setIsProcessing(false);
-  };
-
-  const handleRemoveBoatFromLocation = async () => {
-    if (!viewingBoat || !viewingBoat.currentLocation) return;
-
-    const location = viewingBoat.currentLocation;
-    const slotId = viewingBoat.currentSlot;
-
-    // Remove from location
-    const updatedLocation = {
-      ...location,
-      boats: { ...location.boats }
-    };
-    delete updatedLocation.boats[slotId];
-
-    const updatedLocations = locations.map(l => l.id === location.id ? updatedLocation : l);
-
-    // Update boat
-    const updatedBoat = { ...viewingBoat, location: null, slot: null };
-    const updatedBoats = boats.map(b => b.id === viewingBoat.id ? updatedBoat : b);
-
-    await onUpdateLocations(updatedLocations);
-    await onUpdateBoats(updatedBoats);
-    setViewingBoat(null);
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
@@ -6377,10 +6257,13 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                   setShowBoatAssignModal(true);
                 }}
                 onBoatClick={(boat) => {
-                  // Find the boat's location and slot to enable removal
-                  const boatLocation = locations.find(l => l.name === boat.location);
-                  const slotId = boat.slot ? boat.slot.replace(/(\d+)-(\d+)/, (match, r, c) => `${parseInt(r)-1}-${parseInt(c)-1}`) : null;
-                  setViewingBoat({ ...boat, currentLocation: boatLocation, currentSlot: slotId });
+                  // Find which slot in THIS location contains this boat
+                  const boatSlot = Object.keys(location.boats || {}).find(slot => location.boats[slot] === boat.id);
+                  setViewingBoat({
+                    ...boat,
+                    currentLocation: location,  // Use the location object we already have
+                    currentSlot: boatSlot        // The actual slot ID from location.boats
+                  });
                 }}
                 draggingBoat={null}
                 onDragStart={() => {}}
@@ -6445,7 +6328,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          onRemove={handleRemoveBoatFromLocation}
+          onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
             onUpdateBoats(updatedBoats);
@@ -6486,6 +6369,12 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
   const [filterMake, setFilterMake] = useState('all');
   const [filterModel, setFilterModel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  // Use unified remove boat hook
+  const { removeBoat } = useRemoveBoat({
+    onMoveBoat,
+    onSuccess: () => setViewingBoat(null)
+  });
 
   // Keep viewingBoat in sync with inventoryBoats when they update from database
   useEffect(() => {
@@ -6543,16 +6432,6 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
     if (onUpdateSingleBoat) {
       await onUpdateSingleBoat(updatedBoat.id, updatedBoat);
     }
-  };
-
-  const handleRemoveBoatFromLocation = async () => {
-    if (!viewingBoat) return;
-    
-    // Use the move callback with null location to remove from slot
-    if (onMoveBoat) {
-      await onMoveBoat(viewingBoat.id, null, null, true);
-    }
-    setViewingBoat(null);
   };
 
   // Use the proper move callback from AppContainer which handles both tables correctly
