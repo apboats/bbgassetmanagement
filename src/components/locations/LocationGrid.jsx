@@ -6,7 +6,226 @@
 // ============================================================================
 
 import React from 'react';
-import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield } from 'lucide-react';
+import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign } from 'lucide-react';
+
+// ============================================================================
+// MAXIMIZED LOCATION MODAL
+// ============================================================================
+// Full-screen modal for viewing a location in expanded view
+// ============================================================================
+
+export function MaximizedLocationModal({
+  location,
+  boats,
+  inventoryBoats,
+  onSlotClick,
+  onBoatClick,
+  draggingBoat,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  onClose
+}) {
+  // Combine boats and inventory boats
+  const allBoats = [...(boats || []), ...(inventoryBoats || [])];
+
+  const isUShape = location.layout === 'u-shaped';
+  const totalSlots = isUShape
+    ? (location.rows * 2) + location.columns
+    : location.rows * location.columns;
+  const occupiedSlots = Object.keys(location.boats || {}).length;
+  const occupancyRate = totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0;
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  // Get slot styling based on boat type
+  const getSlotStyle = (boat) => {
+    if (!boat) return '';
+
+    if (boat.isInventory) {
+      const salesStatusColors = {
+        'HA': 'bg-gradient-to-br from-green-500 to-green-600',
+        'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700',
+        'OA': 'bg-gradient-to-br from-blue-500 to-blue-600',
+        'OS': 'bg-gradient-to-br from-blue-600 to-blue-700',
+        'FA': 'bg-gradient-to-br from-amber-500 to-amber-600',
+        'FS': 'bg-gradient-to-br from-amber-600 to-amber-700',
+        'S': 'bg-gradient-to-br from-purple-500 to-purple-600',
+        'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600',
+        'FP': 'bg-gradient-to-br from-slate-500 to-slate-600',
+      };
+      return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
+    }
+
+    return `status-${boat.status}`;
+  };
+
+  // Render slot content
+  const renderSlotContent = (boat, row, col) => {
+    if (!boat) {
+      return (
+        <div className="text-slate-400 pointer-events-none">
+          <div className="text-3xl mb-1">+</div>
+          <p className="text-sm">{row + 1}-{col + 1}</p>
+        </div>
+      );
+    }
+
+    if (boat.isInventory) {
+      const salesStatusShort = {
+        'HA': 'AVAIL', 'HS': 'SOLD', 'OA': 'ORDER', 'OS': 'ORD-S',
+        'FA': 'FUTURE', 'FS': 'FUT-S', 'S': 'SOLD', 'R': 'RSVD', 'FP': 'FP'
+      };
+      return (
+        <>
+          <p className="text-white font-bold text-base leading-tight pointer-events-none truncate w-full px-1">
+            {boat.name}
+          </p>
+          <p className="text-white/80 text-sm pointer-events-none truncate w-full">
+            {boat.year} {boat.model}
+          </p>
+          <div className="flex items-center gap-1 mt-1 pointer-events-none">
+            <span className="px-2 py-0.5 bg-white/20 rounded text-xs text-white font-bold">
+              {salesStatusShort[boat.salesStatus] || boat.salesStatus || 'INV'}
+            </span>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
+        {boat.workOrderNumber && (
+          <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full">
+            WO: {boat.workOrderNumber}
+          </p>
+        )}
+        <div className="flex gap-1.5 mt-1 pointer-events-none">
+          <Wrench className={`w-5 h-5 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+          <Sparkles className={`w-5 h-5 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
+          <Layers className={`w-5 h-5 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+          <Shield className={`w-5 h-5 ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
+          <DollarSign className={`w-5 h-5 ${boat.invoicedComplete ? 'text-white' : 'text-white/30'}`} title="Invoiced" />
+        </div>
+        <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
+      </>
+    );
+  };
+
+  // Render grid slot
+  const renderSlot = (row, col, isPerimeterSlot = true) => {
+    if (!isPerimeterSlot) {
+      return <div key={`${row}-${col}`} className="aspect-square"></div>;
+    }
+
+    const slotId = `${row}-${col}`;
+    const boatId = location.boats?.[slotId];
+    const boat = allBoats.find(b => b.id === boatId);
+    const isDragging = draggingBoat !== null;
+
+    return (
+      <div
+        key={slotId}
+        draggable={!!boat}
+        title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
+        onDragStart={(e) => {
+          if (boat && onDragStart) {
+            onDragStart(e, boat, location, slotId);
+          }
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={(e) => {
+          if (onDrop) onDrop(e, location, row, col);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (boat && onBoatClick) {
+            onBoatClick(boat);
+          } else if (!boat && onSlotClick) {
+            onSlotClick(location, row, col);
+          }
+        }}
+        className={`aspect-square border-2 rounded-xl p-3 flex flex-col items-center justify-center text-center transition-all min-w-[140px] min-h-[140px] ${
+          boat
+            ? `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105`
+            : isDragging
+              ? 'border-blue-400 bg-blue-50 cursor-pointer'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+        }`}
+      >
+        {renderSlotContent(boat, row, col)}
+      </div>
+    );
+  };
+
+  // Render the grid
+  const renderGrid = () => {
+    const slots = [];
+    for (let row = 0; row < location.rows; row++) {
+      for (let col = 0; col < location.columns; col++) {
+        if (isUShape) {
+          const isLeftEdge = col === 0;
+          const isRightEdge = col === location.columns - 1;
+          const isBottomRow = row === location.rows - 1;
+          const isPerimeter = isLeftEdge || isRightEdge || isBottomRow;
+          slots.push(renderSlot(row, col, isPerimeter));
+        } else {
+          slots.push(renderSlot(row, col, true));
+        }
+      }
+    }
+    return slots;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 bg-gradient-to-r from-slate-100 to-slate-200 border-b border-slate-300 rounded-t-2xl flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-bold text-slate-900">{location.name}</h3>
+            <p className="text-sm text-slate-600">
+              {location.type?.replace('-', ' ')} • {location.rows} × {location.columns}
+              {isUShape && ' (U-shaped)'} • {occupiedSlots}/{totalSlots} slots ({occupancyRate}%)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 bg-white hover:bg-slate-100 rounded-lg transition-colors shadow"
+          >
+            <X className="w-6 h-6 text-slate-600" />
+          </button>
+        </div>
+
+        {/* Grid Content */}
+        <div className="flex-1 overflow-auto p-6 bg-slate-50">
+          <div className="inline-block min-w-full">
+            <div
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 1fr))`
+              }}
+            >
+              {renderGrid()}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-100 border-t border-slate-200 rounded-b-2xl">
+          <p className="text-sm text-slate-500 text-center">
+            Drag boats to move them between slots • Click empty slots to assign boats
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function LocationGrid({
   location,
