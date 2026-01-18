@@ -1274,6 +1274,14 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
     await onUpdateBoats(boats.map(b => b.id === updatedBoat.id ? updatedBoat : b));
   };
 
+  // Wrapper to convert BoatDetailsModal's signature (boat, location, slot)
+  // to AppContainer's signature (boatId, locationId, slotId, isInventory)
+  const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
+    if (onMoveBoat) {
+      await onMoveBoat(boat.id, targetLocation?.id || null, targetSlot || null, boat.isInventory || false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-slide-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1756,7 +1764,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
           locations={locations}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
-          onMoveBoat={onMoveBoat}
+          onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
       )}
