@@ -4308,8 +4308,57 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
+  // Work order state
+  const [showWorkOrders, setShowWorkOrders] = useState(false);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
+  const [workOrdersError, setWorkOrdersError] = useState('');
+  const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
+
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);
+
+  // Fetch work orders for this inventory boat
+  const fetchWorkOrders = async () => {
+    if (!boat.dockmasterId) {
+      setWorkOrdersError('No Dockmaster ID available for this boat');
+      return;
+    }
+
+    setLoadingWorkOrders(true);
+    setWorkOrdersError('');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-internal-workorders-query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          dockmasterId: boat.dockmasterId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setWorkOrders(data.workOrders || []);
+        setWorkOrdersLastSynced(data.lastSynced);
+        setShowWorkOrders(true);
+      } else {
+        setWorkOrdersError(data.error || 'Failed to fetch work orders');
+      }
+    } catch (error) {
+      console.error('Error fetching work orders:', error);
+      setWorkOrdersError(error.message || 'Failed to fetch work orders');
+    } finally {
+      setLoadingWorkOrders(false);
+    }
+  };
 
   // Use the shared hook for consistent location display
   const { displayLocation, displaySlot } = useBoatLocation(enrichedBoat, locations);
@@ -4434,6 +4483,39 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
             </div>
           </div>
 
+          {/* Work Orders Button */}
+          {boat.dockmasterId && (
+            <button
+              onClick={fetchWorkOrders}
+              disabled={loadingWorkOrders}
+              className="w-full p-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 hover:border-purple-300 rounded-xl transition-colors text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <Wrench className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-purple-900">View Work Orders</p>
+                    <p className="text-xs text-purple-600">Rigging & prep work orders</p>
+                  </div>
+                </div>
+                {loadingWorkOrders ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-purple-400" />
+                )}
+              </div>
+            </button>
+          )}
+
+          {/* Work Orders Error */}
+          {workOrdersError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{workOrdersError}</p>
+            </div>
+          )}
+
           {/* Sync Info */}
           <div className="text-xs text-slate-400 text-center">
             <p>Last synced: {boat.lastSynced ? new Date(boat.lastSynced).toLocaleString() : 'Unknown'}</p>
@@ -4451,6 +4533,148 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
           </button>
         </div>
       </div>
+
+      {/* Work Orders Modal */}
+      {showWorkOrders && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4 flex-shrink-0">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-xl font-bold">Work Orders</h3>
+                  <p className="text-purple-200 text-sm">{boat.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowWorkOrders(false)}
+                  className="p-1 hover:bg-purple-500 rounded transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              {workOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <Wrench className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 font-medium">No Open Work Orders</p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    No rigging or prep work orders found for this boat
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {workOrders.map((wo) => (
+                    <div key={wo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                      {/* WO Header */}
+                      <div className="p-4 bg-slate-50 border-b border-slate-200">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-mono font-bold text-slate-900">WO #{wo.id}</span>
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                wo.status === 'O'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-green-100 text-green-700'
+                              }`}>
+                                {wo.status === 'O' ? 'Open' : 'Closed'}
+                              </span>
+                            </div>
+                            {wo.title && (
+                              <p className="text-sm text-slate-700">{wo.title}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-slate-900">
+                              ${(wo.totalCharges || 0).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-slate-500">Total Charges</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                          <span>Created: {wo.creationDate}</span>
+                          {wo.category && <span>Category: {wo.category}</span>}
+                        </div>
+                      </div>
+
+                      {/* Operations */}
+                      {wo.operations && wo.operations.length > 0 && (
+                        <div className="p-4">
+                          <p className="text-xs font-medium text-slate-500 mb-2">
+                            OPERATIONS ({wo.operations.length})
+                          </p>
+                          <div className="space-y-2">
+                            {wo.operations.map((op, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {/* Status indicator */}
+                                  {op.status === 'C' ? (
+                                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  ) : op.flagLaborFinished ? (
+                                    <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0" title="Labor finished, not invoiced">
+                                      <DollarSign className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-blue-700">{idx + 1}</span>
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-slate-900 truncate">
+                                      {op.opcodeDesc || op.opcode}
+                                    </p>
+                                    <p className="text-xs text-slate-500">{op.opcode}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {op.flagLaborFinished && op.status !== 'C' && (
+                                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded">
+                                      Unbilled
+                                    </span>
+                                  )}
+                                  <span className="text-sm font-medium text-slate-700">
+                                    ${(op.totalCharges || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">
+                  {workOrdersLastSynced
+                    ? `Data as of ${new Date(workOrdersLastSynced).toLocaleString()}`
+                    : 'Sync work orders from Inventory page'}
+                </p>
+                <button
+                  onClick={() => setShowWorkOrders(false)}
+                  className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Location Picker Modal */}
       {showLocationPicker && (
@@ -6147,6 +6371,10 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
   const [filterModel, setFilterModel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
+  // Work order sync state
+  const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
+  const [woSyncProgress, setWoSyncProgress] = useState(null);
+
   // Use unified remove boat hook
   const { removeBoat } = useRemoveBoat({
     onMoveBoat,
@@ -6238,6 +6466,52 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
     }
   };
 
+  // Sync all internal work orders (rigging WOs)
+  const handleSyncAllWorkOrders = async () => {
+    setIsSyncingWorkOrders(true);
+    setWoSyncProgress({ status: 'Syncing all rigging work orders...', synced: 0, total: 0 });
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-internal-workorders-sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ forceRefresh: true }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setWoSyncProgress({
+          status: 'complete',
+          synced: result.synced,
+          total: result.total,
+          duration: result.duration,
+        });
+      } else {
+        setWoSyncProgress({
+          status: 'error',
+          error: result.error || 'Sync failed',
+        });
+      }
+    } catch (error) {
+      console.error('Work order sync error:', error);
+      setWoSyncProgress({
+        status: 'error',
+        error: error.message || 'Sync failed',
+      });
+    } finally {
+      setIsSyncingWorkOrders(false);
+      // Clear progress after 5 seconds
+      setTimeout(() => setWoSyncProgress(null), 5000);
+    }
+  };
+
   const isConfigured = dockmasterConfig && dockmasterConfig.username;
   const timeSinceSync = lastSync ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60000) : null;
 
@@ -6248,26 +6522,95 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Inventory Boats</h2>
           <p className="text-slate-600">Auto-synced from Dockmaster API</p>
         </div>
-        <button
-          onClick={handleSyncNow}
-          disabled={isSyncing}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md"
-        >
-          {isSyncing ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Syncing...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Sync Now
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sync Work Orders Button */}
+          <button
+            onClick={handleSyncAllWorkOrders}
+            disabled={isSyncingWorkOrders}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors shadow-md disabled:bg-purple-400"
+            title="Sync all internal rigging work orders from Dockmaster"
+          >
+            {isSyncingWorkOrders ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                Syncing WOs...
+              </>
+            ) : (
+              <>
+                <Wrench className="w-5 h-5" />
+                Sync Rigging WOs
+              </>
+            )}
+          </button>
+          {/* Sync Inventory Button */}
+          <button
+            onClick={handleSyncNow}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md"
+          >
+            {isSyncing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                Syncing...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync Inventory
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Work Order Sync Progress/Status */}
+      {woSyncProgress && (
+        <div className={`rounded-xl p-4 border ${
+          woSyncProgress.status === 'error'
+            ? 'bg-red-50 border-red-200'
+            : woSyncProgress.status === 'complete'
+              ? 'bg-green-50 border-green-200'
+              : 'bg-purple-50 border-purple-200'
+        }`}>
+          <div className="flex items-center gap-3">
+            {woSyncProgress.status === 'error' ? (
+              <>
+                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                  <X className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-red-900">Work Order Sync Failed</p>
+                  <p className="text-sm text-red-700">{woSyncProgress.error}</p>
+                </div>
+              </>
+            ) : woSyncProgress.status === 'complete' ? (
+              <>
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-green-900">Work Orders Synced Successfully</p>
+                  <p className="text-sm text-green-700">
+                    Synced {woSyncProgress.synced} of {woSyncProgress.total} work orders in {woSyncProgress.duration}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <div>
+                  <p className="font-semibold text-purple-900">Syncing Work Orders</p>
+                  <p className="text-sm text-purple-700">{woSyncProgress.status}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Configuration Warning - Only show if no boats and not configured */}
       {!isConfigured && inventoryBoats.length === 0 && (
