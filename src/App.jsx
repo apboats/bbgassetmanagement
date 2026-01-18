@@ -3714,23 +3714,34 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 
   const handleReleaseBoat = async () => {
     if (confirm(`Release ${boat.name} back to owner?\n\nThis will archive the boat and remove it from active management. The boat will be moved to the archived boats list.`)) {
-      // If boat is in a location, remove it first
-      if (boat.currentLocation && boat.currentSlot) {
-        await onRemove(); // This removes from location but doesn't close modal
+      try {
+        setIsProcessing(true);
+
+        // If boat is in a location, remove it from location data first
+        if (boat.currentLocation && boat.currentSlot) {
+          await onRemove(); // This removes from location arrays and updates boat location to null
+        }
+
+        // Archive the boat (status change happens after removal)
+        const updatedBoat = {
+          ...boat,
+          status: 'archived',
+          archivedDate: new Date().toISOString(),
+          location: null,
+          slot: null
+        };
+
+        // Update the boat record with archived status
+        onUpdateBoat(updatedBoat);
+
+        // Close modal immediately
+        onClose();
+        setIsProcessing(false);
+      } catch (error) {
+        console.error('Error releasing boat:', error);
+        alert('Failed to release boat. Please try again.');
+        setIsProcessing(false);
       }
-      
-      // Archive the boat
-      const updatedBoat = { 
-        ...boat, 
-        status: 'archived',
-        archivedDate: new Date().toISOString(),
-        location: null,
-        slot: null
-      };
-      onUpdateBoat(updatedBoat);
-      
-      // Close modal
-      onClose();
     }
   };
 
