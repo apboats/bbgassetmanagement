@@ -1139,9 +1139,9 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
     if (showArchived && !isArchived) return false;
     if (!showArchived && isArchived) return false;
     
-    const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (boat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (boat.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (boat.owner || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || boat.status === filterStatus;
     
     let matchesWorkPhase = true;
