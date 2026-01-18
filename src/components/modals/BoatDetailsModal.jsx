@@ -691,7 +691,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
 
       {/* Location Picker Modal */}
       {showLocationPicker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-slide-in">
             <div className="p-4 border-b border-slate-200 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -824,13 +824,14 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                         const isCurrentBoat = isOccupied === boat.id;
                         const displaySlot = `${row + 1}-${col + 1}`;
 
-                        // Skip non-perimeter slots for U-shaped
+                        // For U-shaped layouts, render empty div for interior slots
                         if (selectedMoveLocation.layout === 'u-shaped') {
                           const isLeftEdge = col === 0;
                           const isRightEdge = col === selectedMoveLocation.columns - 1;
                           const isBottomRow = row === selectedMoveLocation.rows - 1;
                           if (!isLeftEdge && !isRightEdge && !isBottomRow) {
-                            return null;
+                            // Render empty placeholder to maintain grid structure
+                            return <div key={slotId} className="aspect-square" />;
                           }
                         }
 

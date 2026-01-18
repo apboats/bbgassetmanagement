@@ -349,6 +349,17 @@ export function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, on
                         const isOccupied = occupyingBoatId && occupyingBoatId !== boat.id;
                         const isCurrent = occupyingBoatId === boat.id;
 
+                        // For U-shaped layouts, render empty div for interior slots
+                        if (selectedMoveLocation.layout === 'u-shaped') {
+                          const isLeftEdge = col === 0;
+                          const isRightEdge = col === selectedMoveLocation.columns - 1;
+                          const isBottomRow = row === selectedMoveLocation.rows - 1;
+                          if (!isLeftEdge && !isRightEdge && !isBottomRow) {
+                            // Render empty placeholder to maintain grid structure
+                            return <div key={slotId} className="aspect-square" />;
+                          }
+                        }
+
                         return (
                           <button
                             key={slotId}
