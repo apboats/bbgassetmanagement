@@ -3660,8 +3660,10 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
         setIsProcessing(true);
 
         // If boat is in a location, remove it from location data first
-        if (boat.currentLocation && boat.currentSlot) {
-          await onRemove(); // This removes from location arrays and updates boat location to null
+        // The removeBoat hook will handle this gracefully even if location data is missing
+        if (boat.location || boat.currentLocation) {
+          console.log('[Release] Removing boat from location before archiving');
+          await onRemove(); // Uses unified removeBoat hook which delegates to service layer
         }
 
         // Archive the boat (status change happens after removal)
