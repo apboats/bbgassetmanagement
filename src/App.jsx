@@ -4894,19 +4894,16 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     if (video && canvas) {
       const context = canvas.getContext('2d');
 
-      // Calculate scan box region (80% width, 80px height, centered)
-      // These match the overlay dimensions
-      const scanBoxWidthPercent = 0.80;
-      const scanBoxHeight = 80;
-
-      // Video dimensions
+      // Video dimensions (actual resolution)
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
 
-      // Calculate the scan box region in video coordinates
-      const scanBoxWidth = videoWidth * scanBoxWidthPercent;
-      const scanBoxX = (videoWidth - scanBoxWidth) / 2;
-      const scanBoxY = (videoHeight - scanBoxHeight) / 2;
+      // Scan box region matches the overlay: 80% width, 20% height, starts at 40% from top
+      // left: 10%, top: 40%, width: 80%, height: 20%
+      const scanBoxX = videoWidth * 0.10;
+      const scanBoxY = videoHeight * 0.40;
+      const scanBoxWidth = videoWidth * 0.80;
+      const scanBoxHeight = videoHeight * 0.20;
 
       // Set canvas to scan box dimensions only
       canvas.width = scanBoxWidth;
@@ -5158,44 +5155,51 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
 
           {/* Active Camera with Scan Box Overlay */}
           {isCameraActive && (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full rounded-lg"
-              />
-              {/* Scan Box Overlay */}
-              <div className="absolute inset-0 pointer-events-none">
-                {/* Dark overlay outside scan box */}
-                <div className="absolute inset-0 bg-black/50" />
-                {/* Clear scan box in center */}
-                <div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-transparent"
-                  style={{
-                    width: '80%',
-                    height: '80px',
-                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
-                  }}
-                >
+            <div className="flex flex-col gap-4">
+              <div className="relative inline-block">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full rounded-lg"
+                />
+                {/* Scan Box Overlay - only covers video */}
+                <div className="absolute inset-0 pointer-events-none rounded-lg overflow-hidden">
+                  {/* Top dark area */}
+                  <div className="absolute top-0 left-0 right-0 h-[40%] bg-black/50" />
+                  {/* Bottom dark area */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-black/50" />
+                  {/* Left dark area (middle section) */}
+                  <div className="absolute top-[40%] left-0 w-[10%] h-[20%] bg-black/50" />
+                  {/* Right dark area (middle section) */}
+                  <div className="absolute top-[40%] right-0 w-[10%] h-[20%] bg-black/50" />
                   {/* Scan box border */}
-                  <div className="absolute inset-0 border-2 border-green-400 rounded-lg">
+                  <div
+                    className="absolute border-3 border-green-400 rounded-lg"
+                    style={{
+                      top: '40%',
+                      left: '10%',
+                      width: '80%',
+                      height: '20%',
+                      borderWidth: '3px'
+                    }}
+                  >
                     {/* Corner markers */}
                     <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl" />
                     <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr" />
                     <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl" />
                     <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br" />
                   </div>
-                </div>
-                {/* Instructions */}
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-4 text-center">
-                  <p className="text-white text-sm font-medium bg-black/60 px-3 py-1 rounded-full">
-                    Position Hull ID inside the box
-                  </p>
+                  {/* Instructions */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-3 text-center">
+                    <p className="text-white text-sm font-medium bg-black/60 px-3 py-1 rounded-full">
+                      Position Hull ID inside the box
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="mt-4 flex gap-2 justify-center">
+              <div className="flex gap-2 justify-center">
                 <button
                   onClick={captureImage}
                   className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
