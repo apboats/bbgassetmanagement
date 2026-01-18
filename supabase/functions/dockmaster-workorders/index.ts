@@ -154,66 +154,78 @@ serve(async (req) => {
       )
     }
 
-    // Step 2: Get detailed info for each work order and filter by boatId
-    const detailedWorkOrders = await Promise.all(
-      workOrdersToFetch.map(async (wo: any) => {
-        const detailUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/Retrieve?Id=${wo.id}&Detail=true`
+    // Step 2: Get all work order IDs for batch retrieval
+    const woIds = workOrdersToFetch.map((wo: any) => wo.id)
+    console.log(`Fetching details for ${woIds.length} work orders via batch POST...`)
 
-        try {
-          const detailResponse = await fetch(detailUrl, {
-            method: 'GET',
-            headers: dmHeaders,
-          })
+    // Step 3: Batch retrieve all work order details with one POST call
+    const retrieveUrl = 'https://api.dmeapi.com/api/v1/Service/WorkOrders/RetrieveList'
+    const retrieveResponse = await fetch(retrieveUrl, {
+      method: 'POST',
+      headers: dmHeaders,
+      body: JSON.stringify({
+        woIds: woIds,
+        detail: true,
+      }),
+    })
 
-          if (!detailResponse.ok) {
-            console.error(`Failed to fetch detail for WO ${wo.id}:`, detailResponse.status)
-            return null
-          }
+    if (!retrieveResponse.ok) {
+      const errorText = await retrieveResponse.text()
+      console.error('Failed to retrieve work order details:', retrieveResponse.status, errorText)
+      return new Response(
+        JSON.stringify({ error: `Failed to retrieve work order details: ${retrieveResponse.status}` }),
+        { status: retrieveResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-          const detail = await detailResponse.json()
-          
-          // Get the boat ID from the detail response
-          const detailBoatId = String(detail.boatId || '').trim()
-          console.log(`WO ${wo.id} detail - boatId: "${detailBoatId}", looking for: "${boatId}"`)
-          
-          // Filter: only return work orders for the specific boat we're looking for
-          if (boatId) {
-            const targetBoatId = String(boatId).trim()
-            if (detailBoatId !== targetBoatId) {
-              console.log(`Skipping WO ${wo.id} - boat "${detailBoatId}" doesn't match "${targetBoatId}"`)
-              return null
-            }
-            console.log(`WO ${wo.id} matches boat ${targetBoatId}`)
-          }
-          
-          return {
-            id: detail.id,
-            customer_id: customerId,
-            boat_id: boatUuid,
-            creation_date: detail.creationDate,
-            category: detail.category,
-            status: detail.status,
-            title: detail.title,
-            total_charges: detail.totalWOCharges || 0,
-            last_synced: new Date().toISOString(),
-            operations: (detail.operations || []).map((op: any) => ({
-              opcode: op.opcode,
-              opcode_desc: op.opcodeDesc,
-              status: op.status,
-              type: op.type,
-              flag_labor_finished: op.flagLaborFinished || false,
-              total_charges: op.totalCharges || 0,
-            })),
-          }
-        } catch (err) {
-          console.error(`Error fetching detail for WO ${wo.id}:`, err)
+    const retrieveData = await retrieveResponse.json()
+
+    // Handle different response structures - might be array directly or wrapped in content/data
+    const workOrdersWithDetails = Array.isArray(retrieveData)
+      ? retrieveData
+      : (retrieveData?.content || retrieveData?.data || retrieveData)
+
+    console.log(`Retrieved ${workOrdersWithDetails?.length || 0} work orders with details`)
+
+    // Filter by boatId and transform the data
+    const detailedWorkOrders = (workOrdersWithDetails || []).map((detail: any) => {
+      // Get the boat ID from the detail response
+      const detailBoatId = String(detail.boatId || '').trim()
+      console.log(`WO ${detail.id} detail - boatId: "${detailBoatId}", looking for: "${boatId}"`)
+
+      // Filter: only return work orders for the specific boat we're looking for
+      if (boatId) {
+        const targetBoatId = String(boatId).trim()
+        if (detailBoatId !== targetBoatId) {
+          console.log(`Skipping WO ${detail.id} - boat "${detailBoatId}" doesn't match "${targetBoatId}"`)
           return null
         }
-      })
-    )
+        console.log(`WO ${detail.id} matches boat ${targetBoatId}`)
+      }
 
-    // Filter out any failed fetches and non-matching boats
-    const validWorkOrders = detailedWorkOrders.filter(wo => wo !== null)
+      return {
+        id: detail.id,
+        customer_id: customerId,
+        boat_id: boatUuid,
+        creation_date: detail.creationDate,
+        category: detail.category,
+        status: detail.status,
+        title: detail.title,
+        total_charges: detail.totalWOCharges || 0,
+        last_synced: new Date().toISOString(),
+        operations: (detail.operations || []).map((op: any) => ({
+          opcode: op.opcode,
+          opcode_desc: op.opcodeDesc,
+          status: op.status,
+          type: op.type,
+          flag_labor_finished: op.flagLaborFinished || false,
+          total_charges: op.totalCharges || 0,
+        })),
+      }
+    })
+
+    // Filter out non-matching boats (nulls from boatId filter)
+    const validWorkOrders = detailedWorkOrders.filter((wo: any) => wo !== null)
     console.log(`Valid work orders after filtering: ${validWorkOrders.length}`)
 
     // Step 3: Save to database (upsert work orders, replace operations)
