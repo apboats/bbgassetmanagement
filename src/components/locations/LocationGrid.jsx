@@ -163,7 +163,7 @@ export function LocationGrid({
               if (boat && onBoatClick) {
                 onBoatClick(boat);
               } else if (!boat && onSlotClick) {
-                onSlotClick(slotId);
+                onSlotClick(location, row, col);
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
@@ -213,7 +213,7 @@ export function LocationGrid({
               if (boat && onBoatClick) {
                 onBoatClick(boat);
               } else if (!boat && onSlotClick) {
-                onSlotClick(slotId);
+                onSlotClick(location, row, col);
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
