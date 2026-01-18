@@ -134,7 +134,7 @@ export function WorkOrdersModal({
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-slate-900">
-                          ${(wo.totalCharges || 0).toFixed(2)}
+                          ${(wo.totalCharges ?? wo.total_charges ?? 0).toFixed(2)}
                         </p>
                         <p className="text-xs text-slate-500">Total Charges</p>
                       </div>
@@ -154,7 +154,11 @@ export function WorkOrdersModal({
                       <div className="space-y-2">
                         {wo.operations.map((op, idx) => {
                           const isClosed = op.status === 'C';
-                          const isUnbilled = !isClosed && op.flagLaborFinished;
+                          // Handle both camelCase and snake_case field names (API vs cached data)
+                          const flagLaborFinished = op.flagLaborFinished || op.flag_labor_finished;
+                          const isUnbilled = !isClosed && flagLaborFinished;
+                          const totalCharges = op.totalCharges ?? op.total_charges ?? 0;
+                          const opcodeDesc = op.opcodeDesc || op.opcode_desc;
 
                           return (
                             <div
@@ -202,7 +206,7 @@ export function WorkOrdersModal({
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-sm font-medium text-slate-900">
-                                      {op.opcodeDesc || op.opcode}
+                                      {opcodeDesc || op.opcode}
                                     </p>
                                     {isUnbilled && (
                                       <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded uppercase">
@@ -218,9 +222,9 @@ export function WorkOrdersModal({
                                   </p>
                                 </div>
                               </div>
-                              {(op.totalCharges || 0) > 0 && (
+                              {totalCharges > 0 && (
                                 <span className="text-sm font-medium text-slate-700 flex-shrink-0 ml-2">
-                                  ${op.totalCharges.toFixed(2)}
+                                  ${totalCharges.toFixed(2)}
                                 </span>
                               )}
                             </div>
