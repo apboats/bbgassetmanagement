@@ -10,6 +10,7 @@ import { LocationGrid } from './components/locations/LocationGrid';
 import { LocationSection } from './components/locations/LocationSection';
 import { useRemoveBoat } from './hooks/useRemoveBoat';
 import { useAssignBoat } from './hooks/useAssignBoat';
+import { useBoatDragDrop } from './hooks/useBoatDragDrop';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -2530,14 +2531,11 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
 function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
-  const [draggingBoat, setDraggingBoat] = useState(null);
-  const [draggingFrom, setDraggingFrom] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDraggingActive, setIsDraggingActive] = useState(false);
   const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
 
@@ -2556,6 +2554,19 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       setSelectedSlot(null);
       setIsProcessing(false);
     }
+  });
+
+  // Use unified drag-and-drop hook
+  const {
+    draggingBoat,
+    draggingFrom,
+    isDragging: isDraggingActive,
+    handleDragStart,
+    handleDragEnd,
+    handleGridDrop,
+    handlePoolDrop
+  } = useBoatDragDrop({
+    onMoveBoat: onMoveBoatFromContainer
   });
 
   // Sync viewingBoat with boats array when it updates (real-time changes)
@@ -2663,175 +2674,6 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       }
       onUpdateLocations(locations.filter(l => l.id !== locationId));
     }
-  };
-
-  const handleDragStart = (e, boat, location, slotId) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', boat.id);
-    setDraggingBoat(boat);
-    setDraggingFrom({ location, slotId });
-    setIsDraggingActive(true);
-  };
-
-  const handleDragEnd = () => {
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsDraggingActive(false);
-  };
-
-  const handleDrop = async (e, targetLocation, row, col) => {
-    e.preventDefault();
-    if (!draggingBoat || isProcessing) return;
-
-    setIsProcessing(true);
-
-    const newSlotId = `${row}-${col}`;
-    
-    // Check if target slot is already occupied
-    if (targetLocation.boats[newSlotId]) {
-      alert('This slot is already occupied!');
-      setDraggingBoat(null);
-      setDraggingFrom(null);
-      setIsProcessing(false);
-      return;
-    }
-
-    let updatedLocations = [...locations];
-
-    // ALWAYS remove boat from old location if it's currently assigned somewhere
-    // This handles both dragging from within a location AND dragging from elsewhere
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        const updatedOldLocation = {
-          ...oldLocation,
-          boats: { ...oldLocation.boats }
-        };
-        // Find and remove the boat from its current slot
-        const oldSlotId = Object.keys(updatedOldLocation.boats).find(
-          key => updatedOldLocation.boats[key] === draggingBoat.id
-        );
-        if (oldSlotId) {
-          delete updatedOldLocation.boats[oldSlotId];
-        }
-        
-        updatedLocations = updatedLocations.map(l => 
-          l.id === oldLocation.id ? updatedOldLocation : l
-        );
-      }
-    }
-
-    // Add boat to new location - use the already updated locations array
-    const currentTargetLocation = updatedLocations.find(l => l.id === targetLocation.id);
-    const updatedNewLocation = {
-      ...currentTargetLocation,
-      boats: { ...currentTargetLocation.boats, [newSlotId]: draggingBoat.id }
-    };
-    updatedLocations = updatedLocations.map(l => 
-      l.id === targetLocation.id ? updatedNewLocation : l
-    );
-
-    // Update boat's location (display format with +1)
-    const updatedBoat = {
-      ...draggingBoat,
-      location: targetLocation.name,
-      slot: newSlotId // Store as-is for consistency
-    };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
-
-    // Update both locations and boats
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error updating boat location:', error);
-      alert('Failed to update boat location. Please try again.');
-    }
-
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsProcessing(false);
-  };
-
-  // Handle dropping boat into a pool location
-  const handlePoolDrop = async (poolId, slotType) => {
-    if (!draggingBoat || isProcessing) return;
-
-    setIsProcessing(true);
-
-    const targetPool = locations.find(l => l.id === poolId);
-    if (!targetPool) {
-      setIsProcessing(false);
-      return;
-    }
-
-    let updatedLocations = [...locations];
-
-    // Remove from old location if it had one
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        if (oldLocation.type === 'pool') {
-          // Remove from old pool
-          const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
-          const updatedOldPool = {
-            ...oldLocation,
-            pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
-          };
-          updatedLocations = updatedLocations.map(l => 
-            l.id === oldLocation.id ? updatedOldPool : l
-          );
-        } else {
-          // Remove from old grid slot
-          const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
-          const oldSlotId = Object.keys(oldLocation.boats).find(
-            key => oldLocation.boats[key] === draggingBoat.id
-          );
-          if (oldSlotId) {
-            delete updatedOldLocation.boats[oldSlotId];
-          }
-          updatedLocations = updatedLocations.map(l => 
-            l.id === oldLocation.id ? updatedOldLocation : l
-          );
-        }
-      }
-    }
-
-    // Add to new pool
-    const currentPool = updatedLocations.find(l => l.id === poolId);
-    const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
-    
-    // Don't add if already in this pool
-    if (!currentPoolBoats.includes(draggingBoat.id)) {
-      const updatedPool = {
-        ...currentPool,
-        pool_boats: [...currentPoolBoats, draggingBoat.id],
-      };
-      updatedLocations = updatedLocations.map(l => 
-        l.id === poolId ? updatedPool : l
-      );
-    }
-
-    // Update boat's location reference
-    const updatedBoat = {
-      ...draggingBoat,
-      location: targetPool.name,
-      slot: 'pool'
-    };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
-
-    // Save changes
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error updating boat location:', error);
-      alert('Failed to update boat location. Please try again.');
-    }
-
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsProcessing(false);
   };
 
   const handleSlotClick = (location, row, col) => {
@@ -3105,7 +2947,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
-          onDrop={handleDrop}
+          onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onMaximize={setMaximizedLocation}
@@ -3124,7 +2966,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
-          onDrop={handleDrop}
+          onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onMaximize={setMaximizedLocation}
@@ -3143,7 +2985,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           onEdit={setEditingLocation}
           onDelete={handleDeleteLocation}
           onDragStart={handleDragStart}
-          onDrop={handleDrop}
+          onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onMaximize={setMaximizedLocation}
@@ -3255,7 +3097,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           boats={boats}
           onSlotClick={handleSlotClick}
           onDragStart={handleDragStart}
-          onDrop={handleDrop}
+          onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onClose={() => setMaximizedLocation(null)}
@@ -5495,12 +5337,8 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
   const [hasChanges, setHasChanges] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   
-  // Drag and drop state for boats
-  const [draggingBoat, setDraggingBoat] = useState(null);
-  const [draggingFrom, setDraggingFrom] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Boat assignment modal state
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -5523,6 +5361,19 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       setSelectedSlot(null);
       setIsProcessing(false);
     }
+  });
+
+  // Use unified drag-and-drop hook
+  const {
+    draggingBoat,
+    draggingFrom,
+    isDragging,
+    handleDragStart: handleBoatDragStart,
+    handleDragEnd: handleBoatDragEnd,
+    handleGridDrop: handleBoatDrop,
+    handlePoolDrop
+  } = useBoatDragDrop({
+    onMoveBoat: onMoveBoatFromContainer
   });
 
   // Sync viewingBoat with boats array when it updates (real-time changes)
@@ -5668,22 +5519,6 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
     setSelectedLocations(defaultSelected);
     setLocationOrder(defaultOrder);
     setHasChanges(true);
-  };
-
-  // Boat drag and drop handlers
-  const handleBoatDragStart = (e, boat, location, slotId) => {
-    e.stopPropagation(); // Prevent location drag
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', boat.id);
-    setDraggingBoat(boat);
-    setDraggingFrom({ location, slotId });
-    setIsDragging(true);
-  };
-
-  const handleBoatDragEnd = () => {
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsDragging(false);
   };
 
   const handleSlotClick = (location, row, col) => {
@@ -5875,161 +5710,6 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       alert('Failed to move boat. Please try again.');
     }
     
-    setIsProcessing(false);
-  };
-
-  const handleBoatDrop = async (e, targetLocation, row, col) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!draggingBoat || isProcessing) return;
-
-    setIsProcessing(true);
-
-    const newSlotId = `${row}-${col}`;
-    
-    // Check if target slot is already occupied
-    if (targetLocation.boats[newSlotId]) {
-      alert('This slot is already occupied!');
-      setDraggingBoat(null);
-      setDraggingFrom(null);
-      setIsDragging(false);
-      setIsProcessing(false);
-      return;
-    }
-
-    let updatedLocations = [...locations];
-
-    // ALWAYS remove boat from old location if it's currently assigned somewhere
-    // This handles both dragging from within a location AND dragging from elsewhere
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        const updatedOldLocation = {
-          ...oldLocation,
-          boats: { ...oldLocation.boats }
-        };
-        // Find and remove the boat from its current slot
-        const oldSlotId = Object.keys(updatedOldLocation.boats).find(
-          key => updatedOldLocation.boats[key] === draggingBoat.id
-        );
-        if (oldSlotId) {
-          delete updatedOldLocation.boats[oldSlotId];
-        }
-        
-        updatedLocations = updatedLocations.map(l => 
-          l.id === oldLocation.id ? updatedOldLocation : l
-        );
-      }
-    }
-
-    // Add boat to new location
-    const currentTargetLocation = updatedLocations.find(l => l.id === targetLocation.id);
-    const updatedNewLocation = {
-      ...currentTargetLocation,
-      boats: { ...currentTargetLocation.boats, [newSlotId]: draggingBoat.id }
-    };
-    updatedLocations = updatedLocations.map(l => 
-      l.id === targetLocation.id ? updatedNewLocation : l
-    );
-
-    // Update boat's location
-    const updatedBoat = {
-      ...draggingBoat,
-      location: targetLocation.name,
-      slot: newSlotId
-    };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
-
-    // Update both locations and boats
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error updating boat location:', error);
-      alert('Failed to update boat location. Please try again.');
-    }
-
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsDragging(false);
-    setIsProcessing(false);
-  };
-
-  // Handle dropping boat into a pool location
-  const handlePoolDrop = async (poolId) => {
-    if (!draggingBoat || isProcessing) return;
-
-    setIsProcessing(true);
-
-    const targetPool = locations.find(l => l.id === poolId);
-    if (!targetPool) {
-      setIsProcessing(false);
-      return;
-    }
-
-    let updatedLocations = [...locations];
-
-    // Remove from old location if it had one
-    if (draggingBoat.location) {
-      const oldLocation = locations.find(l => l.name === draggingBoat.location);
-      if (oldLocation) {
-        if (oldLocation.type === 'pool') {
-          // Remove from old pool
-          const oldPoolBoats = oldLocation.pool_boats || oldLocation.poolBoats || [];
-          const updatedOldPool = {
-            ...oldLocation,
-            pool_boats: oldPoolBoats.filter(id => id !== draggingBoat.id),
-          };
-          updatedLocations = updatedLocations.map(l =>
-            l.id === oldLocation.id ? updatedOldPool : l
-          );
-        } else {
-          // Remove from old grid slot
-          const updatedOldLocation = { ...oldLocation, boats: { ...oldLocation.boats } };
-          const oldSlotId = Object.keys(oldLocation.boats || {}).find(
-            key => oldLocation.boats[key] === draggingBoat.id
-          );
-          if (oldSlotId) {
-            delete updatedOldLocation.boats[oldSlotId];
-          }
-          updatedLocations = updatedLocations.map(l =>
-            l.id === oldLocation.id ? updatedOldLocation : l
-          );
-        }
-      }
-    }
-
-    // Add to new pool
-    const currentPool = updatedLocations.find(l => l.id === poolId);
-    const currentPoolBoats = currentPool.pool_boats || currentPool.poolBoats || [];
-    const updatedPool = {
-      ...currentPool,
-      pool_boats: [...currentPoolBoats, draggingBoat.id]
-    };
-    updatedLocations = updatedLocations.map(l =>
-      l.id === poolId ? updatedPool : l
-    );
-
-    // Update boat's location
-    const updatedBoat = {
-      ...draggingBoat,
-      location: targetPool.name,
-      slot: 'pool'
-    };
-    const updatedBoats = boats.map(b => b.id === draggingBoat.id ? updatedBoat : b);
-
-    // Update both locations and boats
-    try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(updatedBoats);
-    } catch (error) {
-      console.error('Error updating boat location:', error);
-      alert('Failed to update boat location. Please try again.');
-    }
-
-    setDraggingBoat(null);
-    setDraggingFrom(null);
-    setIsDragging(false);
     setIsProcessing(false);
   };
 
