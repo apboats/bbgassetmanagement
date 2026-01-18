@@ -381,39 +381,46 @@ export const boatsService = {
 
     if (locError) throw locError
 
-    const boat = await this.getById(boatId)
+    // Remove from ALL locations where this boat might exist (more robust than relying on boat.location)
+    // This ensures the boat is removed even if boat.location is stale or incorrect
+    const { data: allLocations } = await supabase
+      .from('locations')
+      .select('*')
+      .order('id', { ascending: true })
 
-    // Remove from old location
-    if (boat.location) {
-      const { data: oldLocations } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('name', boat.location)
+    if (allLocations) {
+      for (const loc of allLocations) {
+        let needsUpdate = false
+        let updatedLocation = { ...loc }
 
-      if (oldLocations && oldLocations.length > 0) {
-        const oldLocation = oldLocations[0]
-
-        if (oldLocation.type === 'pool') {
-          // Pool location - remove from pool_boats array
-          const updatedPoolBoats = (oldLocation.pool_boats || []).filter(id => id !== boatId)
-          await supabase
-            .from('locations')
-            .update({ pool_boats: updatedPoolBoats })
-            .eq('id', oldLocation.id)
-        } else {
-          // Grid location - remove from boats object
-          const updatedOldBoats = { ...oldLocation.boats }
-
-          // Find the slot by boat ID (more reliable than using boat.slot)
-          const oldSlotKey = Object.keys(updatedOldBoats).find(key => updatedOldBoats[key] === boatId)
-          if (oldSlotKey) {
-            delete updatedOldBoats[oldSlotKey]
+        // Handle grid-type locations
+        if (loc.boats) {
+          const slotKey = Object.keys(loc.boats).find(key => loc.boats[key] === boatId)
+          if (slotKey) {
+            console.log('[Boats] Found boat in grid location:', loc.name, 'slot:', slotKey, '- removing it')
+            updatedLocation.boats = { ...loc.boats }
+            delete updatedLocation.boats[slotKey]
+            needsUpdate = true
           }
+        }
+
+        // Handle pool-type locations
+        if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.includes(boatId)) {
+          console.log('[Boats] Found boat in pool location:', loc.name, '- removing it')
+          updatedLocation.pool_boats = loc.pool_boats.filter(id => id !== boatId)
+          needsUpdate = true
+        }
+
+        // Only update if changes were made
+        if (needsUpdate) {
+          const updateData = {}
+          if (updatedLocation.boats) updateData.boats = updatedLocation.boats
+          if (updatedLocation.pool_boats) updateData.pool_boats = updatedLocation.pool_boats
 
           await supabase
             .from('locations')
-            .update({ boats: updatedOldBoats })
-            .eq('id', oldLocation.id)
+            .update(updateData)
+            .eq('id', loc.id)
         }
       }
     }
