@@ -5919,6 +5919,14 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         return;
       }
 
+      // Validate slot coordinates
+      if (typeof selectedSlot.row !== 'number' || typeof selectedSlot.col !== 'number') {
+        console.error('[MyView Assign] Invalid slot coordinates:', selectedSlot);
+        alert('Invalid slot selection. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+
       // Remove boat from old location if it has one
       if (boat.location) {
         const oldLocation = locations.find(l => l.name === boat.location);
@@ -5951,7 +5959,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       const currentSelectedLocation = updatedLocations.find(l => l.id === selectedLocation.id);
       const updatedLocation = {
         ...currentSelectedLocation,
-        boats: { ...currentSelectedLocation.boats, [selectedSlot]: boatId }
+        boats: { ...(currentSelectedLocation.boats || {}), [selectedSlot.slotId]: boatId }
       };
       updatedLocations = updatedLocations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
 
@@ -5959,7 +5967,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
       updatedBoat = {
         ...boat,
         location: selectedLocation.name,
-        slot: selectedSlot
+        slot: `${selectedSlot.row + 1}-${selectedSlot.col + 1}`
       };
     }
 
@@ -6359,9 +6367,10 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                 location={location}
                 boats={boats.filter(b => !b.isInventory)}
                 inventoryBoats={boats.filter(b => b.isInventory)}
-                onSlotClick={(slotId) => {
+                onSlotClick={(loc, row, col) => {
+                  const slotId = `${row}-${col}`;
                   setSelectedLocation(location);
-                  setSelectedSlot(slotId);
+                  setSelectedSlot({ row, col, slotId });
                   setShowBoatAssignModal(true);
                 }}
                 onBoatClick={setViewingBoat}
