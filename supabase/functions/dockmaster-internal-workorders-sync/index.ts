@@ -1,6 +1,6 @@
 // Supabase Edge Function: dockmaster-internal-workorders-sync
-// Full sync of all internal (CustId 3112) work orders from Dockmaster API
-// Used for manual "Sync All Rigging WOs" button on Inventory page
+// Full sync of all internal work orders (CustId=3112)
+// Used for manual "Sync Rigging WOs" button on Inventory page
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -12,10 +12,6 @@ const corsHeaders = {
 
 // Internal customer ID for BBG dealership
 const INTERNAL_CUSTOMER_ID = '3112'
-
-// Rate limiting settings
-const BATCH_SIZE = 10 // Concurrent requests per batch
-const BATCH_DELAY_MS = 500 // Delay between batches
 
 // Authenticate with Dockmaster API
 async function authenticateDockmaster(username: string, password: string) {
@@ -42,88 +38,6 @@ async function authenticateDockmaster(username: string, password: string) {
   return { authToken, systemId }
 }
 
-// Process a batch of work orders with rate limiting
-async function processBatch(
-  workOrders: any[],
-  dmHeaders: Record<string, string>,
-  startIndex: number
-): Promise<any[]> {
-  const results = await Promise.all(
-    workOrders.map(async (wo: any) => {
-      const detailUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/Retrieve?Id=${wo.id}&Detail=true`
-
-      try {
-        const detailResponse = await fetch(detailUrl, {
-          method: 'GET',
-          headers: dmHeaders,
-        })
-
-        if (!detailResponse.ok) {
-          console.error(`Failed to fetch detail for WO ${wo.id}:`, detailResponse.status)
-          return null
-        }
-
-        const detail = await detailResponse.json()
-
-        return {
-          id: detail.id,
-          customer_id: INTERNAL_CUSTOMER_ID,
-          boat_id: null, // Internal WOs don't link to boats table directly
-          rigging_id: detail.riggingId || null,
-          rigging_type: detail.riggingType || null,
-          is_internal: true,
-          creation_date: detail.creationDate,
-          category: detail.category,
-          status: detail.status,
-          title: detail.title,
-          boat_name: detail.boatName || '',
-          boat_year: detail.boatYear || '',
-          boat_make: detail.boatMake || '',
-          boat_model: detail.boatModel || '',
-          boat_serial_number: detail.boatSerialNumber || '',
-          total_charges: detail.totalWOCharges || 0,
-          total_parts: detail.totalParts || 0,
-          total_labor: detail.totalLabor || 0,
-          total_labor_hours: detail.totalLaborHours || 0,
-          est_comp_date: detail.estCompDate || null,
-          promised_date: detail.promisedDate || null,
-          comments: detail.comments || '',
-          last_synced: new Date().toISOString(),
-          operations: (detail.operations || []).map((op: any) => ({
-            id: op.id,
-            opcode: op.opcode,
-            opcode_desc: op.opcodeDesc,
-            status: op.status,
-            type: op.type,
-            category: op.category,
-            flag_labor_finished: op.flagLaborFinished || false,
-            total_charges: op.totalCharges || 0,
-            total_parts: op.totalParts || 0,
-            total_labor: op.totalLabor || 0,
-            total_labor_hours: op.totalLaborHours || 0,
-            labor_billed: op.laborBilled || 0,
-            total_to_complete: op.totalToComplete || 0,
-            long_desc: op.longDesc || '',
-            tech_desc: op.techDesc || '',
-            est_start_date: op.estStartDate || null,
-            est_complete_date: op.estCompleteDate || null,
-          })),
-        }
-      } catch (err) {
-        console.error(`Error fetching detail for WO ${wo.id}:`, err)
-        return null
-      }
-    })
-  )
-
-  return results.filter(r => r !== null)
-}
-
-// Sleep helper for rate limiting
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -132,7 +46,6 @@ serve(async (req) => {
 
   const startTime = Date.now()
   let syncedCount = 0
-  let errorCount = 0
 
   try {
     // Get Supabase client
@@ -171,9 +84,9 @@ serve(async (req) => {
       'X-DM_SYSTEM_ID': systemId,
     }
 
-    // Step 1: Get list of all open work orders for internal customer
+    // Step 1: Get list of open work orders for internal customer (3112)
     const listUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListForCustomer?CustId=${INTERNAL_CUSTOMER_ID}&Status=O`
-    console.log('Fetching work orders list for CustId:', INTERNAL_CUSTOMER_ID)
+    console.log('Fetching work orders list:', listUrl)
 
     const listResponse = await fetch(listUrl, {
       method: 'GET',
@@ -182,15 +95,15 @@ serve(async (req) => {
 
     if (!listResponse.ok) {
       const errorText = await listResponse.text()
-      throw new Error(`Failed to fetch work orders: ${listResponse.status} - ${errorText}`)
+      throw new Error(`Failed to fetch work orders list: ${listResponse.status} - ${errorText}`)
     }
 
     const workOrdersList = await listResponse.json()
     const totalCount = workOrdersList?.length || 0
-    console.log('Total open work orders to sync:', totalCount)
+    console.log(`Total open work orders for CustId ${INTERNAL_CUSTOMER_ID}: ${totalCount}`)
 
     if (totalCount === 0) {
-      // Update sync status
+      // No work orders - update sync status and return
       await supabase
         .from('sync_status')
         .upsert({
@@ -207,7 +120,6 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           synced: 0,
-          errors: 0,
           total: 0,
           duration: `${(Date.now() - startTime) / 1000}s`,
         }),
@@ -215,29 +127,46 @@ serve(async (req) => {
       )
     }
 
-    // Step 2: Process work orders in batches with rate limiting
-    const allWorkOrders: any[] = []
+    // Step 2: Get all work order IDs for batch retrieval
+    const woIds = workOrdersList.map((wo: any) => wo.id)
+    console.log(`Fetching details for ${woIds.length} work orders via batch POST...`)
 
-    for (let i = 0; i < totalCount; i += BATCH_SIZE) {
-      const batch = workOrdersList.slice(i, i + BATCH_SIZE)
-      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(totalCount / BATCH_SIZE)} (WOs ${i + 1}-${Math.min(i + BATCH_SIZE, totalCount)})`)
+    // Step 3: Batch retrieve all work order details with one POST call
+    const retrieveUrl = 'https://api.dmeapi.com/api/v1/Service/WorkOrders/RetrieveList'
+    const retrieveResponse = await fetch(retrieveUrl, {
+      method: 'POST',
+      headers: dmHeaders,
+      body: JSON.stringify({
+        woIds: woIds,
+        detail: true,
+      }),
+    })
 
-      const batchResults = await processBatch(batch, dmHeaders, i)
-      allWorkOrders.push(...batchResults)
-
-      syncedCount += batchResults.length
-      errorCount += batch.length - batchResults.length
-
-      // Rate limiting delay between batches
-      if (i + BATCH_SIZE < totalCount) {
-        await sleep(BATCH_DELAY_MS)
-      }
+    if (!retrieveResponse.ok) {
+      const errorText = await retrieveResponse.text()
+      throw new Error(`Failed to retrieve work order details: ${retrieveResponse.status} - ${errorText}`)
     }
 
-    console.log(`Fetched ${allWorkOrders.length} work orders with details`)
+    const retrieveData = await retrieveResponse.json()
+    console.log('RetrieveList response type:', typeof retrieveData)
+    console.log('RetrieveList response keys:', JSON.stringify(Object.keys(retrieveData || {})))
 
-    // Step 3: Save to database
-    // First, delete all existing internal work orders (clean slate approach for full sync)
+    // Handle different response structures - might be array directly or wrapped in content/data
+    const workOrdersWithDetails = Array.isArray(retrieveData)
+      ? retrieveData
+      : (retrieveData?.content || retrieveData?.data || retrieveData)
+
+    console.log(`Retrieved ${workOrdersWithDetails?.length || 0} work orders with details`)
+
+    // Log first work order to see actual values
+    if (workOrdersWithDetails?.length > 0) {
+      const sample = workOrdersWithDetails[0]
+      console.log('Sample WO id:', sample.id)
+      console.log('Sample WO riggingId value:', sample.riggingId)
+      console.log('Sample WO full object:', JSON.stringify(sample).substring(0, 500))
+    }
+
+    // Delete all existing internal work orders (clean slate approach for full sync)
     const { error: deleteError } = await supabase
       .from('work_orders')
       .delete()
@@ -247,9 +176,36 @@ serve(async (req) => {
       console.error('Error deleting old internal work orders:', deleteError)
     }
 
-    // Insert/upsert work orders
-    for (const wo of allWorkOrders) {
-      const { operations, ...workOrderData } = wo
+    // Transform and save all work orders
+    for (const wo of (workOrdersWithDetails || [])) {
+      // Log rigging_id being saved
+      console.log(`WO ${wo.id}: riggingId from API = "${wo.riggingId}", riggingType = "${wo.riggingType}"`)
+
+      const workOrderData = {
+        id: wo.id,
+        customer_id: INTERNAL_CUSTOMER_ID,
+        boat_id: null,
+        rigging_id: wo.riggingId || null,
+        rigging_type: wo.riggingType || null,
+        is_internal: true,
+        creation_date: wo.creationDate,
+        category: wo.category,
+        status: wo.status,
+        title: wo.title,
+        boat_name: wo.boatName || '',
+        boat_year: wo.boatYear || '',
+        boat_make: wo.boatMake || '',
+        boat_model: wo.boatModel || '',
+        boat_serial_number: wo.boatSerialNumber || '',
+        total_charges: wo.totalWOCharges || 0,
+        total_parts: wo.totalParts || 0,
+        total_labor: wo.totalLabor || 0,
+        total_labor_hours: wo.totalLaborHours || 0,
+        est_comp_date: wo.estCompDate || null,
+        promised_date: wo.promisedDate || null,
+        comments: wo.comments || '',
+        last_synced: new Date().toISOString(),
+      }
 
       // Upsert work order
       const { error: woError } = await supabase
@@ -258,6 +214,7 @@ serve(async (req) => {
 
       if (woError) {
         console.error('Error saving work order:', wo.id, woError)
+        console.error('Work order data was:', JSON.stringify(workOrderData))
         continue
       }
 
@@ -267,10 +224,26 @@ serve(async (req) => {
         .delete()
         .eq('work_order_id', wo.id)
 
-      if (operations && operations.length > 0) {
-        const opsWithWoId = operations.map((op: any) => ({
-          ...op,
+      if (wo.operations && wo.operations.length > 0) {
+        const opsWithWoId = wo.operations.map((op: any) => ({
+          id: op.id,
           work_order_id: wo.id,
+          opcode: op.opcode,
+          opcode_desc: op.opcodeDesc,
+          status: op.status,
+          type: op.type,
+          category: op.category,
+          flag_labor_finished: op.flagLaborFinished || false,
+          total_charges: op.totalCharges || 0,
+          total_parts: op.totalParts || 0,
+          total_labor: op.totalLabor || 0,
+          total_labor_hours: op.totalLaborHours || 0,
+          labor_billed: op.laborBilled || 0,
+          total_to_complete: op.totalToComplete || 0,
+          long_desc: op.longDesc || '',
+          tech_desc: op.techDesc || '',
+          est_start_date: op.estStartDate || null,
+          est_complete_date: op.estCompleteDate || null,
         }))
 
         const { error: opsError } = await supabase
@@ -281,6 +254,8 @@ serve(async (req) => {
           console.error('Error saving operations for WO:', wo.id, opsError)
         }
       }
+
+      syncedCount++
     }
 
     // Update sync status to success
@@ -302,7 +277,6 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         synced: syncedCount,
-        errors: errorCount,
         total: totalCount,
         duration: `${duration.toFixed(1)}s`,
       }),
@@ -331,7 +305,6 @@ serve(async (req) => {
         success: false,
         error: error.message,
         synced: syncedCount,
-        errors: errorCount,
         duration: `${(Date.now() - startTime) / 1000}s`,
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
