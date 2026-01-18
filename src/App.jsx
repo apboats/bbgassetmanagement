@@ -1153,8 +1153,10 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
       matchesWorkPhase = !boat.fiberglassComplete;
     } else if (filterWorkPhase === 'needs-warranty') {
       matchesWorkPhase = !boat.warrantyComplete;
+    } else if (filterWorkPhase === 'needs-invoiced') {
+      matchesWorkPhase = !boat.invoicedComplete;
     } else if (filterWorkPhase === 'all-complete') {
-      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
+      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete && boat.invoicedComplete;
     }
     
     let matchesLocation = true;
@@ -1414,6 +1416,27 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
               {boats.filter(b => b.status !== 'archived' && !b.warrantyComplete).length}
             </p>
           </button>
+
+          <button
+            onClick={() => setFilterWorkPhase(filterWorkPhase === 'needs-invoiced' ? 'all' : 'needs-invoiced')}
+            className={`p-3 rounded-lg border-2 transition-all ${
+              filterWorkPhase === 'needs-invoiced'
+                ? 'border-emerald-400 bg-emerald-50'
+                : 'border-slate-200 bg-white hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-slate-600">Invoiced</span>
+              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">
+              {boats.filter(b => b.status !== 'archived' && !b.invoicedComplete).length}
+            </p>
+          </button>
         </div>
       </div>
 
@@ -1611,6 +1634,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
               <option value="needs-clean">Needs Clean</option>
               <option value="needs-fiberglass">Needs Fiberglass</option>
               <option value="needs-warranty">Needs Warranty</option>
+              <option value="needs-invoiced">Needs Invoiced</option>
               <option value="all-complete">All Phases Complete</option>
             </select>
           </div>
@@ -1861,9 +1885,20 @@ function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
                 Warr
               </span>
             </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={boat.invoicedComplete || false}
+                readOnly
+                className="w-3 h-3 rounded pointer-events-none"
+              />
+              <span className={boat.invoicedComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
+                Inv
+              </span>
+            </label>
           </div>
           {/* Pending work badges */}
-          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete || !boat.warrantyComplete) && (
+          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete || !boat.warrantyComplete || !boat.invoicedComplete) && (
             <div className="flex flex-wrap gap-1 mt-2">
               {!boat.mechanicalsComplete && (
                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-medium rounded-full">
@@ -1883,6 +1918,11 @@ function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
               {!boat.warrantyComplete && (
                 <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-medium rounded-full">
                   Needs Warr
+                </span>
+              )}
+              {!boat.invoicedComplete && (
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
+                  Needs Inv
                 </span>
               )}
             </div>
@@ -2052,10 +2092,11 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
     mechanicalsComplete: false,
     cleanComplete: false,
     fiberglassComplete: false,
-    warrantyComplete: false
+    warrantyComplete: false,
+    invoicedComplete: false
   });
 
-  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete && formData.warrantyComplete;
+  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete && formData.warrantyComplete && formData.invoicedComplete;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2223,6 +2264,21 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm text-slate-700">Warranty Complete</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.invoicedComplete || false}
+                  onChange={(e) => {
+                    const newData = { ...formData, invoicedComplete: e.target.checked };
+                    if (!e.target.checked && formData.status === 'all-work-complete') {
+                      newData.status = 'on-deck';
+                    }
+                    setFormData(newData);
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-slate-700">Invoiced Complete</span>
               </label>
             </div>
           </div>
@@ -3258,7 +3314,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
     'FP': 'Floor Planned'
   };
 
-  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
+  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete && boat.invoicedComplete;
   const isArchived = boat.status === 'archived';
   const isInventory = boat.isInventory === true; // Check if this is an inventory boat
 
@@ -3277,13 +3333,29 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 
   const handleStatusUpdate = (newStatus) => {
     if (isArchived) return; // Can't modify archived boats
-    
+
     // Validate: can't set to complete without all phases done
     if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
-      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty) must be completed first.');
+      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty, Invoiced) must be completed first.');
       return;
     }
-    
+
+    // Check for unbilled opcodes (labor finished but not closed) when marking complete
+    if (newStatus === 'all-work-complete' && workOrders.length > 0) {
+      const hasUnbilledOpcodes = workOrders.some(wo =>
+        wo.operations && wo.operations.some(op =>
+          op.status !== 'C' && op.flagLaborFinished
+        )
+      );
+
+      if (hasUnbilledOpcodes) {
+        const shouldOverride = confirm('All work should be invoiced before the boat is marked as complete. Would you like to override?');
+        if (!shouldOverride) {
+          return;
+        }
+      }
+    }
+
     const updatedBoat = { ...boat, status: newStatus };
     onUpdateBoat(updatedBoat);
   };
@@ -3676,6 +3748,31 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
                   boat.warrantyComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {boat.warrantyComplete ? '✓' : '○'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleWorkPhaseToggle('invoicedComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.invoicedComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.invoicedComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Invoiced</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.invoicedComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.invoicedComplete ? '✓' : '○'}
                 </span>
               </button>
             </div>
