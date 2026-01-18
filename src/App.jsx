@@ -2966,11 +2966,13 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
   const handleRemoveBoatFromLocation = async () => {
     if (!viewingBoat || !viewingBoat.currentLocation || isProcessing) return;
 
+    console.log('[Remove] Starting removal for boat:', viewingBoat.id, 'from location:', viewingBoat.currentLocation.name);
     setIsProcessing(true);
 
     // For inventory boats, use AppContainer's handleMoveBoat to properly update database
     if (viewingBoat.isInventory && onMoveBoatFromContainer) {
       try {
+        console.log('[Remove] Using inventory boat removal');
         await onMoveBoatFromContainer(viewingBoat.id, null, null, true);
         setViewingBoat(null);
       } catch (error) {
@@ -2984,22 +2986,41 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
     // For regular boats, continue with existing logic
     // Check if this is a pool location
     const isPool = viewingBoat.currentLocation.type === 'pool';
+    console.log('[Remove] Location type:', isPool ? 'pool' : 'grid', 'Slot:', viewingBoat.currentSlot);
 
     let updatedLocation;
     if (isPool) {
       // Remove from pool_boats array
       const currentPoolBoats = viewingBoat.currentLocation.pool_boats || viewingBoat.currentLocation.poolBoats || [];
+      console.log('[Remove] Current pool boats:', currentPoolBoats);
+      console.log('[Remove] Removing boat ID:', viewingBoat.id);
       updatedLocation = {
         ...viewingBoat.currentLocation,
         pool_boats: currentPoolBoats.filter(id => id !== viewingBoat.id),
       };
+      console.log('[Remove] Updated pool boats:', updatedLocation.pool_boats);
     } else {
-      // Remove from grid slot
+      // Remove from grid slot - also remove ALL instances of this boat from any slot (cleanup duplicates)
+      const boats = { ...viewingBoat.currentLocation.boats };
+      console.log('[Remove] Current boats object:', boats);
+      console.log('[Remove] Removing from slot:', viewingBoat.currentSlot, 'Boat ID:', viewingBoat.id);
+
+      // Remove from the specified slot
+      delete boats[viewingBoat.currentSlot];
+
+      // Also clean up any duplicate instances of this boat in other slots
+      Object.keys(boats).forEach(slot => {
+        if (boats[slot] === viewingBoat.id) {
+          console.log('[Remove] Found duplicate in slot:', slot, '- removing');
+          delete boats[slot];
+        }
+      });
+
       updatedLocation = {
         ...viewingBoat.currentLocation,
-        boats: { ...viewingBoat.currentLocation.boats }
+        boats
       };
-      delete updatedLocation.boats[viewingBoat.currentSlot];
+      console.log('[Remove] Updated boats object:', updatedLocation.boats);
     }
 
     const updatedLocations = locations.map(l => l.id === viewingBoat.currentLocation.id ? updatedLocation : l);
