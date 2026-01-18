@@ -1255,7 +1255,7 @@ function BoatsView({ boats, locations, onUpdateBoats, onUpdateLocations, dockmas
   const handleViewBoat = (boat) => {
     // Find the location if boat is assigned
     const location = boat.location ? locations.find(l => l.name === boat.location) : null;
-    const slotId = location ? Object.keys(location.boats).find(key => location.boats[key] === boat.id) : null;
+    const slotId = location ? Object.keys(location.boats || {}).find(key => (location.boats || {})[key] === boat.id) : null;
     
     setViewingBoat({
       ...boat,
@@ -2930,10 +2930,10 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         setIsProcessing(false);
         return;
       }
-      
+
       const updatedLocation = {
         ...selectedLocation,
-        boats: { ...selectedLocation.boats, [selectedSlot.slotId]: boatId }
+        boats: { ...(selectedLocation.boats || {}), [selectedSlot.slotId]: boatId }
       };
       updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
       
@@ -5244,8 +5244,8 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
             
             if (!isPerimeter) continue;
           }
-          
-          if (!location.boats[slotId]) {
+
+          if (!(location.boats && location.boats[slotId])) {
             foundSlot = slotId;
           }
         }
