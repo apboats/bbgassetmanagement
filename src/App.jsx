@@ -5245,7 +5245,13 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className="w-full rounded-lg"
+                onLoadedMetadata={() => {
+                  if (videoRef.current) {
+                    videoRef.current.play().catch(err => console.error('Video play error:', err));
+                  }
+                }}
               />
               <div className="mt-4 flex gap-2 justify-center">
                 <button
