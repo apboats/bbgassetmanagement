@@ -372,10 +372,10 @@ export const boatsService = {
 
   // Move boat from one slot to another (handles same or different locations)
   async moveToSlot(boatId, toLocationId, toSlotId) {
-    // Get target location
-    const { data: toLocation, error: locError } = await supabase
+    // Verify target location exists
+    const { error: locError } = await supabase
       .from('locations')
-      .select('*')
+      .select('id')
       .eq('id', toLocationId)
       .single()
 
@@ -425,10 +425,20 @@ export const boatsService = {
       }
     }
 
+    // Re-fetch target location to get current state after removal
+    // This is critical for same-location moves (e.g., moving to adjacent cell)
+    const { data: freshLocation, error: freshLocError } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('id', toLocationId)
+      .single()
+
+    if (freshLocError) throw freshLocError
+
     // Add to target location based on type
-    if (toLocation.type === 'pool') {
+    if (freshLocation.type === 'pool') {
       // Pool location - add to pool_boats array
-      const currentPoolBoats = toLocation.pool_boats || []
+      const currentPoolBoats = freshLocation.pool_boats || []
       const updatedPoolBoats = [...currentPoolBoats, boatId]
       await supabase
         .from('locations')
@@ -436,23 +446,23 @@ export const boatsService = {
         .eq('id', toLocationId)
 
       return this.update(boatId, {
-        location: toLocation.name,
+        location: freshLocation.name,
         slot: 'pool',
       })
     } else {
       // Grid location - check slot availability and add to boats object
-      if (toLocation.boats && toLocation.boats[toSlotId]) {
+      if (freshLocation.boats && freshLocation.boats[toSlotId]) {
         throw new Error('Target slot is already occupied')
       }
 
-      const updatedNewBoats = { ...toLocation.boats, [toSlotId]: boatId }
+      const updatedNewBoats = { ...freshLocation.boats, [toSlotId]: boatId }
       await supabase
         .from('locations')
         .update({ boats: updatedNewBoats })
         .eq('id', toLocationId)
 
       return this.update(boatId, {
-        location: toLocation.name,
+        location: freshLocation.name,
         slot: toSlotId,
       })
     }
