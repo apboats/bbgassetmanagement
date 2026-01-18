@@ -6345,7 +6345,10 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                   key={location.id}
                   location={location}
                   boats={poolBoats}
-                  onBoatClick={setViewingBoat}
+                  onBoatClick={(boat) => {
+                    // Enrich boat with location data for pool boats
+                    setViewingBoat({ ...boat, currentLocation: location, currentSlot: 'pool' });
+                  }}
                   onAddBoat={() => {
                     setSelectedLocation(location);
                     setSelectedSlot('pool');
@@ -6373,7 +6376,12 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
                   setSelectedSlot({ row, col, slotId });
                   setShowBoatAssignModal(true);
                 }}
-                onBoatClick={setViewingBoat}
+                onBoatClick={(boat) => {
+                  // Find the boat's location and slot to enable removal
+                  const boatLocation = locations.find(l => l.name === boat.location);
+                  const slotId = boat.slot ? boat.slot.replace(/(\d+)-(\d+)/, (match, r, c) => `${parseInt(r)-1}-${parseInt(c)-1}`) : null;
+                  setViewingBoat({ ...boat, currentLocation: boatLocation, currentSlot: slotId });
+                }}
                 draggingBoat={null}
                 onDragStart={() => {}}
                 onDragEnd={() => {}}
