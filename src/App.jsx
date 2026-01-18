@@ -2898,19 +2898,22 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
   const handleAssignBoat = async (boatId) => {
     if (!selectedLocation || isProcessing) return;
 
+    console.log('[Assign] Starting assignment:', { boatId, selectedLocation: selectedLocation.name, selectedSlot });
     setIsProcessing(true);
 
     let updatedLocations;
     let updatedBoat;
     const boat = boats.find(b => b.id === boatId);
-    
+
     if (!boat) {
+      console.error('[Assign] Boat not found:', boatId);
       setIsProcessing(false);
       return;
     }
 
     // Check if this is a pool location
     if (selectedLocation.type === 'pool') {
+      console.log('[Assign] Pool location assignment');
       // Add to pool
       const currentPoolBoats = selectedLocation.pool_boats || selectedLocation.poolBoats || [];
       const updatedLocation = {
@@ -2918,7 +2921,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         pool_boats: [...currentPoolBoats, boatId],
       };
       updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
-      
+
       updatedBoat = {
         ...boat,
         location: selectedLocation.name,
@@ -2927,6 +2930,17 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
     } else {
       // Grid assignment (existing logic)
       if (!selectedSlot) {
+        console.error('[Assign] No slot selected for grid assignment');
+        setIsProcessing(false);
+        return;
+      }
+
+      console.log('[Assign] Grid assignment to slot:', selectedSlot);
+
+      // Validate slot coordinates
+      if (typeof selectedSlot.row !== 'number' || typeof selectedSlot.col !== 'number') {
+        console.error('[Assign] Invalid slot coordinates:', selectedSlot);
+        alert('Invalid slot selection. Please try again.');
         setIsProcessing(false);
         return;
       }
@@ -2936,27 +2950,36 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         boats: { ...(selectedLocation.boats || {}), [selectedSlot.slotId]: boatId }
       };
       updatedLocations = locations.map(l => l.id === selectedLocation.id ? updatedLocation : l);
-      
+
       updatedBoat = {
         ...boat,
         location: selectedLocation.name,
         slot: `${selectedSlot.row + 1}-${selectedSlot.col + 1}`
       };
+
+      console.log('[Assign] Updated boat:', updatedBoat);
     }
 
     const updatedBoats = boats.map(b => b.id === boatId ? updatedBoat : b);
 
+    console.log('[Assign] Updating locations and boats...');
+    console.log('[Assign] Updated locations:', updatedLocations.find(l => l.id === selectedLocation.id));
+    console.log('[Assign] Updated boats:', updatedBoats.find(b => b.id === boatId));
+
     // Await both updates
     try {
       await onUpdateLocations(updatedLocations);
+      console.log('[Assign] Locations updated successfully');
       await onUpdateBoats(updatedBoats);
+      console.log('[Assign] Boats updated successfully');
     } catch (error) {
-      console.error('Error assigning boat:', error);
+      console.error('[Assign] Error assigning boat:', error);
       alert('Failed to assign boat. Please try again.');
       setIsProcessing(false);
       return;
     }
 
+    console.log('[Assign] Assignment complete, closing modal');
     setShowBoatAssignModal(false);
     setSelectedLocation(null);
     setSelectedSlot(null);
