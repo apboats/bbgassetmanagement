@@ -54,7 +54,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
         .catch(err => console.error('Error loading movement history:', err))
         .finally(() => setLoadingMovements(false));
     }
-  }, [boat?.id]);
+  }, [boat?.id, boat?.location, boat?.slot]);
 
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);

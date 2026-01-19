@@ -67,7 +67,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
         .catch(err => console.error('Error loading movement history:', err))
         .finally(() => setLoadingMovements(false));
     }
-  }, [boat?.id]);
+  }, [boat?.id, boat?.location, boat?.slot]);
 
   const statusLabels = {
     'needs-approval': 'Needs Approval',
