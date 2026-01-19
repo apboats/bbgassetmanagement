@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
-import supabaseService from '../../services/supabaseService';
+import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -256,49 +256,32 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   };
 
   const handleReleaseBoat = async () => {
-    if (confirm(`Release ${boat.name} back to owner?\n\nThis will archive the boat and remove it from active management. The boat will be moved to the archived boats list.`)) {
+    if (confirm(`Release ${boat.name} back to owner? This will remove it from its current location and archive it. This action cannot be undone.`)) {
       try {
         setIsProcessing(true);
 
-        // If boat is in a location, remove it from location data first
+        // Remove from location first (if assigned)
         if (boat.location || boat.currentLocation) {
-          console.log('[Release] Removing boat from location before archiving');
-
-          // Ensure onRemove is defined before calling it
           if (onRemove) {
             try {
               await onRemove();
-              console.log('[Release] Boat removed from location successfully');
             } catch (removeError) {
-              console.error('[Release] Error removing boat from location:', removeError);
-              // Continue with archival even if removal fails - the location fields will be nulled
-              // This handles cases where the location data might be out of sync
+              console.error('Error removing boat from location:', removeError);
+              // Continue with archival even if removal fails
             }
-          } else {
-            console.warn('[Release] onRemove callback not provided, skipping location removal');
           }
         }
 
-        // Archive the boat (status change happens after removal)
-        const updatedBoat = {
-          ...boat,
-          status: 'archived',
-          archivedDate: new Date().toISOString(),
-          location: null,
-          slot: null
-        };
+        // Use centralized service to archive the boat
+        const archivedBoat = await boatLifecycleService.archiveBoat(boat.id);
 
-        // Update the boat record with archived status
-        await onUpdateBoat(updatedBoat);
-
-        console.log('[Release] Boat archived successfully');
-
-        // Close modal
+        // Update parent component
+        await onUpdateBoat(archivedBoat);
         onClose();
-        setIsProcessing(false);
       } catch (error) {
-        console.error('[Release] Error releasing boat:', error);
+        console.error('Error releasing boat:', error);
         alert(`Failed to release boat: ${error.message}`);
+      } finally {
         setIsProcessing(false);
       }
     }
