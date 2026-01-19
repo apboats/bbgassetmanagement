@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, DollarSign } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, DollarSign, Download, Magnet } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
@@ -6501,9 +6501,11 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
   const [dragItem, setDragItem] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const PIXELS_PER_FOOT = 10;
+  const SNAP_SIZE = 5; // Snap to 5 foot grid
 
   useEffect(() => { loadShows(); }, []);
   useEffect(() => { if (selectedShow) loadItems(selectedShow.id); else setItems([]); }, [selectedShow?.id]);
@@ -6644,11 +6646,37 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     setIsDragging(true);
   };
 
+  // Touch support for mobile/tablet
+  const handleItemTouchStart = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    setSelectedItem(item);
+    const canvasPos = screenToCanvas(touch.clientX, touch.clientY);
+    setDragOffset({ x: canvasPos.x - item.x, y: canvasPos.y - item.y });
+    setDragItem(item);
+    setIsDragging(true);
+  };
+
   const handleMouseMove = useCallback((e) => {
     if (isDragging && dragItem && selectedShow) {
-      const canvasPos = screenToCanvas(e.clientX, e.clientY);
-      let newX = Math.round(canvasPos.x - dragOffset.x);
-      let newY = Math.round(canvasPos.y - dragOffset.y);
+      // Get position from mouse or touch
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const canvasPos = screenToCanvas(clientX, clientY);
+      let newX = canvasPos.x - dragOffset.x;
+      let newY = canvasPos.y - dragOffset.y;
+
+      // Apply snap-to-grid if enabled
+      if (snapToGrid) {
+        newX = Math.round(newX / SNAP_SIZE) * SNAP_SIZE;
+        newY = Math.round(newY / SNAP_SIZE) * SNAP_SIZE;
+      } else {
+        newX = Math.round(newX);
+        newY = Math.round(newY);
+      }
+
+      // Constrain to canvas bounds
       newX = Math.max(0, Math.min(newX, selectedShow.widthFt - (dragItem.widthFt || 10)));
       newY = Math.max(0, Math.min(newY, selectedShow.heightFt - (dragItem.heightFt || 10)));
       setItems(items.map(i => i.id === dragItem.id ? { ...i, x: newX, y: newY } : i));
@@ -6656,7 +6684,7 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     } else if (isPanning) {
       setPanOffset({ x: panOffset.x + e.movementX, y: panOffset.y + e.movementY });
     }
-  }, [isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow]);
+  }, [isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow, snapToGrid]);
 
   const handleMouseUp = useCallback(async () => {
     if (isDragging && dragItem) {
@@ -6672,7 +6700,14 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     if (isDragging || isPanning) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
-      return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
+      window.addEventListener('touchmove', handleMouseMove, { passive: false });
+      window.addEventListener('touchend', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('touchmove', handleMouseMove);
+        window.removeEventListener('touchend', handleMouseUp);
+      };
     }
   }, [isDragging, isPanning, handleMouseMove, handleMouseUp]);
 
@@ -6685,6 +6720,49 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     printWindow.print();
   };
 
+  const handleExportPNG = () => {
+    const svg = canvasRef.current;
+    if (!svg) return;
+
+    // Get SVG dimensions
+    const svgWidth = svg.getAttribute('width');
+    const svgHeight = svg.getAttribute('height');
+
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = parseInt(svgWidth) * 2; // 2x for better quality
+    canvas.height = parseInt(svgHeight) * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    // Convert SVG to data URL
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+      // Draw white background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Draw SVG
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      // Download
+      const link = document.createElement('a');
+      link.download = `${selectedShow?.name || 'boat-show-layout'}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    img.onerror = () => {
+      console.error('Failed to load SVG for export');
+      alert('Failed to export PNG. Please try Print instead.');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+
   const filteredBoats = inventoryBoats.filter(boat => !boatSearch || boat.name?.toLowerCase().includes(boatSearch.toLowerCase()) || boat.model?.toLowerCase().includes(boatSearch.toLowerCase()) || boat.make?.toLowerCase().includes(boatSearch.toLowerCase()));
   const boatsInLayout = new Set(items.filter(i => i.inventoryBoatId).map(i => i.inventoryBoatId));
 
@@ -6695,7 +6773,19 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
       <div className="flex items-center justify-between mb-4">
         <div><h2 className="text-2xl font-bold text-slate-900">Boat Show Planner</h2><p className="text-slate-600">Design your boat show layout with drag and drop</p></div>
         <div className="flex items-center gap-2">
-          {selectedShow && (<><button onClick={handlePrint} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"><Printer className="w-4 h-4" />Print</button><button onClick={() => setShowEditModal(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"><Edit2 className="w-4 h-4" />Edit Show</button></>)}
+          {selectedShow && (
+            <>
+              <button onClick={handleExportPNG} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors" title="Export as PNG">
+                <Download className="w-4 h-4" />Export
+              </button>
+              <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">
+                <Printer className="w-4 h-4" />Print
+              </button>
+              <button onClick={() => setShowEditModal(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">
+                <Edit2 className="w-4 h-4" />Edit
+              </button>
+            </>
+          )}
           <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"><Plus className="w-4 h-4" />New Show</button>
         </div>
       </div>
@@ -6721,6 +6811,7 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
               <button onClick={() => setZoom(Math.max(zoom - 0.1, 0.3))} className="p-2 hover:bg-slate-100 rounded" title="Zoom out"><ZoomOut className="w-4 h-4" /></button>
               <div className="w-px h-6 bg-slate-200" />
               <button onClick={() => setShowGridLines(!showGridLines)} className={`p-2 rounded ${showGridLines ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100'}`} title="Toggle grid"><Grid className="w-4 h-4" /></button>
+              <button onClick={() => setSnapToGrid(!snapToGrid)} className={`p-2 rounded ${snapToGrid ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100'}`} title={`Snap to grid (${SNAP_SIZE}ft)`}><Magnet className="w-4 h-4" /></button>
               <button onClick={() => { setZoom(1); setPanOffset({ x: 0, y: 0 }); }} className="p-2 hover:bg-slate-100 rounded" title="Reset view"><Move className="w-4 h-4" /></button>
             </div>
             <div className="absolute top-4 right-4 z-10 bg-white rounded-lg shadow-md px-3 py-2"><p className="text-sm font-medium text-slate-700">{selectedShow.widthFt}' × {selectedShow.heightFt}'</p></div>
@@ -6734,16 +6825,82 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
                     const x = item.x * PIXELS_PER_FOOT;
                     const y = item.y * PIXELS_PER_FOOT;
                     const isSelected = selectedItem?.id === item.id;
+                    const isBeingDragged = isDragging && dragItem?.id === item.id;
                     const typeConfig = SHOW_ITEM_TYPES[item.itemType] || SHOW_ITEM_TYPES.furniture;
                     const boat = item.boat;
                     const displayName = boat ? `${boat.year || ''} ${boat.name}`.trim() : item.label;
                     const bgColor = item.itemType === 'boat' ? '#3b82f6' : (item.color || typeConfig.color);
+
+                    // More realistic boat hull shape with curved bow and stern
+                    const boatPath = `
+                      M ${width * 0.12} ${height * 0.15}
+                      Q ${width * 0.02} ${height * 0.15}, ${width * 0.02} ${height * 0.5}
+                      Q ${width * 0.02} ${height * 0.85}, ${width * 0.12} ${height * 0.85}
+                      L ${width * 0.75} ${height * 0.85}
+                      Q ${width * 0.95} ${height * 0.85}, ${width * 0.98} ${height * 0.5}
+                      Q ${width * 0.95} ${height * 0.15}, ${width * 0.75} ${height * 0.15}
+                      Z
+                    `;
+
                     return (
-                      <g key={item.id} transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`} onMouseDown={(e) => handleItemMouseDown(e, item)} style={{ cursor: 'move' }}>
-                        {item.itemType === 'boat' ? <path d={`M ${width * 0.1} 0 L ${width * 0.9} 0 L ${width} ${height * 0.5} L ${width * 0.9} ${height} L ${width * 0.1} ${height} L 0 ${height * 0.5} Z`} fill={bgColor} stroke={isSelected ? '#1d4ed8' : '#2563eb'} strokeWidth={isSelected ? 3 : 1} /> : <rect width={width} height={height} fill={bgColor} stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'} strokeWidth={isSelected ? 3 : 1} rx={item.itemType === 'plant' ? width/2 : 4} ry={item.itemType === 'plant' ? height/2 : 4} />}
-                        <text x={width / 2} y={height / 2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.min(width, height) * 0.15} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>{displayName?.substring(0, 20)}</text>
-                        <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.2} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.8)" fontSize={Math.min(width, height) * 0.1} style={{ pointerEvents: 'none', userSelect: 'none' }}>{item.widthFt}'×{item.heightFt}'</text>
-                        {isSelected && <><rect x={-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={-4} y={height-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={height-4} width={8} height={8} fill="#1d4ed8" /></>}
+                      <g
+                        key={item.id}
+                        transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`}
+                        onMouseDown={(e) => handleItemMouseDown(e, item)}
+                        onTouchStart={(e) => handleItemTouchStart(e, item)}
+                        style={{ cursor: 'move', touchAction: 'none' }}
+                      >
+                        {/* Drag feedback - dashed border */}
+                        {isBeingDragged && (
+                          <rect
+                            x={-3} y={-3}
+                            width={width + 6} height={height + 6}
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            strokeDasharray="6 3"
+                            rx={8}
+                          />
+                        )}
+
+                        {/* Item shape */}
+                        {item.itemType === 'boat' ? (
+                          <path
+                            d={boatPath}
+                            fill={bgColor}
+                            stroke={isSelected ? '#1d4ed8' : '#2563eb'}
+                            strokeWidth={isSelected ? 3 : 1.5}
+                            style={{ filter: isBeingDragged ? 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' : 'none' }}
+                          />
+                        ) : (
+                          <rect
+                            width={width} height={height}
+                            fill={bgColor}
+                            stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'}
+                            strokeWidth={isSelected ? 3 : 1}
+                            rx={item.itemType === 'plant' ? width/2 : 4}
+                            ry={item.itemType === 'plant' ? height/2 : 4}
+                            style={{ filter: isBeingDragged ? 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' : 'none' }}
+                          />
+                        )}
+
+                        {/* Labels */}
+                        <text x={width / 2} y={height / 2 - 5} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.max(10, Math.min(width, height) * 0.14)} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                          {displayName?.substring(0, 18)}
+                        </text>
+                        <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.18} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.9)" fontSize={Math.max(8, Math.min(width, height) * 0.1)} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                          {item.widthFt}' × {item.heightFt}'
+                        </text>
+
+                        {/* Selection handles */}
+                        {isSelected && !isBeingDragged && (
+                          <>
+                            <rect x={-5} y={-5} width={10} height={10} fill="#1d4ed8" rx={2} />
+                            <rect x={width-5} y={-5} width={10} height={10} fill="#1d4ed8" rx={2} />
+                            <rect x={-5} y={height-5} width={10} height={10} fill="#1d4ed8" rx={2} />
+                            <rect x={width-5} y={height-5} width={10} height={10} fill="#1d4ed8" rx={2} />
+                          </>
+                        )}
                       </g>
                     );
                   })}
