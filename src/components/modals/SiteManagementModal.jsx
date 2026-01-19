@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { X, Building2, Edit2, Trash2, Plus } from 'lucide-react';
+import { X, Building2, Edit2, Trash2, Plus, GripVertical } from 'lucide-react';
 
-export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite, onDeleteSite, onClose }) {
+export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite, onDeleteSite, onReorderSites, onClose }) {
   const [editingSiteId, setEditingSiteId] = useState(null);
   const [editingSiteName, setEditingSiteName] = useState('');
   const [isAddingNewSite, setIsAddingNewSite] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [error, setError] = useState('');
+  const [draggedSiteIndex, setDraggedSiteIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   // Count locations assigned to each site
   const getLocationCount = (siteId) => {
@@ -86,6 +88,26 @@ export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite,
     setIsAddingNewSite(false);
     setNewSiteName('');
     setError('');
+  };
+
+  const handleReorder = async (dragIndex, dropIndex) => {
+    if (dragIndex === dropIndex) return;
+
+    // Create reordered array
+    const reorderedSites = [...sites];
+    const [removed] = reorderedSites.splice(dragIndex, 1);
+    reorderedSites.splice(dropIndex, 0, removed);
+
+    // Get array of site IDs in new order
+    const newOrder = reorderedSites.map(s => s.id);
+
+    try {
+      await onReorderSites(newOrder);
+      setError('');
+    } catch (err) {
+      console.error('Failed to reorder sites:', err);
+      setError('Failed to reorder sites. Please try again.');
+    }
   };
 
   return (
@@ -174,14 +196,50 @@ export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite,
                 <p className="text-sm">Add your first site to organize locations</p>
               </div>
             ) : (
-              sites.map(site => {
+              sites.map((site, index) => {
                 const locationCount = getLocationCount(site.id);
                 const isEditing = editingSiteId === site.id;
+                const isDragging = draggedSiteIndex === index;
+                const isDragOver = dragOverIndex === index;
 
                 return (
                   <div
                     key={site.id}
-                    className="p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                    draggable={!isEditing}
+                    onDragStart={(e) => {
+                      if (!isEditing) {
+                        setDraggedSiteIndex(index);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }
+                    }}
+                    onDragOver={(e) => {
+                      if (!isEditing) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverIndex(index);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      setDragOverIndex(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedSiteIndex !== null && draggedSiteIndex !== index && !isEditing) {
+                        handleReorder(draggedSiteIndex, index);
+                      }
+                      setDraggedSiteIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedSiteIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    className={`
+                      p-4 border rounded-lg transition-all
+                      ${isDragging ? 'opacity-50 bg-slate-100' : 'bg-slate-50'}
+                      ${isDragOver ? 'border-indigo-500 border-2 bg-indigo-50' : 'border-slate-200'}
+                      ${!isEditing ? 'hover:bg-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing' : ''}
+                    `}
                   >
                     {isEditing ? (
                       /* Edit Mode */
@@ -214,7 +272,13 @@ export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite,
                       </div>
                     ) : (
                       /* View Mode */
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Drag Handle */}
+                        <div className="flex-shrink-0 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing">
+                          <GripVertical className="w-5 h-5" />
+                        </div>
+
+                        {/* Site Info */}
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full bg-indigo-500" />
@@ -224,16 +288,24 @@ export function SiteManagementModal({ sites, locations, onAddSite, onUpdateSite,
                             {locationCount} location{locationCount === 1 ? '' : 's'}
                           </p>
                         </div>
+
+                        {/* Action Buttons */}
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleStartEdit(site)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEdit(site);
+                            }}
                             className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
                             title="Edit site"
                           >
                             <Edit2 className="w-4 h-4 text-slate-600" />
                           </button>
                           <button
-                            onClick={() => handleDelete(site)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(site);
+                            }}
                             className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                             title={locationCount > 0 ? 'Cannot delete - has locations' : 'Delete site'}
                           >
