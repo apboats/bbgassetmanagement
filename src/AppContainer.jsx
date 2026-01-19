@@ -552,18 +552,26 @@ function AppContainer() {
     }
   }
 
-  const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
-    console.log('[AppContainer.handleMoveBoat] Called with:', { boatId, toLocationId, toSlotId, isInventory })
+  const handleMoveBoat = async (boatOrBoatId, toLocationId, toSlotId, isInventory = false) => {
+    console.log('[AppContainer.handleMoveBoat] Called with:', { boatOrBoatId, toLocationId, toSlotId, isInventory })
+
+    // Handle both boat object and boatId string
+    const boat = typeof boatOrBoatId === 'object' ? boatOrBoatId : null;
+    const boatId = boat ? boat.id : boatOrBoatId;
+
     try {
-      // Find the boat to get current location (before move)
-      const boatsList = isInventory ? inventoryBoats : boats;
-      const boat = boatsList.find(b => b.id === boatId);
-      if (!boat) {
-        throw new Error('Boat not found');
+      // Find the boat if we only have the ID
+      let boatData = boat;
+      if (!boatData) {
+        const boatsList = isInventory ? inventoryBoats : boats;
+        boatData = boatsList.find(b => b.id === boatId);
+        if (!boatData) {
+          throw new Error('Boat not found');
+        }
       }
 
-      const fromLocation = boat.location || null;
-      const fromSlot = boat.slot || null;
+      const fromLocation = boatData.location || null;
+      const fromSlot = boatData.slot || null;
       const toLocation = toLocationId
         ? locations.find(l => l.id === toLocationId)?.name
         : null;
@@ -594,9 +602,10 @@ function AppContainer() {
 
       // Log the movement to boat_movements table
       try {
+        const boatType = isInventory || boatData.isInventory ? 'inventory' : 'customer';
         await supabaseService.boatMovements.logMovement({
           boatId: boatId,
-          boatType: isInventory ? 'inventory' : 'customer',
+          boatType: boatType,
           fromLocation: fromLocation,
           fromSlot: fromSlot,
           toLocation: toLocation,
