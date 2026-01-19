@@ -555,6 +555,19 @@ function AppContainer() {
   const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
     console.log('[AppContainer.handleMoveBoat] Called with:', { boatId, toLocationId, toSlotId, isInventory })
     try {
+      // Find the boat to get current location (before move)
+      const boatsList = isInventory ? inventoryBoats : boats;
+      const boat = boatsList.find(b => b.id === boatId);
+      if (!boat) {
+        throw new Error('Boat not found');
+      }
+
+      const fromLocation = boat.location || null;
+      const fromSlot = boat.slot || null;
+      const toLocation = toLocationId
+        ? locations.find(l => l.id === toLocationId)?.name
+        : null;
+
       // If toLocationId is null, this is a removal
       if (!toLocationId) {
         console.log('[AppContainer.handleMoveBoat] Removing boat from location')
@@ -578,6 +591,25 @@ function AppContainer() {
           await loadBoats()
         }
       }
+
+      // Log the movement to boat_movements table
+      try {
+        await supabaseService.boatMovements.logMovement({
+          boatId: boatId,
+          boatType: isInventory ? 'inventory' : 'customer',
+          fromLocation: fromLocation,
+          fromSlot: fromSlot,
+          toLocation: toLocation,
+          toSlot: toSlotId || null,
+          movedBy: user?.name || user?.email || 'Unknown',
+          notes: null
+        });
+        console.log('[AppContainer.handleMoveBoat] Movement logged successfully');
+      } catch (logError) {
+        // Don't fail the move if logging fails - just log the error
+        console.error('Failed to log movement:', logError);
+      }
+
       console.log('[AppContainer.handleMoveBoat] Reloading locations')
       await loadLocations()
       console.log('[AppContainer.handleMoveBoat] Complete')
