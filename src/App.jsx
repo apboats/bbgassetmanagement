@@ -2771,6 +2771,18 @@ function LocationsView({
   const handleSiteDragStart = (e, site) => {
     setDraggedSite(site);
     e.dataTransfer.effectAllowed = 'move';
+
+    // Create a small drag image instead of the entire element
+    const dragImage = document.createElement('div');
+    dragImage.textContent = site.name;
+    dragImage.style.cssText = 'position: absolute; top: -1000px; left: -1000px; padding: 8px 16px; background: #6366f1; color: white; border-radius: 8px; font-weight: bold; font-size: 14px;';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+
+    // Clean up the drag image after a short delay
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
   };
 
   const handleSiteDragOver = (e) => {
@@ -3196,17 +3208,19 @@ function LocationsView({
           <div
             key={site.id}
             className="space-y-4"
-            draggable={isManagerOrAdmin}
-            onDragStart={(e) => handleSiteDragStart(e, site)}
             onDragOver={handleSiteDragOver}
             onDrop={(e) => handleSiteDrop(e, site)}
           >
             {/* Site Header */}
-            <div className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 ${draggedSite?.id === site.id ? 'opacity-50' : ''}`}>
+            <div
+              className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 ${draggedSite?.id === site.id ? 'opacity-50' : ''} ${isManagerOrAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              draggable={isManagerOrAdmin}
+              onDragStart={(e) => handleSiteDragStart(e, site)}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {isManagerOrAdmin && (
-                    <div className="cursor-grab text-indigo-400 hover:text-indigo-600">
+                    <div className="text-indigo-400 hover:text-indigo-600 pointer-events-none">
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                       </svg>
