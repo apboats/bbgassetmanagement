@@ -119,7 +119,7 @@ export function MaximizedLocationModal({
     );
   };
 
-  // Render grid slot
+  // Render grid slot (for layout view)
   const renderSlot = (row, col, isPerimeterSlot = true) => {
     if (!isPerimeterSlot) {
       return <div key={`${row}-${col}`} className="aspect-square"></div>;
@@ -160,6 +160,50 @@ export function MaximizedLocationModal({
               ? 'border-blue-400 bg-blue-50 cursor-pointer'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
         }`}
+      >
+        {renderSlotContent(boat, row, col)}
+      </div>
+    );
+  };
+
+  // Render slot for concise view (fixed dimensions)
+  const renderConciseSlot = (row, col) => {
+    const slotId = `${row}-${col}`;
+    const boatId = location.boats?.[slotId];
+    const boat = allBoats.find(b => b.id === boatId);
+    const isDragging = draggingBoat !== null;
+
+    return (
+      <div
+        key={slotId}
+        draggable={!!boat}
+        title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
+        onDragStart={(e) => {
+          if (boat && onDragStart) {
+            onDragStart(e, boat, location, slotId);
+          }
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={(e) => {
+          if (onDrop) onDrop(e, location, row, col);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (boat && onBoatClick) {
+            onBoatClick(boat);
+          } else if (!boat && onSlotClick) {
+            onSlotClick(location, row, col);
+          }
+        }}
+        className={`border-2 rounded-xl p-2 flex flex-col items-center justify-center text-center transition-all overflow-hidden ${
+          boat
+            ? `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105`
+            : isDragging
+              ? 'border-blue-400 bg-blue-50 cursor-pointer'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+        }`}
+        style={{ width: '140px', height: '140px', flexShrink: 0 }}
       >
         {renderSlotContent(boat, row, col)}
       </div>
@@ -210,8 +254,11 @@ export function MaximizedLocationModal({
     const renderSection = (title, slots) => (
       <div className="mb-6">
         <h4 className="text-sm font-semibold text-slate-600 mb-2 px-1">{title}</h4>
-        <div className="flex flex-wrap gap-5">
-          {slots.map(({ row, col }) => renderSlot(row, col, true))}
+        <div
+          className="grid gap-4"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, 140px)' }}
+        >
+          {slots.map(({ row, col }) => renderConciseSlot(row, col))}
         </div>
       </div>
     );
@@ -581,14 +628,14 @@ export function LocationGrid({
             onSlotClick(location, row, col);
           }
         }}
-        className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
+        className={`location-slot border-2 rounded-lg p-1.5 flex flex-col items-center justify-center text-center transition-all overflow-hidden ${
           boat
             ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105`
             : isDragging
               ? 'border-blue-400 bg-blue-50 cursor-pointer'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
         }`}
-        style={{ minWidth: '100px', minHeight: '100px' }}
+        style={{ width: '100px', height: '100px', flexShrink: 0 }}
       >
         {renderSlotContent(boat, row, col)}
       </div>
@@ -620,7 +667,10 @@ export function LocationGrid({
     const renderSection = (title, slots) => (
       <div className="mb-3">
         <p className="text-xs font-semibold text-slate-500 mb-1.5 px-0.5">{title}</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, 100px)' }}
+        >
           {slots.map(({ row, col }) => renderConciseSlot(row, col))}
         </div>
       </div>
