@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, DollarSign, Download, Magnet } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, ChevronDown, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, DollarSign, Download, Magnet } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
@@ -2767,6 +2767,14 @@ function LocationsView({
 
   // Site drag reorder handlers
   const [draggedSite, setDraggedSite] = useState(null);
+  const [collapsedSites, setCollapsedSites] = useState({});
+
+  const toggleSiteCollapsed = (siteId) => {
+    setCollapsedSites(prev => ({
+      ...prev,
+      [siteId]: !prev[siteId]
+    }));
+  };
 
   const handleSiteDragStart = (e, site) => {
     setDraggedSite(site);
@@ -2783,24 +2791,43 @@ function LocationsView({
     setTimeout(() => {
       document.body.removeChild(dragImage);
     }, 0);
+
+    // Start auto-scroll interval while dragging
+    const scrollInterval = setInterval(() => {
+      if (!draggedSite) {
+        clearInterval(scrollInterval);
+        return;
+      }
+    }, 50);
+
+    // Store interval ID to clear on drag end
+    e.target.dataset.scrollInterval = scrollInterval;
+  };
+
+  // Auto-scroll function for drag operations
+  const autoScrollDuringDrag = (e) => {
+    const scrollThreshold = 100;
+    const scrollSpeed = 10;
+    const mouseY = e.clientY;
+    const windowHeight = window.innerHeight;
+
+    if (mouseY < scrollThreshold) {
+      window.scrollBy(0, -scrollSpeed);
+    } else if (mouseY > windowHeight - scrollThreshold) {
+      window.scrollBy(0, scrollSpeed);
+    }
   };
 
   const handleSiteDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    autoScrollDuringDrag(e);
+  };
 
-    // Auto-scroll when dragging near edges
-    const scrollThreshold = 100; // pixels from edge to start scrolling
-    const scrollSpeed = 15; // pixels per frame
-    const mouseY = e.clientY;
-    const windowHeight = window.innerHeight;
-
-    if (mouseY < scrollThreshold) {
-      // Near top - scroll up
-      window.scrollBy(0, -scrollSpeed);
-    } else if (mouseY > windowHeight - scrollThreshold) {
-      // Near bottom - scroll down
-      window.scrollBy(0, scrollSpeed);
+  // Global drag over handler for auto-scroll anywhere on page
+  const handleGlobalDragOver = (e) => {
+    if (draggedSite) {
+      autoScrollDuringDrag(e);
     }
   };
 
@@ -3144,7 +3171,7 @@ function LocationsView({
   };
 
   return (
-    <div className="space-y-6 animate-slide-in">
+    <div className="space-y-6 animate-slide-in" onDragOver={handleGlobalDragOver}>
       {/* Processing Overlay */}
       {isProcessing && (
         <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-40">
@@ -3233,39 +3260,62 @@ function LocationsView({
                       </svg>
                     </div>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSiteCollapsed(site.id);
+                    }}
+                    className="p-1 text-indigo-500 hover:text-indigo-700 transition-colors"
+                    title={collapsedSites[site.id] ? 'Expand site' : 'Collapse site'}
+                  >
+                    <ChevronDown className={`w-5 h-5 transition-transform ${collapsedSites[site.id] ? '-rotate-90' : ''}`} />
+                  </button>
                   <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
                     <Map className="w-6 h-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-indigo-900">{site.name}</h3>
-                    <p className="text-sm text-indigo-600">{siteLocations.length} location{siteLocations.length !== 1 ? 's' : ''}</p>
+                    <p className="text-sm text-indigo-600">
+                      {siteLocations.length} location{siteLocations.length !== 1 ? 's' : ''}
+                      {collapsedSites[site.id] && ' (collapsed)'}
+                    </p>
                   </div>
                 </div>
-                {isManagerOrAdmin && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setEditingSite(site)}
-                      className="p-2 text-indigo-600 hover:bg-indigo-200 rounded-lg transition-colors"
-                      title="Edit Site"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSite(site.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Delete Site"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {isManagerOrAdmin && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSite(site);
+                        }}
+                        className="p-2 text-indigo-600 hover:bg-indigo-200 rounded-lg transition-colors"
+                        title="Edit Site"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSite(site.id);
+                        }}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Delete Site"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Site's locations grouped by type */}
-            <div className="pl-4 border-l-4 border-indigo-200 space-y-6">
-              {renderLocationsByType(siteLocations)}
-            </div>
+            {!collapsedSites[site.id] && (
+              <div className="pl-4 border-l-4 border-indigo-200 space-y-6">
+                {renderLocationsByType(siteLocations)}
+              </div>
+            )}
           </div>
         );
       })}
