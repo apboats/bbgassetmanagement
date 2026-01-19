@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, ChevronDown, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, DollarSign, Download, Magnet } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
 import { boatsService, inventoryBoatsService } from './services/supabaseService';
 import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation, BoatStatusIcons, InventoryBadge, findBoatLocationData } from './components/BoatComponents';
 import { PoolLocation } from './components/locations/PoolLocation';
-import { LocationGrid, MaximizedLocationModal } from './components/locations/LocationGrid';
+import { LocationGrid } from './components/locations/LocationGrid';
 import { LocationSection } from './components/locations/LocationSection';
 import { useRemoveBoat } from './hooks/useRemoveBoat';
 import { useAssignBoat } from './hooks/useAssignBoat';
 import { useBoatDragDrop } from './hooks/useBoatDragDrop';
-import { BoatDetailsModal } from './components/modals/BoatDetailsModal';
-import { InventoryBoatDetailsModal } from './components/modals/InventoryBoatDetailsModal';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -90,14 +88,7 @@ export default function BoatsByGeorgeAssetManager({
   onAssignBoatToSlot,
   onRemoveBoatFromSlot,
   onMoveBoat,
-
-  // Sites
-  sites = [],
-  onAddSite,
-  onUpdateSite,
-  onDeleteSite,
-  onReorderSites,
-
+  
   // User Preferences
   userPreferences = {},
   onSavePreferences,
@@ -112,29 +103,7 @@ export default function BoatsByGeorgeAssetManager({
 }) {
   // UI State (keep these)
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Bypass auth for development
-
-  // Hash-based routing for URL persistence
-  const validViews = ['dashboard', 'myview', 'locations', 'boats', 'inventory', 'shows', 'scan', 'settings'];
-  const getViewFromHash = () => {
-    const hash = window.location.hash.replace('#/', '').replace('#', '');
-    return validViews.includes(hash) ? hash : 'dashboard';
-  };
-  const [currentView, setCurrentViewState] = useState(getViewFromHash);
-
-  // Sync view state with URL hash
-  const setCurrentView = (view) => {
-    window.location.hash = `#/${view}`;
-    setCurrentViewState(view);
-  };
-
-  // Listen for browser back/forward navigation
-  useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentViewState(getViewFromHash());
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  const [currentView, setCurrentView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
@@ -602,22 +571,17 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
+          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
         )}
         {currentView === 'locations' && (
           <LocationsView
             locations={locations}
-            sites={sites}
-            onAddSite={onAddSite}
-            onUpdateSite={onUpdateSite}
-            onDeleteSite={onDeleteSite}
-            onReorderSites={onReorderSites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               // If same ID exists in both, keep the inventory version
               const seen = {};
               const combined = [];
-
+              
               // Add regular boats first
               boats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -625,7 +589,7 @@ export default function BoatsByGeorgeAssetManager({
                   combined.push(boat);
                 }
               });
-
+              
               // Add inventory boats (will replace duplicates)
               inventoryBoats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -637,7 +601,7 @@ export default function BoatsByGeorgeAssetManager({
                   if (index !== -1) combined[index] = boat;
                 }
               });
-
+              
               return combined;
             })()}
             onUpdateLocations={saveLocations}
@@ -649,18 +613,15 @@ export default function BoatsByGeorgeAssetManager({
               saveInventoryBoats(invBoats);
             }}
             onMoveBoat={onMoveBoat}
-            currentUser={currentUser}
           />
         )}
         {currentView === 'boats' && (
           <BoatsView
             boats={boats}
             locations={locations}
-            sites={sites}
             onUpdateBoats={saveBoats}
-            onMoveBoat={onMoveBoat}
+            onMoveBoat={handleMoveBoat}
             dockmasterConfig={dockmasterConfig}
-            currentUser={currentUser}
           />
         )}
         {currentView === 'scan' && (
@@ -674,7 +635,6 @@ export default function BoatsByGeorgeAssetManager({
         {currentView === 'myview' && (
           <MyViewEditor
             locations={locations}
-            sites={sites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               const seen = {};
@@ -711,10 +671,9 @@ export default function BoatsByGeorgeAssetManager({
           />
         )}
         {currentView === 'inventory' && (
-          <InventoryView
+          <InventoryView 
             inventoryBoats={inventoryBoats}
             locations={locations}
-            sites={sites}
             lastSync={lastInventorySync}
             onSyncNow={syncInventoryBoats}
             onUpdateInventoryBoats={saveInventoryBoats}
@@ -842,7 +801,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
+function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   // Use unified remove boat hook
@@ -1131,7 +1090,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat, currentUser }) {
+function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1183,9 +1142,9 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
     if (showArchived && !isArchived) return false;
     if (!showArchived && isArchived) return false;
     
-    const matchesSearch = (boat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (boat.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (boat.owner || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         boat.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || boat.status === filterStatus;
     
     let matchesWorkPhase = true;
@@ -1197,10 +1156,8 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
       matchesWorkPhase = !boat.fiberglassComplete;
     } else if (filterWorkPhase === 'needs-warranty') {
       matchesWorkPhase = !boat.warrantyComplete;
-    } else if (filterWorkPhase === 'needs-invoiced') {
-      matchesWorkPhase = !boat.invoicedComplete;
     } else if (filterWorkPhase === 'all-complete') {
-      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete && boat.invoicedComplete;
+      matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
     }
     
     let matchesLocation = true;
@@ -1460,27 +1417,6 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
               {boats.filter(b => b.status !== 'archived' && !b.warrantyComplete).length}
             </p>
           </button>
-
-          <button
-            onClick={() => setFilterWorkPhase(filterWorkPhase === 'needs-invoiced' ? 'all' : 'needs-invoiced')}
-            className={`p-3 rounded-lg border-2 transition-all ${
-              filterWorkPhase === 'needs-invoiced'
-                ? 'border-emerald-400 bg-emerald-50'
-                : 'border-slate-200 bg-white hover:border-emerald-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-slate-600">Invoiced</span>
-              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">
-              {boats.filter(b => b.status !== 'archived' && !b.invoicedComplete).length}
-            </p>
-          </button>
         </div>
       </div>
 
@@ -1530,7 +1466,7 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
             <div className="flex-1">
               <p className="text-sm font-medium text-slate-900">Unassigned</p>
               <p className="text-xs text-slate-500">
-                {boats.filter(b => !b.location && b.status !== 'archived').length} boats
+                {boats.filter(b => !b.location).length} boats
               </p>
             </div>
           </label>
@@ -1678,7 +1614,6 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
               <option value="needs-clean">Needs Clean</option>
               <option value="needs-fiberglass">Needs Fiberglass</option>
               <option value="needs-warranty">Needs Warranty</option>
-              <option value="needs-invoiced">Needs Invoiced</option>
               <option value="all-complete">All Phases Complete</option>
             </select>
           </div>
@@ -1830,12 +1765,10 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
     </div>
@@ -1931,20 +1864,9 @@ function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
                 Warr
               </span>
             </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={boat.invoicedComplete || false}
-                readOnly
-                className="w-3 h-3 rounded pointer-events-none"
-              />
-              <span className={boat.invoicedComplete ? 'text-green-600 font-medium' : 'text-slate-500'}>
-                Inv
-              </span>
-            </label>
           </div>
           {/* Pending work badges */}
-          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete || !boat.warrantyComplete || !boat.invoicedComplete) && (
+          {(!boat.mechanicalsComplete || !boat.cleanComplete || !boat.fiberglassComplete || !boat.warrantyComplete) && (
             <div className="flex flex-wrap gap-1 mt-2">
               {!boat.mechanicalsComplete && (
                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-medium rounded-full">
@@ -1964,11 +1886,6 @@ function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
               {!boat.warrantyComplete && (
                 <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-medium rounded-full">
                   Needs Warr
-                </span>
-              )}
-              {!boat.invoicedComplete && (
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
-                  Needs Inv
                 </span>
               )}
             </div>
@@ -2138,11 +2055,10 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
     mechanicalsComplete: false,
     cleanComplete: false,
     fiberglassComplete: false,
-    warrantyComplete: false,
-    invoicedComplete: false
+    warrantyComplete: false
   });
 
-  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete && formData.warrantyComplete && formData.invoicedComplete;
+  const allWorkPhasesComplete = formData.mechanicalsComplete && formData.cleanComplete && formData.fiberglassComplete && formData.warrantyComplete;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2310,21 +2226,6 @@ function BoatModal({ boat, locations, onSave, onCancel }) {
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm text-slate-700">Warranty Complete</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.invoicedComplete || false}
-                  onChange={(e) => {
-                    const newData = { ...formData, invoicedComplete: e.target.checked };
-                    if (!e.target.checked && formData.status === 'all-work-complete') {
-                      newData.status = 'on-deck';
-                    }
-                    setFormData(newData);
-                  }}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-sm text-slate-700">Invoiced Complete</span>
               </label>
             </div>
           </div>
@@ -2571,25 +2472,8 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({
-  locations,
-  sites = [],
-  onAddSite,
-  onUpdateSite,
-  onDeleteSite,
-  onReorderSites,
-  boats,
-  onUpdateLocations,
-  onUpdateBoats,
-  onMoveBoat: onMoveBoatFromContainer,
-  currentUser
-}) {
-  // Role check for location management permissions
-  const isManagerOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
-
+function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
-  const [showAddSite, setShowAddSite] = useState(false);
-  const [editingSite, setEditingSite] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -2734,127 +2618,6 @@ function LocationsView({
       }
       onUpdateLocations(locations.filter(l => l.id !== locationId));
     }
-  };
-
-  // Site handlers
-  const handleSaveSite = async (siteData) => {
-    try {
-      if (editingSite) {
-        await onUpdateSite(editingSite.id, siteData);
-        setEditingSite(null);
-      } else {
-        await onAddSite(siteData);
-        setShowAddSite(false);
-      }
-    } catch (error) {
-      console.error('Error saving site:', error);
-      alert(error.message || 'Failed to save site');
-    }
-  };
-
-  const handleDeleteSite = async (siteId) => {
-    const siteLocations = locations.filter(l => l.site_id === siteId);
-    if (siteLocations.length > 0) {
-      alert('Cannot delete site with assigned locations. Please move or delete all locations from this site first.');
-      return;
-    }
-    if (confirm('Are you sure you want to delete this site?')) {
-      try {
-        await onDeleteSite(siteId);
-      } catch (error) {
-        console.error('Error deleting site:', error);
-        alert(error.message || 'Failed to delete site');
-      }
-    }
-  };
-
-  // Site drag reorder handlers
-  const [draggedSite, setDraggedSite] = useState(null);
-  const [collapsedSites, setCollapsedSites] = useState({});
-
-  const toggleSiteCollapsed = (siteId) => {
-    setCollapsedSites(prev => ({
-      ...prev,
-      [siteId]: !prev[siteId]
-    }));
-  };
-
-  const handleSiteDragStart = (e, site) => {
-    setDraggedSite(site);
-    e.dataTransfer.effectAllowed = 'move';
-
-    // Create a small drag image instead of the entire element
-    const dragImage = document.createElement('div');
-    dragImage.textContent = site.name;
-    dragImage.style.cssText = 'position: absolute; top: -1000px; left: -1000px; padding: 8px 16px; background: #6366f1; color: white; border-radius: 8px; font-weight: bold; font-size: 14px;';
-    document.body.appendChild(dragImage);
-    e.dataTransfer.setDragImage(dragImage, 0, 0);
-
-    // Clean up the drag image after a short delay
-    setTimeout(() => {
-      document.body.removeChild(dragImage);
-    }, 0);
-
-    // Start auto-scroll interval while dragging
-    const scrollInterval = setInterval(() => {
-      if (!draggedSite) {
-        clearInterval(scrollInterval);
-        return;
-      }
-    }, 50);
-
-    // Store interval ID to clear on drag end
-    e.target.dataset.scrollInterval = scrollInterval;
-  };
-
-  // Auto-scroll function for drag operations
-  const autoScrollDuringDrag = (e) => {
-    const scrollThreshold = 100;
-    const scrollSpeed = 10;
-    const mouseY = e.clientY;
-    const windowHeight = window.innerHeight;
-
-    if (mouseY < scrollThreshold) {
-      window.scrollBy(0, -scrollSpeed);
-    } else if (mouseY > windowHeight - scrollThreshold) {
-      window.scrollBy(0, scrollSpeed);
-    }
-  };
-
-  const handleSiteDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    autoScrollDuringDrag(e);
-  };
-
-  // Global drag over handler for auto-scroll anywhere on page
-  const handleGlobalDragOver = (e) => {
-    if (draggedSite) {
-      autoScrollDuringDrag(e);
-    }
-  };
-
-  const handleSiteDrop = async (e, targetSite) => {
-    e.preventDefault();
-    if (!draggedSite || draggedSite.id === targetSite.id) {
-      setDraggedSite(null);
-      return;
-    }
-
-    // Reorder sites
-    const currentOrder = sites.map(s => s.id);
-    const dragIndex = currentOrder.indexOf(draggedSite.id);
-    const targetIndex = currentOrder.indexOf(targetSite.id);
-
-    currentOrder.splice(dragIndex, 1);
-    currentOrder.splice(targetIndex, 0, draggedSite.id);
-
-    try {
-      await onReorderSites(currentOrder);
-    } catch (error) {
-      console.error('Error reordering sites:', error);
-    }
-    setDraggedSite(null);
   };
 
   const handleSlotClick = (location, row, col) => {
@@ -3064,117 +2827,14 @@ function LocationsView({
   });
   const unassignedBoats = boats.filter(b => b.status !== 'archived' && !assignedBoatIds.has(b.id));
 
-  // Helper to get locations for a site
-  const getLocationsForSite = (siteId) => {
-    return locations.filter(l => l.site_id === siteId);
-  };
-
-  // Get locations without a site (for migration purposes)
-  const unassignedLocations = locations.filter(l => !l.site_id);
-
-  // Helper to render locations grouped by type within a site
-  const renderLocationsByType = (siteLocations) => {
-    const racks = siteLocations.filter(l => l.type === 'rack-building');
-    const parking = siteLocations.filter(l => l.type === 'parking-lot');
-    const workshops = siteLocations.filter(l => l.type === 'shop');
-    const pools = siteLocations.filter(l => l.type === 'pool');
-
-    return (
-      <>
-        {workshops.length > 0 && (
-          <LocationSection
-            title="Service Workshops"
-            icon={Settings}
-            color="orange"
-            locations={workshops}
-            boats={boats}
-            onSlotClick={handleSlotClick}
-            onBoatClick={(boat) => setViewingBoat(boat)}
-            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-            onDragStart={handleDragStart}
-            onDrop={handleGridDrop}
-            onDragEnd={handleDragEnd}
-            draggingBoat={draggingBoat}
-            onMaximize={setMaximizedLocation}
-          />
-        )}
-
-        {pools.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
-            </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {pools.map(pool => (
-                <PoolLocation
-                  key={pool.id}
-                  location={pool}
-                  boats={boats}
-                  onEdit={isManagerOrAdmin ? () => setEditingLocation(pool) : undefined}
-                  onDelete={isManagerOrAdmin ? () => handleDeleteLocation(pool.id) : undefined}
-                  onDragStart={handleDragStart}
-                  onDrop={handlePoolDrop}
-                  onDragEnd={handleDragEnd}
-                  isDragging={!!draggingBoat}
-                  onBoatClick={(boat) => setViewingBoat(boat)}
-                  onAddBoat={() => {
-                    setSelectedLocation(pool);
-                    setSelectedSlot('pool');
-                    setShowBoatAssignModal(true);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {racks.length > 0 && (
-          <LocationSection
-            title="Rack Buildings"
-            icon={Grid}
-            color="blue"
-            locations={racks}
-            boats={boats}
-            onSlotClick={handleSlotClick}
-            onBoatClick={(boat) => setViewingBoat(boat)}
-            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-            onDragStart={handleDragStart}
-            onDrop={handleGridDrop}
-            onDragEnd={handleDragEnd}
-            draggingBoat={draggingBoat}
-            onMaximize={setMaximizedLocation}
-          />
-        )}
-
-        {parking.length > 0 && (
-          <LocationSection
-            title="Parking Lots"
-            icon={Map}
-            color="purple"
-            locations={parking}
-            boats={boats}
-            onSlotClick={handleSlotClick}
-            onBoatClick={(boat) => setViewingBoat(boat)}
-            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-            onDragStart={handleDragStart}
-            onDrop={handleGridDrop}
-            onDragEnd={handleDragEnd}
-            draggingBoat={draggingBoat}
-            onMaximize={setMaximizedLocation}
-          />
-        )}
-      </>
-    );
-  };
+  // Group locations by type
+  const racks = locations.filter(l => l.type === 'rack-building');
+  const parking = locations.filter(l => l.type === 'parking-lot');
+  const workshops = locations.filter(l => l.type === 'shop');
+  const pools = locations.filter(l => l.type === 'pool');
 
   return (
-    <div className="space-y-6 animate-slide-in" onDragOver={handleGlobalDragOver}>
+    <div className="space-y-6 animate-slide-in">
       {/* Processing Overlay */}
       {isProcessing && (
         <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-40">
@@ -3184,30 +2844,19 @@ function LocationsView({
           </div>
         </div>
       )}
-
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Storage Locations</h2>
           <p className="text-slate-600">Manage boat storage facilities and assignments</p>
         </div>
-        {isManagerOrAdmin && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAddSite(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Site
-            </button>
-            <button
-              onClick={() => setShowAddLocation(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Location
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => setShowAddLocation(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
+        >
+          <Plus className="w-5 h-5" />
+          Add Location
+        </button>
       </div>
 
       {/* Instructions Banner */}
@@ -3229,176 +2878,117 @@ function LocationsView({
         </div>
       </div>
 
-      {/* Sites with their locations */}
-      {sites.map(site => {
-        const siteLocations = getLocationsForSite(site.id);
-        if (siteLocations.length === 0) return null;
+      {/* Locations by Type */}
+      {racks.length > 0 && (
+        <LocationSection
+          title="Rack Buildings"
+          icon={Grid}
+          color="blue"
+          locations={racks}
+          boats={boats}
+          onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
+          onEdit={setEditingLocation}
+          onDelete={handleDeleteLocation}
+          onDragStart={handleDragStart}
+          onDrop={handleGridDrop}
+          onDragEnd={handleDragEnd}
+          draggingBoat={draggingBoat}
+          onMaximize={setMaximizedLocation}
+        />
+      )}
 
-        return (
-          <div
-            key={site.id}
-            className="space-y-4"
-          >
-            {/* Site Header */}
-            <div
-              className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 rounded-xl p-4 transition-all ${
-                draggedSite?.id === site.id
-                  ? 'opacity-50 border-indigo-200'
-                  : draggedSite && draggedSite.id !== site.id
-                  ? 'border-indigo-400 border-dashed'
-                  : 'border-indigo-200'
-              } ${isManagerOrAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
-              draggable={isManagerOrAdmin}
-              onDragStart={(e) => handleSiteDragStart(e, site)}
-              onDragEnd={() => setDraggedSite(null)}
-              onDragOver={handleSiteDragOver}
-              onDrop={(e) => handleSiteDrop(e, site)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {isManagerOrAdmin && (
-                    <div className="text-indigo-400 hover:text-indigo-600 pointer-events-none">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                      </svg>
-                    </div>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSiteCollapsed(site.id);
-                    }}
-                    className="p-1 text-indigo-500 hover:text-indigo-700 transition-colors"
-                    title={collapsedSites[site.id] ? 'Expand site' : 'Collapse site'}
-                  >
-                    <ChevronDown className={`w-5 h-5 transition-transform ${collapsedSites[site.id] ? '-rotate-90' : ''}`} />
-                  </button>
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                    <Map className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-indigo-900">{site.name}</h3>
-                    <p className="text-sm text-indigo-600">
-                      {siteLocations.length} location{siteLocations.length !== 1 ? 's' : ''}
-                      {collapsedSites[site.id] && ' (collapsed)'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isManagerOrAdmin && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSite(site);
-                        }}
-                        className="p-2 text-indigo-600 hover:bg-indigo-200 rounded-lg transition-colors"
-                        title="Edit Site"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSite(site.id);
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                        title="Delete Site"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+      {parking.length > 0 && (
+        <LocationSection
+          title="Parking Lots"
+          icon={Map}
+          color="purple"
+          locations={parking}
+          boats={boats}
+          onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
+          onEdit={setEditingLocation}
+          onDelete={handleDeleteLocation}
+          onDragStart={handleDragStart}
+          onDrop={handleGridDrop}
+          onDragEnd={handleDragEnd}
+          draggingBoat={draggingBoat}
+          onMaximize={setMaximizedLocation}
+        />
+      )}
+
+      {workshops.length > 0 && (
+        <LocationSection
+          title="Service Workshops"
+          icon={Settings}
+          color="orange"
+          locations={workshops}
+          boats={boats}
+          onSlotClick={handleSlotClick}
+          onBoatClick={(boat) => setViewingBoat(boat)}
+          onEdit={setEditingLocation}
+          onDelete={handleDeleteLocation}
+          onDragStart={handleDragStart}
+          onDrop={handleGridDrop}
+          onDragEnd={handleDragEnd}
+          draggingBoat={draggingBoat}
+          onMaximize={setMaximizedLocation}
+        />
+      )}
+
+      {/* Pool Locations */}
+      {pools.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+              <Package className="w-6 h-6 text-white" />
             </div>
-
-            {/* Site's locations grouped by type */}
-            {!collapsedSites[site.id] && (
-              <div className="pl-4 border-l-4 border-indigo-200 space-y-6">
-                {renderLocationsByType(siteLocations)}
-              </div>
-            )}
+            <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
           </div>
-        );
-      })}
-
-      {/* Unassigned locations (no site) - shown for migration purposes */}
-      {unassignedLocations.length > 0 && (
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-200 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-slate-400 to-slate-500 rounded-lg flex items-center justify-center">
-                <Map className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-700">Unassigned Locations</h3>
-                <p className="text-sm text-slate-500">These locations need to be assigned to a site</p>
-              </div>
-            </div>
-          </div>
-          <div className="pl-4 border-l-4 border-slate-200 space-y-6">
-            {renderLocationsByType(unassignedLocations)}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {pools.map(pool => (
+              <PoolLocation
+                key={pool.id}
+                location={pool}
+                boats={boats}
+                onEdit={() => setEditingLocation(pool)}
+                onDelete={() => handleDeleteLocation(pool.id)}
+                onDragStart={handleDragStart}
+                onDrop={handlePoolDrop}
+                onDragEnd={handleDragEnd}
+                isDragging={!!draggingBoat}
+                onBoatClick={(boat) => {
+                  // Modal will handle finding location data - just pass the boat
+                  setViewingBoat(boat);
+                }}
+                onAddBoat={() => {
+                  setSelectedLocation(pool);
+                  setSelectedSlot('pool');
+                  setShowBoatAssignModal(true);
+                }}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Empty state - no sites and no locations */}
-      {sites.length === 0 && locations.length === 0 && (
+      {locations.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
           <Map className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 mb-4">No sites or storage locations yet</p>
-          {isManagerOrAdmin ? (
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setShowAddSite(true)}
-                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
-              >
-                Create First Site
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">Contact a manager to create sites and locations</p>
-          )}
-        </div>
-      )}
-
-      {/* Has sites but no locations */}
-      {sites.length > 0 && locations.length === 0 && (
-        <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
-          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 mb-4">Sites created, but no locations yet</p>
-          {isManagerOrAdmin ? (
-            <button
-              onClick={() => setShowAddLocation(true)}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Add First Location
-            </button>
-          ) : (
-            <p className="text-sm text-slate-400">Contact a manager to create locations</p>
-          )}
+          <p className="text-slate-500 mb-4">No storage locations yet</p>
+          <button
+            onClick={() => setShowAddLocation(true)}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Create First Location
+          </button>
         </div>
       )}
 
       {/* Modals */}
-      {/* Site Modals */}
-      {(showAddSite || editingSite) && (
-        <EditSiteModal
-          site={editingSite}
-          onSave={handleSaveSite}
-          onCancel={() => {
-            setShowAddSite(false);
-            setEditingSite(null);
-          }}
-        />
-      )}
-
-      {/* Location Modals */}
       {showAddLocation && (
         <EditLocationModal
           location={null}
-          sites={sites}
           onSave={handleAddLocation}
           onCancel={() => setShowAddLocation(false)}
         />
@@ -3406,7 +2996,6 @@ function LocationsView({
       {editingLocation && (
         <EditLocationModal
           location={editingLocation}
-          sites={sites}
           onSave={handleUpdateLocation}
           onCancel={() => setEditingLocation(null)}
         />
@@ -3430,7 +3019,6 @@ function LocationsView({
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -3439,22 +3027,19 @@ function LocationsView({
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
 
       {/* Maximized Location Modal */}
       {maximizedLocation && (
         <MaximizedLocationModal
-          location={locations.find(l => l.id === maximizedLocation.id) || maximizedLocation}
+          location={maximizedLocation}
           boats={boats}
           onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
@@ -3641,92 +3226,1252 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
   );
 }
 
-// BoatDetailsModal and InventoryBoatDetailsModal have been extracted to separate files
-// See: src/components/modals/BoatDetailsModal.jsx
-// See: src/components/modals/InventoryBoatDetailsModal.jsx
+function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat }) {
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
+  const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
+  const [showWorkOrders, setShowWorkOrders] = useState(false);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
+  const [workOrdersError, setWorkOrdersError] = useState('');
+  const [updatingFromDockmaster, setUpdatingFromDockmaster] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const [updateSuccess, setUpdateSuccess] = useState('');
+  
+  const statusLabels = {
+    'needs-approval': 'Needs Approval',
+    'needs-parts': 'Needs Parts',
+    'parts-kit-pulled': 'Parts Kit Pulled',
+    'on-deck': 'On Deck',
+    'all-work-complete': 'All Work Complete',
+    'archived': 'Released'
+  };
 
-// Edit Site Modal - Simple modal for creating/editing sites
-function EditSiteModal({ site, onSave, onCancel }) {
-  const [name, setName] = useState(site?.name || '');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Sales Status labels for inventory boats
+  const salesStatusLabels = {
+    'HA': 'On Hand Available',
+    'HS': 'On Hand Sold',
+    'OA': 'On Order Available',
+    'OS': 'On Order Sold',
+    'FA': 'Future Available',
+    'FS': 'Future Sold',
+    'S': 'Sold',
+    'R': 'Reserved',
+    'FP': 'Floor Planned'
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
+  const isArchived = boat.status === 'archived';
+  const isInventory = boat.isInventory === true; // Check if this is an inventory boat
 
-    setIsSubmitting(true);
+  const handleWorkPhaseToggle = (phase) => {
+    if (isArchived) return; // Can't modify archived boats
+    
+    const updatedBoat = { ...boat, [phase]: !boat[phase] };
+    
+    // If unchecking a phase and status is complete, change status
+    if (!updatedBoat[phase] && boat.status === 'all-work-complete') {
+      updatedBoat.status = 'on-deck';
+    }
+    
+    onUpdateBoat(updatedBoat);
+  };
+
+  const handleStatusUpdate = (newStatus) => {
+    if (isArchived) return; // Can't modify archived boats
+    
+    // Validate: can't set to complete without all phases done
+    if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
+      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty) must be completed first.');
+      return;
+    }
+    
+    const updatedBoat = { ...boat, status: newStatus };
+    onUpdateBoat(updatedBoat);
+  };
+
+  const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
+  const [workOrdersFromCache, setWorkOrdersFromCache] = useState(false);
+
+  const fetchWorkOrders = async (refresh = false) => {
+    if (!boat.customerId && !boat.id) {
+      setWorkOrdersError('No customer ID associated with this boat. Work orders cannot be fetched.');
+      return;
+    }
+
+    setLoadingWorkOrders(true);
+    setWorkOrdersError('');
+
     try {
-      await onSave({ name: name.trim() });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      // Extract only the primitive values we need to avoid circular references
+      const requestBody = {
+        customerId: String(boat.customerId || ''),
+        boatId: String(boat.dockmasterId || ''),
+        boatUuid: String(boat.id || ''),
+        refresh: Boolean(refresh),
+      };
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-workorders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch work orders');
+      }
+
+      const data = await response.json();
+      setWorkOrders(data.workOrders || []);
+      setWorkOrdersLastSynced(data.lastSynced);
+      setWorkOrdersFromCache(data.fromCache || false);
+      setShowWorkOrders(true);
     } catch (error) {
-      console.error('Error saving site:', error);
+      console.error('Error fetching work orders:', error);
+      setWorkOrdersError(error.message);
     } finally {
-      setIsSubmitting(false);
+      setLoadingWorkOrders(false);
+    }
+  };
+
+  const updateFromDockmaster = async () => {
+    if (!boat.dockmasterId) {
+      setUpdateError('This boat has no Dockmaster ID. It may have been created manually.');
+      return;
+    }
+
+    setUpdatingFromDockmaster(true);
+    setUpdateError('');
+    setUpdateSuccess('');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      // Call the retrieve endpoint to get fresh data
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-retrieve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          boatId: boat.dockmasterId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch boat data from Dockmaster');
+      }
+
+      const boatData = await response.json();
+      console.log('Updated boat data from Dockmaster:', boatData);
+
+      // Update the boat with fresh data from Dockmaster
+      const updatedBoat = {
+        ...boat,
+        name: boatData.name || boat.name,
+        model: boatData.model || boat.model,
+        make: boatData.make || boat.make,
+        year: boatData.year || boat.year,
+        hullId: boatData.hin || boat.hullId,
+        customerId: boatData.ownerId || boat.customerId, // This is the key field we need!
+      };
+
+      onUpdateBoat(updatedBoat);
+      setUpdateSuccess('Boat updated successfully from Dockmaster!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setUpdateSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error updating from Dockmaster:', error);
+      setUpdateError(error.message);
+    } finally {
+      setUpdatingFromDockmaster(false);
+    }
+  };
+
+  const handleReleaseBoat = async () => {
+    if (confirm(`Release ${boat.name} back to owner?\n\nThis will archive the boat and remove it from active management. The boat will be moved to the archived boats list.`)) {
+      try {
+        setIsProcessing(true);
+
+        // If boat is in a location, remove it from location data first
+        if (boat.location || boat.currentLocation) {
+          console.log('[Release] Removing boat from location before archiving');
+
+          // Ensure onRemove is defined before calling it
+          if (onRemove) {
+            try {
+              await onRemove();
+              console.log('[Release] Boat removed from location successfully');
+            } catch (removeError) {
+              console.error('[Release] Error removing boat from location:', removeError);
+              // Continue with archival even if removal fails - the location fields will be nulled
+              // This handles cases where the location data might be out of sync
+            }
+          } else {
+            console.warn('[Release] onRemove callback not provided, skipping location removal');
+          }
+        }
+
+        // Archive the boat (status change happens after removal)
+        const updatedBoat = {
+          ...boat,
+          status: 'archived',
+          archivedDate: new Date().toISOString(),
+          location: null,
+          slot: null
+        };
+
+        // Update the boat record with archived status
+        await onUpdateBoat(updatedBoat);
+
+        console.log('[Release] Boat archived successfully');
+
+        // Close modal
+        onClose();
+        setIsProcessing(false);
+      } catch (error) {
+        console.error('[Release] Error releasing boat:', error);
+        alert(`Failed to release boat: ${error.message}`);
+        setIsProcessing(false);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-slide-in">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-slate-900">{site ? 'Edit Site' : 'Add New Site'}</h3>
-          <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded transition-colors">
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 md:p-4 z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col animate-slide-in">
+        {/* Fixed Header */}
+        <div className={`status-${boat.status} p-4 md:p-6 rounded-t-xl flex-shrink-0`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg md:text-xl font-bold text-white mb-0.5 truncate">{boat.name}</h3>
+                <p className="text-xs md:text-sm text-white/90 truncate">{boat.model} • {boat.qrCode}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex-shrink-0"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Scrollable Content */}
+        <div className="p-4 md:p-6 space-y-4 md:space-y-5 overflow-y-auto flex-1">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Site Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., Main Marina, Overflow Yard"
-              required
-              autoFocus
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              A site represents a physical location where storage areas are located.
-            </p>
+            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-3">Boat Information</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-600 mb-0.5">Owner</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">{boat.owner}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-600 mb-0.5">Status</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">{statusLabels[boat.status]}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg col-span-1 sm:col-span-2">
+                <p className="text-xs text-slate-600 mb-0.5">Work Order Number</p>
+                <input
+                  type="text"
+                  value={boat.workOrderNumber || ''}
+                  onChange={(e) => onUpdateBoat({ ...boat, workOrderNumber: e.target.value })}
+                  disabled={isArchived}
+                  className={`w-full text-sm font-semibold text-slate-900 bg-transparent border-0 border-b-2 ${
+                    isArchived ? 'border-slate-200' : 'border-slate-300 focus:border-blue-500'
+                  } px-0 py-1 focus:outline-none focus:ring-0`}
+                  placeholder={isArchived ? 'N/A' : 'Enter work order number'}
+                />
+              </div>
+              
+              {/* Sales Status - Only shown for inventory boats */}
+              {isInventory && boat.salesStatus && (
+                <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg col-span-1 sm:col-span-2">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <svg className="w-3 h-3 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    <p className="text-xs text-blue-700 font-medium">Sales Status (Inventory)</p>
+                  </div>
+                  <p className="text-sm font-bold text-blue-900">
+                    {boat.salesStatus} - {salesStatusLabels[boat.salesStatus] || boat.salesStatus}
+                  </p>
+                </div>
+              )}
+              
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-600 mb-0.5">Current Location</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900 truncate">
+                    {boat.location || 'Unassigned'}
+                  </p>
+                  {!isArchived && locations.length > 0 && (
+                    <button
+                      onClick={() => setShowLocationPicker(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                    >
+                      {boat.location ? 'Move...' : 'Assign...'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-600 mb-0.5">Slot</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">
+                  {boat.slot === 'pool' ? 'Pool' : boat.slot ? (() => {
+                    // Convert 0-indexed slot to 1-indexed for display (e.g., "0-2" → "1-3")
+                    const parts = boat.slot.split('-');
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                      return `${parseInt(parts[0]) + 1}-${parseInt(parts[1]) + 1}`;
+                    }
+                    return boat.slot;
+                  })() : 'N/A'}
+                </p>
+              </div>
+              
+              {/* NFC Tag Management */}
+              <div className="p-3 bg-purple-50 border-2 border-purple-200 rounded-lg col-span-1 sm:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-xs text-purple-700 font-medium">NFC Tag</p>
+                  </div>
+                  {boat.nfcTag && !isArchived && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Release this NFC tag? It can be reassigned to another boat.')) {
+                          onUpdateBoat({ ...boat, nfcTag: null });
+                        }
+                      }}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-medium underline"
+                    >
+                      Release Tag
+                    </button>
+                  )}
+                </div>
+                {boat.nfcTag ? (
+                  <p className="text-sm font-bold text-purple-900 font-mono">{boat.nfcTag}</p>
+                ) : (
+                  <p className="text-xs text-purple-600">
+                    No NFC tag assigned • Tag will auto-assign on first scan
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:bg-indigo-400"
-              disabled={isSubmitting || !name.trim()}
-            >
-              {isSubmitting ? 'Saving...' : (site ? 'Save Changes' : 'Add Site')}
-            </button>
+          <div>
+            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
+            <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleWorkPhaseToggle('mechanicalsComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.mechanicalsComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.mechanicalsComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Mechanicals</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.mechanicalsComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.mechanicalsComplete ? '✓' : '○'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleWorkPhaseToggle('cleanComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.cleanComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.cleanComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Clean</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.cleanComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.cleanComplete ? '✓' : '○'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleWorkPhaseToggle('fiberglassComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.fiberglassComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.fiberglassComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Fiberglass</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.fiberglassComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.fiberglassComplete ? '✓' : '○'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleWorkPhaseToggle('warrantyComplete')}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                    boat.warrantyComplete ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {boat.warrantyComplete ? (
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <X className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-slate-900 truncate">Warranty</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                  boat.warrantyComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {boat.warrantyComplete ? '✓' : '○'}
+                </span>
+              </button>
+            </div>
           </div>
-        </form>
+
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 mb-4">Update Status</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <StatusButton
+                status="needs-approval"
+                label="Needs Approval"
+                active={boat.status === 'needs-approval'}
+                onClick={() => handleStatusUpdate('needs-approval')}
+              />
+              <StatusButton
+                status="needs-parts"
+                label="Needs Parts"
+                active={boat.status === 'needs-parts'}
+                onClick={() => handleStatusUpdate('needs-parts')}
+              />
+              <StatusButton
+                status="parts-kit-pulled"
+                label="Parts Pulled"
+                active={boat.status === 'parts-kit-pulled'}
+                onClick={() => handleStatusUpdate('parts-kit-pulled')}
+              />
+              <StatusButton
+                status="on-deck"
+                label="On Deck"
+                active={boat.status === 'on-deck'}
+                onClick={() => handleStatusUpdate('on-deck')}
+              />
+              <button
+                onClick={() => handleStatusUpdate('all-work-complete')}
+                disabled={!allWorkPhasesComplete}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  boat.status === 'all-work-complete'
+                    ? 'status-all-work-complete border-transparent text-white font-semibold shadow-md' 
+                    : allWorkPhasesComplete
+                      ? 'border-slate-300 bg-white hover:border-slate-400 text-slate-700'
+                      : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
+                title={!allWorkPhasesComplete ? 'Complete all work phases first' : ''}
+              >
+                Complete
+              </button>
+            </div>
+            {!allWorkPhasesComplete && (
+              <p className="text-sm text-orange-600 mt-2">
+                ⚠️ All work phases must be completed before marking as complete
+              </p>
+            )}
+          </div>
+
+          {isArchived ? (
+            /* Archived Boat View - Read Only */
+            <div className="space-y-4">
+              {boat.archivedDate && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-sm text-slate-600 mb-1">Released On</p>
+                  <p className="font-semibold text-slate-900">
+                    {new Date(boat.archivedDate).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </p>
+                </div>
+              )}
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Active Boat View - Editable */
+            <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+              {/* Update from Dockmaster button - show for boats with dockmasterId */}
+              {!boat.isInventory && boat.dockmasterId && (
+                <button
+                  onClick={updateFromDockmaster}
+                  disabled={updatingFromDockmaster}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:from-purple-400 disabled:to-purple-500 text-white font-semibold rounded-lg transition-all shadow-md"
+                >
+                  <svg className={`w-5 h-5 ${updatingFromDockmaster ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {updatingFromDockmaster ? 'Updating...' : 'Update from Dockmaster'}
+                </button>
+              )}
+              {updateError && (
+                <p className="text-sm text-red-600 text-center">{updateError}</p>
+              )}
+              {updateSuccess && (
+                <p className="text-sm text-green-600 text-center">{updateSuccess}</p>
+              )}
+              
+              {/* View Work Orders Button - only for customer boats with customerId */}
+              {!boat.isInventory && boat.customerId && (
+                <button
+                  onClick={fetchWorkOrders}
+                  disabled={loadingWorkOrders}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 text-white font-semibold rounded-lg transition-all shadow-md"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {loadingWorkOrders ? 'Loading Work Orders...' : 'View Open Work Orders'}
+                </button>
+              )}
+              {!boat.isInventory && !boat.customerId && boat.dockmasterId && (
+                <p className="text-xs text-slate-500 text-center">Click "Update from Dockmaster" to enable Work Orders</p>
+              )}
+              {workOrdersError && (
+                <p className="text-sm text-red-600 text-center">{workOrdersError}</p>
+              )}
+              <button
+                onClick={handleReleaseBoat}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg transition-all shadow-md"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Release Boat to Owner
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={onRemove}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Remove from Location
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+      
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-slide-in">
+            <div className="p-4 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-bold text-slate-900">
+                  {selectedMoveLocation ? 'Select Slot' : 'Move to Location'}
+                </h4>
+                <button
+                  onClick={() => {
+                    setShowLocationPicker(false);
+                    setSelectedMoveLocation(null);
+                    setSelectedMoveSlot(null);
+                  }}
+                  className="p-1 hover:bg-slate-100 rounded"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              {!selectedMoveLocation ? (
+                // Step 1: Select location
+                <div className="space-y-2">
+                  {/* Remove from location option - shown prominently at top */}
+                  {boat.location && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          if (onMoveBoat) {
+                            await onMoveBoat(boat, null, null);
+                            setShowLocationPicker(false);
+                          }
+                        }}
+                        className="w-full p-4 text-left rounded-lg border-2 border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <X className="w-4 h-4 text-red-600" />
+                          <p className="font-bold text-red-900">Remove from Location</p>
+                        </div>
+                        <p className="text-xs text-red-700">Remove boat from {boat.location} and mark as unassigned</p>
+                      </button>
+                      <div className="border-t border-slate-200 my-3" />
+                    </>
+                  )}
+
+                  {/* Pool locations */}
+                  {locations.filter(l => l.type === 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={async () => {
+                        if (onMoveBoat) {
+                          await onMoveBoat(boat, loc, 'pool');
+                          setShowLocationPicker(false);
+                        }
+                      }}
+                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                        boat.location === loc.name
+                          ? 'border-teal-500 bg-teal-50'
+                          : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-teal-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Pool • {(loc.pool_boats || loc.poolBoats || []).length} boats
+                      </p>
+                    </button>
+                  ))}
+                  
+                  {/* Grid locations */}
+                  {locations.filter(l => l.type !== 'pool').map(loc => {
+                    const totalSlots = loc.layout === 'u-shaped' 
+                      ? (loc.rows * 2) + loc.columns 
+                      : loc.rows * loc.columns;
+                    const occupiedSlots = Object.keys(loc.boats || {}).length;
+                    const availableSlots = totalSlots - occupiedSlots;
+                    
+                    return (
+                      <button
+                        key={loc.id}
+                        onClick={() => setSelectedMoveLocation(loc)}
+                        disabled={availableSlots === 0 && boat.location !== loc.name}
+                        className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                          boat.location === loc.name
+                            ? 'border-blue-500 bg-blue-50'
+                            : availableSlots === 0
+                            ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${
+                            loc.type === 'rack-building' ? 'bg-blue-500' :
+                            loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                          }`} />
+                          <p className="font-semibold text-slate-900">{loc.name}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {loc.type.replace('-', ' ')} • {availableSlots} slots available
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Step 2: Select slot for grid location
+                <div>
+                  <button
+                    onClick={() => setSelectedMoveLocation(null)}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back to locations
+                  </button>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Select a slot in <strong>{selectedMoveLocation.name}</strong>:
+                  </p>
+                  <div 
+                    className="grid gap-1.5 max-h-[300px] overflow-y-auto"
+                    style={{ 
+                      gridTemplateColumns: `repeat(${Math.min(selectedMoveLocation.columns, 6)}, minmax(50px, 1fr))` 
+                    }}
+                  >
+                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
+                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
+                        const slotId = `${row}-${col}`;
+                        const isOccupied = selectedMoveLocation.boats?.[slotId];
+                        const isCurrentBoat = isOccupied === boat.id;
+                        const displaySlot = `${row + 1}-${col + 1}`;
+                        
+                        // Skip non-perimeter slots for U-shaped
+                        if (selectedMoveLocation.layout === 'u-shaped') {
+                          const isLeftEdge = col === 0;
+                          const isRightEdge = col === selectedMoveLocation.columns - 1;
+                          const isBottomRow = row === selectedMoveLocation.rows - 1;
+                          if (!isLeftEdge && !isRightEdge && !isBottomRow) {
+                            return null;
+                          }
+                        }
+                        
+                        return (
+                          <button
+                            key={slotId}
+                            onClick={async () => {
+                              if (!isOccupied && onMoveBoat) {
+                                await onMoveBoat(boat, selectedMoveLocation, slotId);
+                                setShowLocationPicker(false);
+                                setSelectedMoveLocation(null);
+                              }
+                            }}
+                            disabled={isOccupied && !isCurrentBoat}
+                            className={`p-2 text-xs font-medium rounded transition-colors ${
+                              isCurrentBoat
+                                ? 'bg-blue-500 text-white'
+                                : isOccupied
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-100 hover:bg-blue-100 text-slate-700'
+                            }`}
+                          >
+                            {displaySlot}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Work Orders Modal */}
+      {showWorkOrders && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-slide-in">
+            <div className="p-4 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Open Work Orders</h3>
+                  <p className="text-sm text-slate-600">{boat.name} - {boat.owner}</p>
+                  {workOrdersLastSynced && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {workOrdersFromCache ? 'Cached' : 'Synced'}: {new Date(workOrdersLastSynced).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => fetchWorkOrders(true)}
+                    disabled={loadingWorkOrders}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 disabled:bg-slate-100 text-blue-700 disabled:text-slate-400 text-sm font-medium rounded-lg transition-colors"
+                    title="Refresh from Dockmaster"
+                  >
+                    <svg className={`w-4 h-4 ${loadingWorkOrders ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {loadingWorkOrders ? 'Syncing...' : 'Refresh'}
+                  </button>
+                  <button 
+                    onClick={() => setShowWorkOrders(false)} 
+                    className="p-1 hover:bg-slate-100 rounded transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {workOrders.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-slate-500">No open work orders found for this boat.</p>
+                  <button
+                    onClick={() => fetchWorkOrders(true)}
+                    disabled={loadingWorkOrders}
+                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {loadingWorkOrders ? 'Checking...' : 'Check Dockmaster'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {workOrders.map((wo) => (
+                    <div key={wo.id} className="border-2 border-slate-300 rounded-xl overflow-hidden shadow-md bg-white">
+                      {/* Work Order Header */}
+                      <div className="bg-gradient-to-r from-slate-100 to-slate-50 p-4 border-b-2 border-slate-300">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-slate-900">WO# {wo.id}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                wo.status === 'O' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                              }`}>
+                                {wo.status === 'O' ? 'Open' : 'Closed'}
+                              </span>
+                            </div>
+                            {wo.title && <p className="text-sm text-slate-600 mt-1">{wo.title}</p>}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-slate-500">Created</p>
+                            <p className="text-sm font-medium text-slate-700">{wo.creationDate}</p>
+                          </div>
+                        </div>
+                        {wo.category && (
+                          <p className="text-xs text-slate-500 mt-2">Category: {wo.category}</p>
+                        )}
+                      </div>
+
+                      {/* Operations List */}
+                      {wo.operations && wo.operations.length > 0 && (
+                        <div className="p-4 bg-slate-50">
+                          <p className="text-xs font-medium text-slate-500 uppercase mb-3">Operations</p>
+                          <div className="space-y-2">
+                            {wo.operations.map((op, idx) => {
+                              // Determine opcode status
+                              const isClosed = op.status === 'C';
+                              const isUnbilled = !isClosed && op.flagLaborFinished;
+                              const isOpen = !isClosed && !op.flagLaborFinished;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center justify-between p-3 rounded-lg border-2 ${
+                                    isClosed ? 'bg-green-50 border-green-200' :
+                                    isUnbilled ? 'bg-orange-50 border-orange-300' :
+                                    'bg-white border-slate-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                      isClosed ? 'bg-green-500' :
+                                      isUnbilled ? 'bg-orange-500' :
+                                      'bg-slate-300'
+                                    }`}>
+                                      {isClosed ? (
+                                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      ) : isUnbilled ? (
+                                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      ) : (
+                                        <span className="text-xs text-white font-bold">{idx + 1}</span>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-sm font-medium text-slate-900">
+                                          {op.opcode} - {op.opcodeDesc}
+                                        </p>
+                                        {isUnbilled && (
+                                          <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded uppercase">
+                                            Unbilled
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-500">
+                                        {op.type} • {op.status === 'O' ? 'Open' : 'Closed'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {op.totalCharges > 0 && (
+                                    <span className="text-sm font-medium text-slate-700 flex-shrink-0 ml-2">
+                                      ${op.totalCharges.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Work Order Total */}
+                      {wo.totalCharges > 0 && (
+                        <div className="bg-slate-100 p-3 flex justify-between items-center">
+                          <span className="text-sm font-medium text-slate-600">Total Charges</span>
+                          <span className="text-lg font-bold text-slate-900">${wo.totalCharges.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 flex-shrink-0">
+              <button
+                onClick={() => setShowWorkOrders(false)}
+                className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function EditLocationModal({ location, sites = [], onSave, onCancel }) {
+// ============================================================================
+// INVENTORY BOAT DETAILS MODAL
+// ============================================================================
+// Simplified modal for inventory boats - read-only info from Dockmaster
+// with location assignment capability
+// ============================================================================
+
+function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }) {
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
+
+  // Enrich boat with location data if missing (centralized logic)
+  const { enrichedBoat } = findBoatLocationData(boat, locations);
+
+  // Use the shared hook for consistent location display
+  const { displayLocation, displaySlot } = useBoatLocation(enrichedBoat, locations);
+
+  const salesStatusLabels = {
+    'HA': 'On Hand Available',
+    'HS': 'On Hand Sold',
+    'OA': 'On Order Available',
+    'OS': 'On Order Sold',
+    'FA': 'Future Available',
+    'FS': 'Future Sold',
+    'S': 'Sold',
+    'R': 'Reserved',
+    'FP': 'Floor Planned'
+  };
+
+  const handleMove = async (targetLocation, targetSlot) => {
+    console.log('[InventoryBoatDetailsModal.handleMove] Called with:', { targetLocation: targetLocation?.id, targetSlot });
+    if (onMoveBoat) {
+      console.log('[InventoryBoatDetailsModal.handleMove] Calling onMoveBoat with boat:', boat.id);
+      await onMoveBoat(boat, targetLocation, targetSlot);
+      console.log('[InventoryBoatDetailsModal.handleMove] onMoveBoat complete');
+    } else {
+      console.log('[InventoryBoatDetailsModal.handleMove] No onMoveBoat handler!');
+    }
+    setShowLocationPicker(false);
+    setSelectedMoveLocation(null);
+
+    // If removing from location (targetLocation is null), close the modal
+    if (!targetLocation) {
+      console.log('[InventoryBoatDetailsModal.handleMove] Closing modal after removal');
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 bg-blue-500 rounded text-xs font-medium">INVENTORY</span>
+              </div>
+              <h3 className="text-xl font-bold truncate">{boat.name}</h3>
+              <p className="text-blue-100 text-sm truncate">{boat.year} {boat.make} {boat.model}</p>
+            </div>
+            <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded transition-colors flex-shrink-0 ml-2">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 overflow-y-auto flex-1 space-y-4">
+          {/* Sales Status - Prominent */}
+          {boat.salesStatus && (
+            <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <p className="text-sm text-blue-700 font-medium">Sales Status</p>
+              </div>
+              <p className="text-lg font-bold text-blue-900">
+                {salesStatusLabels[boat.salesStatus] || boat.salesStatus}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">Code: {boat.salesStatus}</p>
+            </div>
+          )}
+
+          {/* Boat Info Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Hull ID</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.hullId || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Dockmaster ID</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.dockmasterId || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Length</p>
+              <p className="text-sm font-semibold text-slate-900">{boat.length || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Beam</p>
+              <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
+            </div>
+          </div>
+
+          {/* Location Assignment */}
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-medium text-slate-700">Current Location</p>
+                <p className="text-lg font-bold text-slate-900">
+                  {enrichedBoat.location ? (
+                    <>
+                      {displayLocation}
+                      {displaySlot && (
+                        <>
+                          <span className="text-slate-400 mx-2">•</span>
+                          {displaySlot}
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    'Unassigned'
+                  )}
+                </p>
+              </div>
+              {locations.length > 0 && (
+                <button
+                  onClick={() => setShowLocationPicker(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {enrichedBoat.location ? 'Move' : 'Assign'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sync Info */}
+          <div className="text-xs text-slate-400 text-center">
+            <p>Last synced: {boat.lastSynced ? new Date(boat.lastSynced).toLocaleString() : 'Unknown'}</p>
+            <p className="mt-1">Data synced from Dockmaster • Read-only</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-200 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h4 className="font-bold text-slate-900">
+                  {selectedMoveLocation ? 'Select Slot' : 'Select Location'}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {selectedMoveLocation ? `in ${selectedMoveLocation.name}` : 'Choose where to place this boat'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLocationPicker(false);
+                  setSelectedMoveLocation(null);
+                }}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              {!selectedMoveLocation ? (
+                // Step 1: Select location
+                <div className="space-y-2">
+                  {/* Remove from location option - shown prominently at top */}
+                  {enrichedBoat.location && (
+                    <>
+                      <button
+                        onClick={() => handleMove(null, null)}
+                        className="w-full p-4 text-left rounded-lg border-2 border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <X className="w-4 h-4 text-red-600" />
+                          <p className="font-bold text-red-900">Remove from Location</p>
+                        </div>
+                        <p className="text-xs text-red-700">Remove boat from {enrichedBoat.location} and mark as unassigned</p>
+                      </button>
+                      <div className="border-t border-slate-200 my-3" />
+                    </>
+                  )}
+                  
+                  {/* Pool locations */}
+                  {locations.filter(l => l.type === 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={() => handleMove(loc, 'pool')}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-teal-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Pool location</p>
+                    </button>
+                  ))}
+                  
+                  {/* Grid locations */}
+                  {locations.filter(l => l.type !== 'pool').map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={() => setSelectedMoveLocation(loc)}
+                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        <p className="font-semibold text-slate-900">{loc.name}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                // Step 2: Select slot in grid
+                <div>
+                  <button
+                    onClick={() => setSelectedMoveLocation(null)}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back to locations
+                  </button>
+                  
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${selectedMoveLocation.columns}, 1fr)` }}>
+                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
+                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
+                        const slotId = `${row}-${col}`;
+                        const occupyingBoatId = selectedMoveLocation.boats?.[slotId];
+                        const isOccupied = occupyingBoatId && occupyingBoatId !== boat.id;
+                        const isCurrent = occupyingBoatId === boat.id;
+                        
+                        return (
+                          <button
+                            key={slotId}
+                            onClick={() => !isOccupied && handleMove(selectedMoveLocation, slotId)}
+                            disabled={isOccupied}
+                            className={`aspect-square rounded flex items-center justify-center text-xs font-medium transition-colors ${
+                              isCurrent
+                                ? 'bg-blue-500 text-white'
+                                : isOccupied
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700'
+                            }`}
+                          >
+                            {row + 1}-{col + 1}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditLocationModal({ location, onSave, onCancel }) {
   const [formData, setFormData] = useState(location || {
     name: '',
     type: 'rack-building',
     layout: 'grid',
     rows: 4,
-    columns: 8,
-    site_id: sites.length > 0 ? sites[0].id : null
+    columns: 8
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
+    
     // Clean up the data before saving
     const dataToSave = {
       name: formData.name,
@@ -3734,19 +4479,18 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
       layout: formData.type === 'pool' ? 'grid' : (formData.layout || 'grid'),
       rows: formData.type === 'pool' ? 1 : formData.rows,
       columns: formData.type === 'pool' ? 1 : formData.columns,
-      site_id: formData.site_id,
     };
-
+    
     // Preserve id if editing existing location
     if (formData.id) {
       dataToSave.id = formData.id;
     }
-
+    
     // Preserve boats data if it exists
     if (formData.boats) {
       dataToSave.boats = formData.boats;
     }
-
+    
     onSave(dataToSave);
   };
 
@@ -3776,26 +4520,6 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
               required
             />
           </div>
-
-          {sites.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Site</label>
-              <select
-                value={formData.site_id || ''}
-                onChange={(e) => setFormData({ ...formData, site_id: e.target.value || null })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select a site...</option>
-                {sites.map(site => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                Which physical site/facility is this location at?
-              </p>
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
@@ -3849,7 +4573,7 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
                   <input
                     type="number"
                     min="1"
-                    max="50"
+                    max="20"
                     value={formData.rows}
                     onChange={(e) => setFormData({ ...formData, rows: parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -3866,7 +4590,7 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
                   <input
                     type="number"
                     min="1"
-                    max="50"
+                    max="20"
                     value={formData.columns}
                     onChange={(e) => setFormData({ ...formData, columns: parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -3940,9 +4664,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [autocompleteResults, setAutocompleteResults] = useState([]);
-  const [isSearchingDockmaster, setIsSearchingDockmaster] = useState(false);
-  const [dockmasterSearchResults, setDockmasterSearchResults] = useState([]);
 
   // Refs for camera
   const videoRef = useRef(null);
@@ -4053,28 +4774,9 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
 
     if (video && canvas) {
       const context = canvas.getContext('2d');
-
-      // Video dimensions (actual resolution)
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-
-      // Scan box region matches the overlay: 80% width, 20% height, starts at 40% from top
-      // left: 10%, top: 40%, width: 80%, height: 20%
-      const scanBoxX = videoWidth * 0.10;
-      const scanBoxY = videoHeight * 0.40;
-      const scanBoxWidth = videoWidth * 0.80;
-      const scanBoxHeight = videoHeight * 0.20;
-
-      // Set canvas to scan box dimensions only
-      canvas.width = scanBoxWidth;
-      canvas.height = scanBoxHeight;
-
-      // Draw only the scan box region to the canvas
-      context.drawImage(
-        video,
-        scanBoxX, scanBoxY, scanBoxWidth, scanBoxHeight,  // Source region
-        0, 0, scanBoxWidth, scanBoxHeight                  // Destination
-      );
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageDataUrl = canvas.toDataURL('image/png');
       setCapturedImage(imageDataUrl);
@@ -4083,186 +4785,39 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     }
   };
 
-  // Image preprocessing utilities for better OCR on metallic/engraved surfaces
-  const preprocessImage = (canvas, mode) => {
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    if (mode === 'grayscale') {
-      // Convert to grayscale
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        data[i] = data[i + 1] = data[i + 2] = gray;
-      }
-    } else if (mode === 'invert') {
-      // Invert colors (helps with shiny metal where letters appear darker)
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = 255 - data[i];
-        data[i + 1] = 255 - data[i + 1];
-        data[i + 2] = 255 - data[i + 2];
-      }
-    } else if (mode === 'highContrast') {
-      // High contrast with adaptive threshold
-      // First convert to grayscale
-      const grayValues = [];
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        grayValues.push(gray);
-      }
-      // Calculate mean for threshold
-      const mean = grayValues.reduce((a, b) => a + b, 0) / grayValues.length;
-      // Apply threshold with some tolerance
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = grayValues[i / 4];
-        const value = gray > mean - 20 ? 255 : 0; // Slight bias toward white
-        data[i] = data[i + 1] = data[i + 2] = value;
-      }
-    } else if (mode === 'edgeEnhance') {
-      // Edge enhancement for engraved text
-      const width = canvas.width;
-      const height = canvas.height;
-      const copy = new Uint8ClampedArray(data);
-
-      for (let y = 1; y < height - 1; y++) {
-        for (let x = 1; x < width - 1; x++) {
-          const idx = (y * width + x) * 4;
-          // Sobel-like edge detection
-          const gx =
-            -copy[idx - 4 - width * 4] + copy[idx + 4 - width * 4] +
-            -2 * copy[idx - 4] + 2 * copy[idx + 4] +
-            -copy[idx - 4 + width * 4] + copy[idx + 4 + width * 4];
-          const gy =
-            -copy[idx - width * 4 - 4] - 2 * copy[idx - width * 4] - copy[idx - width * 4 + 4] +
-            copy[idx + width * 4 - 4] + 2 * copy[idx + width * 4] + copy[idx + width * 4 + 4];
-          const edge = Math.min(255, Math.sqrt(gx * gx + gy * gy));
-          // Combine original with edge
-          const gray = 0.299 * copy[idx] + 0.587 * copy[idx + 1] + 0.114 * copy[idx + 2];
-          const enhanced = Math.min(255, gray + edge * 0.5);
-          data[idx] = data[idx + 1] = data[idx + 2] = enhanced > 128 ? 255 : 0;
-        }
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/png');
-  };
-
-  // OCR processing with multiple passes
+  // OCR processing
   const processImage = async (imageDataUrl) => {
     setIsProcessing(true);
-    setOcrResult('Processing...');
+    setOcrResult('');
 
     try {
-      // Create a canvas to work with the image
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageDataUrl;
-      });
-
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = img.width;
-      tempCanvas.height = img.height;
-      const tempCtx = tempCanvas.getContext('2d');
-
-      // Define preprocessing modes to try
-      const modes = [
-        { name: 'original', process: false },
-        { name: 'inverted', process: 'invert' },
-        { name: 'highContrast', process: 'highContrast' },
-        { name: 'edgeEnhance', process: 'edgeEnhance' },
-      ];
-
-      let bestResult = { text: '', confidence: 0, mode: '' };
-
-      // Create a single worker to reuse
       const worker = await Tesseract.createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') {
-            // Only log occasionally to avoid spam
-            if (Math.round(m.progress * 100) % 25 === 0) {
-              console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
-            }
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
           }
         }
       });
 
-      await worker.setParameters({
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-        tessedit_pageseg_mode: '7', // Treat image as single text line
-      });
-
-      // Try each preprocessing mode
-      for (const mode of modes) {
-        console.log(`[OCR] Trying ${mode.name} mode...`);
-        setOcrResult(`Trying ${mode.name}...`);
-
-        // Draw original image
-        tempCtx.drawImage(img, 0, 0);
-
-        // Apply preprocessing if needed
-        let processedImage = imageDataUrl;
-        if (mode.process) {
-          processedImage = preprocessImage(tempCanvas, mode.process);
-        }
-
-        try {
-          const { data } = await worker.recognize(processedImage);
-
-          // Clean the result
-          let cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-          // Strip "US" prefix if present
-          if (cleanedText.startsWith('US')) {
-            cleanedText = cleanedText.substring(2);
-          }
-
-          console.log(`[OCR] ${mode.name}: "${cleanedText}" (confidence: ${data.confidence}%)`);
-
-          // Keep the best result (prioritize longer valid text with decent confidence)
-          const isValidLength = cleanedText.length >= 8 && cleanedText.length <= 20;
-          const currentBestValid = bestResult.text.length >= 8 && bestResult.text.length <= 20;
-
-          if (isValidLength) {
-            if (!currentBestValid || data.confidence > bestResult.confidence) {
-              bestResult = { text: cleanedText, confidence: data.confidence, mode: mode.name };
-              console.log(`[OCR] New best result from ${mode.name}: "${cleanedText}"`);
-            }
-          } else if (!currentBestValid && cleanedText.length > bestResult.text.length) {
-            // If we don't have a valid result yet, keep the longest one
-            bestResult = { text: cleanedText, confidence: data.confidence, mode: mode.name };
-          }
-
-          // If we get a high confidence valid result, stop early
-          if (isValidLength && data.confidence > 80) {
-            console.log(`[OCR] High confidence result found, stopping early`);
-            break;
-          }
-        } catch (err) {
-          console.error(`[OCR] Error with ${mode.name} mode:`, err);
-        }
-      }
-
+      const { data } = await worker.recognize(imageDataUrl);
       await worker.terminate();
 
-      // Use the best result
-      setOcrResult(bestResult.text || 'No text detected');
-      setOcrConfidence(bestResult.confidence);
+      // Extract alphanumeric text, remove special characters
+      const cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-      console.log(`[OCR] Final result: "${bestResult.text}" from ${bestResult.mode} (confidence: ${bestResult.confidence}%)`);
+      setOcrResult(cleanedText);
+      setOcrConfidence(data.confidence);
 
       // Search for boat with this Hull ID
-      if (bestResult.text.length >= 8) {
-        await searchBoatByHullId(bestResult.text);
+      if (cleanedText.length >= 8) {
+        await searchBoatByHullId(cleanedText);
       } else {
+        alert('Could not read a valid Hull ID. Please try again or use manual search.');
         setShowManualSearch(true);
       }
     } catch (error) {
       console.error('OCR error:', error);
-      alert('Failed to process image. Please try again or use manual entry.');
-      setShowManualSearch(true);
+      alert('Failed to process image. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -4300,29 +4855,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     }
   };
 
-  // Autocomplete - provides suggestions as user types
-  const handleSearchInputChange = (value) => {
-    setSearchQuery(value);
-    setDockmasterSearchResults([]); // Clear Dockmaster results when typing
-
-    if (value.length < 2) {
-      setAutocompleteResults([]);
-      return;
-    }
-
-    const query = value.toLowerCase().trim();
-
-    // Search across all boats for autocomplete
-    const matches = boats.filter(boat =>
-      boat.name?.toLowerCase().includes(query) ||
-      boat.owner?.toLowerCase().includes(query) ||
-      boat.hullId?.toLowerCase().includes(query) ||
-      boat.model?.toLowerCase().includes(query)
-    ).slice(0, 5); // Limit to 5 suggestions
-
-    setAutocompleteResults(matches);
-  };
-
   // Manual search
   const searchBoatsManually = () => {
     const query = searchQuery.toLowerCase().trim();
@@ -4331,8 +4863,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       alert('Please enter a search term');
       return;
     }
-
-    setAutocompleteResults([]); // Clear autocomplete when doing full search
 
     // Search across all boats
     const results = boats.filter(boat =>
@@ -4343,103 +4873,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     );
 
     setSearchResults(results);
-  };
-
-  // Search Dockmaster for boats not yet imported
-  const searchDockmaster = async () => {
-    const query = searchQuery.trim();
-
-    if (!query) {
-      alert('Please enter a Hull ID to search Dockmaster');
-      return;
-    }
-
-    setIsSearchingDockmaster(true);
-    setDockmasterSearchResults([]);
-
-    try {
-      // Call the existing Dockmaster search edge function
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({ searchString: query }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-
-      const data = await response.json();
-
-      // Dockmaster returns an array of boats directly
-      const boats = Array.isArray(data) ? data : (data.boats || []);
-
-      if (boats.length > 0) {
-        // Transform Dockmaster response to our format
-        // Handle both raw Dockmaster API format and pre-transformed format
-        const transformedBoats = boats.map((boat) => ({
-          id: boat.id,
-          name: boat.name || boat.description ||
-                `${boat.boatModelInfo?.year || boat.year || ''} ${boat.boatModelInfo?.vendorName || boat.make || ''} ${boat.boatModelInfo?.modelNumber || boat.model || ''}`.trim() ||
-                'Unknown',
-          year: boat.boatModelInfo?.year || boat.year,
-          make: boat.boatModelInfo?.vendorName || boat.make,
-          model: boat.boatModelInfo?.modelNumber || boat.model,
-          hullId: boat.serialNumber || boat.hin || boat.hullId,
-          serialNumber: boat.serialNumber || boat.hin || boat.hullId,
-          owner: boat.custName || boat.customerName || boat.owner,
-          custId: boat.custId,
-          custName: boat.custName,
-          dockmasterId: boat.id,
-          // Pass through the raw boat data for import
-          boatModelInfo: boat.boatModelInfo,
-        }));
-        setDockmasterSearchResults(transformedBoats);
-      } else {
-        alert(`No boats found in Dockmaster matching: ${query}`);
-      }
-    } catch (error) {
-      console.error('Dockmaster search error:', error);
-      alert('Failed to search Dockmaster. Please try again.');
-    } finally {
-      setIsSearchingDockmaster(false);
-    }
-  };
-
-  // Import a boat from Dockmaster search results
-  const importFromDockmaster = async (dockmasterBoat) => {
-    try {
-      setIsLoading(true);
-
-      // Import the boat using existing service
-      const importedBoat = await boatsService.importFromDockmaster(dockmasterBoat);
-
-      if (importedBoat) {
-        // Add to local boats list and select it
-        setSelectedBoat(importedBoat);
-        setShowLocationPicker(true);
-        setShowManualSearch(false);
-        setDockmasterSearchResults([]);
-        setSearchQuery('');
-
-        // Refresh boats list
-        if (onUpdateBoats) {
-          const updatedBoats = [...boats, importedBoat];
-          onUpdateBoats(updatedBoats);
-        }
-      }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Failed to import boat from Dockmaster. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const selectBoatFromSearch = (boat) => {
@@ -4570,53 +5003,17 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
             </div>
           )}
 
-          {/* Active Camera with Scan Box Overlay */}
+          {/* Active Camera with Capture Button */}
           {isCameraActive && (
-            <div className="flex flex-col gap-4">
-              <div className="relative inline-block">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full rounded-lg"
-                />
-                {/* Scan Box Overlay - only covers video */}
-                <div className="absolute inset-0 pointer-events-none rounded-lg overflow-hidden">
-                  {/* Top dark area */}
-                  <div className="absolute top-0 left-0 right-0 h-[40%] bg-black/50" />
-                  {/* Bottom dark area */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-black/50" />
-                  {/* Left dark area (middle section) */}
-                  <div className="absolute top-[40%] left-0 w-[10%] h-[20%] bg-black/50" />
-                  {/* Right dark area (middle section) */}
-                  <div className="absolute top-[40%] right-0 w-[10%] h-[20%] bg-black/50" />
-                  {/* Scan box border */}
-                  <div
-                    className="absolute border-3 border-green-400 rounded-lg"
-                    style={{
-                      top: '40%',
-                      left: '10%',
-                      width: '80%',
-                      height: '20%',
-                      borderWidth: '3px'
-                    }}
-                  >
-                    {/* Corner markers */}
-                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl" />
-                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr" />
-                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl" />
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br" />
-                  </div>
-                  {/* Instructions */}
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-3 text-center">
-                    <p className="text-white text-sm font-medium bg-black/60 px-3 py-1 rounded-full">
-                      Position Hull ID inside the box
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-center">
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full rounded-lg"
+              />
+              <div className="mt-4 flex gap-2 justify-center">
                 <button
                   onClick={captureImage}
                   className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -4671,50 +5068,24 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
           {showManualSearch && (
             <div className="mt-6 border-t border-slate-200 pt-6">
               <h3 className="text-lg font-semibold mb-3">Manual Search</h3>
-              <div className="relative">
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => handleSearchInputChange(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
-                    placeholder="Search by name, owner, or Hull ID..."
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={searchBoatsManually}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Search
-                  </button>
-                </div>
-
-                {/* Autocomplete dropdown */}
-                {autocompleteResults.length > 0 && (
-                  <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
-                    {autocompleteResults.map(boat => (
-                      <button
-                        key={boat.id}
-                        onClick={() => {
-                          selectBoatFromSearch(boat);
-                          setAutocompleteResults([]);
-                        }}
-                        className="w-full p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-b-0"
-                      >
-                        <p className="font-medium text-slate-900">{boat.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {boat.model} {boat.hullId && <span className="font-mono">• {boat.hullId}</span>}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
+                  placeholder="Search by name, owner, or Hull ID..."
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={searchBoatsManually}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Search
+                </button>
               </div>
-
-              {/* Local search results */}
               {searchResults.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
-                  <p className="text-sm text-slate-500 mb-2">Found {searchResults.length} boat(s):</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {searchResults.map(boat => (
                     <button
                       key={boat.id}
@@ -4728,69 +5099,6 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
                       )}
                     </button>
                   ))}
-                </div>
-              )}
-
-              {/* No results - show Dockmaster search option */}
-              {searchResults.length === 0 && searchQuery.length >= 3 && (
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-3">
-                    No boats found locally. Search Dockmaster for boats not yet imported?
-                  </p>
-                  <button
-                    onClick={searchDockmaster}
-                    disabled={isSearchingDockmaster}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-400 transition-colors"
-                  >
-                    {isSearchingDockmaster ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="w-4 h-4" />
-                        Search Dockmaster
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* Dockmaster search results */}
-              {dockmasterSearchResults.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium text-slate-700 mb-2">
-                    Found in Dockmaster ({dockmasterSearchResults.length}):
-                  </p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {dockmasterSearchResults.map((boat, idx) => (
-                      <div
-                        key={boat.id || idx}
-                        className="p-3 border border-amber-200 bg-amber-50 rounded-lg"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-bold text-slate-900">{boat.name || 'Unknown'}</p>
-                            <p className="text-sm text-slate-600">
-                              {boat.year} {boat.make} {boat.model}
-                            </p>
-                            {boat.hullId && (
-                              <p className="text-xs text-slate-500 font-mono mt-1">Hull ID: {boat.hullId}</p>
-                            )}
-                            <p className="text-xs text-slate-500 mt-1">Owner: {boat.owner || 'Unknown'}</p>
-                          </div>
-                          <button
-                            onClick={() => importFromDockmaster(boat)}
-                            disabled={isLoading}
-                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-green-400 transition-colors"
-                          >
-                            {isLoading ? 'Importing...' : 'Import'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
@@ -4962,7 +5270,7 @@ function WorkPhaseToggle({ label, checked, onChange }) {
  * - Reordering locations via drag and drop
  * - Preferences are saved per user
  */
-function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
     userPreferences.selectedLocations || locations.map(l => l.id)
   );
@@ -5431,135 +5739,57 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
             </div>
           </div>
 
-          <div className="p-4 space-y-4">
-            {/* Group locations by site */}
-            {sites.map(site => {
-              const siteLocations = allOrderedLocations.filter(l => l.site_id === site.id);
-              if (siteLocations.length === 0) return null;
-
-              return (
-                <div key={site.id} className="space-y-2">
-                  {/* Site Header (non-draggable) */}
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <Map className="w-4 h-4 text-indigo-500" />
-                    <span className="text-sm font-semibold text-indigo-700">{site.name}</span>
-                    <div className="flex-1 border-t border-indigo-200 ml-2" />
-                  </div>
-
-                  {/* Site's locations */}
-                  {siteLocations.map((location) => (
-                    <div
-                      key={location.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, location.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, location.id)}
-                      className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ml-4 ${
-                        draggedItem === location.id
-                          ? 'border-blue-400 bg-blue-50 opacity-50'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                      }`}
-                    >
-                      {/* Drag Handle */}
-                      <div className="flex-shrink-0 text-slate-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                        </svg>
-                      </div>
-
-                      {/* Checkbox */}
-                      <input
-                        type="checkbox"
-                        checked={selectedLocations.includes(location.id)}
-                        onChange={() => handleToggleLocation(location.id)}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-
-                      {/* Location Info */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-slate-900">{location.name}</h4>
-                        <p className="text-sm text-slate-600 capitalize">
-                          {location.type} • {location.rows} × {location.columns}
-                          {location.layout === 'u-shaped' && ' (U-shaped)'}
-                        </p>
-                      </div>
-
-                      {/* Visibility Badge */}
-                      {selectedLocations.includes(location.id) ? (
-                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
-                          Visible
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
-                          Hidden
-                        </span>
-                      )}
-                    </div>
-                  ))}
+          <div className="p-4 space-y-2">
+            {allOrderedLocations.map((location) => (
+              <div
+                key={location.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, location.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, location.id)}
+                className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ${
+                  draggedItem === location.id
+                    ? 'border-blue-400 bg-blue-50 opacity-50'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                {/* Drag Handle */}
+                <div className="flex-shrink-0 text-slate-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                  </svg>
                 </div>
-              );
-            })}
 
-            {/* Unassigned locations (no site) */}
-            {(() => {
-              const unassignedLocs = allOrderedLocations.filter(l => !l.site_id);
-              if (unassignedLocs.length === 0) return null;
+                {/* Checkbox */}
+                <input
+                  type="checkbox"
+                  checked={selectedLocations.includes(location.id)}
+                  onChange={() => handleToggleLocation(location.id)}
+                  className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
 
-              return (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <Map className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-semibold text-slate-500">Unassigned</span>
-                    <div className="flex-1 border-t border-slate-200 ml-2" />
-                  </div>
-
-                  {unassignedLocs.map((location) => (
-                    <div
-                      key={location.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, location.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, location.id)}
-                      className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ml-4 ${
-                        draggedItem === location.id
-                          ? 'border-blue-400 bg-blue-50 opacity-50'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                      }`}
-                    >
-                      <div className="flex-shrink-0 text-slate-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                        </svg>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={selectedLocations.includes(location.id)}
-                        onChange={() => handleToggleLocation(location.id)}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-slate-900">{location.name}</h4>
-                        <p className="text-sm text-slate-600 capitalize">
-                          {location.type} • {location.rows} × {location.columns}
-                          {location.layout === 'u-shaped' && ' (U-shaped)'}
-                        </p>
-                      </div>
-                      {selectedLocations.includes(location.id) ? (
-                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
-                          Visible
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
-                          Hidden
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                {/* Location Info */}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-slate-900">{location.name}</h4>
+                  <p className="text-sm text-slate-600 capitalize">
+                    {location.type} • {location.rows} × {location.columns}
+                    {location.layout === 'u-shaped' && ' (U-shaped)'}
+                  </p>
                 </div>
-              );
-            })()}
+
+                {/* Visibility Badge */}
+                {selectedLocations.includes(location.id) ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
+                    Visible
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
+                    Hidden
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -5681,7 +5911,6 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -5690,7 +5919,6 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
@@ -5699,7 +5927,6 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
           }}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
     </div>
@@ -5725,7 +5952,7 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
  * - Include last_synced_at timestamp
  * - Mark as active/inactive based on Status field rather than deleting
  */
-function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -5733,10 +5960,6 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
   const [filterMake, setFilterMake] = useState('all');
   const [filterModel, setFilterModel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-
-  // Work order sync state
-  const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
-  const [woSyncProgress, setWoSyncProgress] = useState(null);
 
   // Use unified remove boat hook
   const { removeBoat } = useRemoveBoat({
@@ -5829,52 +6052,6 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
     }
   };
 
-  // Sync all internal work orders (rigging WOs)
-  const handleSyncAllWorkOrders = async () => {
-    setIsSyncingWorkOrders(true);
-    setWoSyncProgress({ status: 'Syncing all rigging work orders...', synced: 0, total: 0 });
-
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-internal-workorders-sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({ forceRefresh: true }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setWoSyncProgress({
-          status: 'complete',
-          synced: result.synced,
-          total: result.total,
-          duration: result.duration,
-        });
-      } else {
-        setWoSyncProgress({
-          status: 'error',
-          error: result.error || 'Sync failed',
-        });
-      }
-    } catch (error) {
-      console.error('Work order sync error:', error);
-      setWoSyncProgress({
-        status: 'error',
-        error: error.message || 'Sync failed',
-      });
-    } finally {
-      setIsSyncingWorkOrders(false);
-      // Clear progress after 5 seconds
-      setTimeout(() => setWoSyncProgress(null), 5000);
-    }
-  };
-
   const isConfigured = dockmasterConfig && dockmasterConfig.username;
   const timeSinceSync = lastSync ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60000) : null;
 
@@ -5885,95 +6062,26 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Inventory Boats</h2>
           <p className="text-slate-600">Auto-synced from Dockmaster API</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Sync Work Orders Button */}
-          <button
-            onClick={handleSyncAllWorkOrders}
-            disabled={isSyncingWorkOrders}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors shadow-md disabled:bg-purple-400"
-            title="Sync all internal rigging work orders from Dockmaster"
-          >
-            {isSyncingWorkOrders ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Syncing WOs...
-              </>
-            ) : (
-              <>
-                <Wrench className="w-5 h-5" />
-                Sync Rigging WOs
-              </>
-            )}
-          </button>
-          {/* Sync Inventory Button */}
-          <button
-            onClick={handleSyncNow}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md"
-          >
-            {isSyncing ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Syncing...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Sync Inventory
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleSyncNow}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md"
+        >
+          {isSyncing ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Syncing...
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Sync Now
+            </>
+          )}
+        </button>
       </div>
-
-      {/* Work Order Sync Progress/Status */}
-      {woSyncProgress && (
-        <div className={`rounded-xl p-4 border ${
-          woSyncProgress.status === 'error'
-            ? 'bg-red-50 border-red-200'
-            : woSyncProgress.status === 'complete'
-              ? 'bg-green-50 border-green-200'
-              : 'bg-purple-50 border-purple-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            {woSyncProgress.status === 'error' ? (
-              <>
-                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                  <X className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-red-900">Work Order Sync Failed</p>
-                  <p className="text-sm text-red-700">{woSyncProgress.error}</p>
-                </div>
-              </>
-            ) : woSyncProgress.status === 'complete' ? (
-              <>
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-semibold text-green-900">Work Orders Synced Successfully</p>
-                  <p className="text-sm text-green-700">
-                    Synced {woSyncProgress.synced} of {woSyncProgress.total} work orders in {woSyncProgress.duration}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                <div>
-                  <p className="font-semibold text-purple-900">Syncing Work Orders</p>
-                  <p className="text-sm text-purple-700">{woSyncProgress.status}</p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Configuration Warning - Only show if no boats and not configured */}
       {!isConfigured && inventoryBoats.length === 0 && (
@@ -6275,7 +6383,6 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -7000,11 +7107,9 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
   const [dragItem, setDragItem] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useState(true);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const PIXELS_PER_FOOT = 10;
-  const SNAP_SIZE = 5; // Snap to 5 foot grid
 
   useEffect(() => { loadShows(); }, []);
   useEffect(() => { if (selectedShow) loadItems(selectedShow.id); else setItems([]); }, [selectedShow?.id]);
@@ -7145,37 +7250,11 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     setIsDragging(true);
   };
 
-  // Touch support for mobile/tablet
-  const handleItemTouchStart = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const touch = e.touches[0];
-    setSelectedItem(item);
-    const canvasPos = screenToCanvas(touch.clientX, touch.clientY);
-    setDragOffset({ x: canvasPos.x - item.x, y: canvasPos.y - item.y });
-    setDragItem(item);
-    setIsDragging(true);
-  };
-
   const handleMouseMove = useCallback((e) => {
     if (isDragging && dragItem && selectedShow) {
-      // Get position from mouse or touch
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const canvasPos = screenToCanvas(clientX, clientY);
-      let newX = canvasPos.x - dragOffset.x;
-      let newY = canvasPos.y - dragOffset.y;
-
-      // Apply snap-to-grid if enabled
-      if (snapToGrid) {
-        newX = Math.round(newX / SNAP_SIZE) * SNAP_SIZE;
-        newY = Math.round(newY / SNAP_SIZE) * SNAP_SIZE;
-      } else {
-        newX = Math.round(newX);
-        newY = Math.round(newY);
-      }
-
-      // Constrain to canvas bounds
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      let newX = Math.round(canvasPos.x - dragOffset.x);
+      let newY = Math.round(canvasPos.y - dragOffset.y);
       newX = Math.max(0, Math.min(newX, selectedShow.widthFt - (dragItem.widthFt || 10)));
       newY = Math.max(0, Math.min(newY, selectedShow.heightFt - (dragItem.heightFt || 10)));
       setItems(items.map(i => i.id === dragItem.id ? { ...i, x: newX, y: newY } : i));
@@ -7183,7 +7262,7 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     } else if (isPanning) {
       setPanOffset({ x: panOffset.x + e.movementX, y: panOffset.y + e.movementY });
     }
-  }, [isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow, snapToGrid]);
+  }, [isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow]);
 
   const handleMouseUp = useCallback(async () => {
     if (isDragging && dragItem) {
@@ -7199,14 +7278,7 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     if (isDragging || isPanning) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
-      window.addEventListener('touchmove', handleMouseMove, { passive: false });
-      window.addEventListener('touchend', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-        window.removeEventListener('touchmove', handleMouseMove);
-        window.removeEventListener('touchend', handleMouseUp);
-      };
+      return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
     }
   }, [isDragging, isPanning, handleMouseMove, handleMouseUp]);
 
@@ -7219,49 +7291,6 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
     printWindow.print();
   };
 
-  const handleExportPNG = () => {
-    const svg = canvasRef.current;
-    if (!svg) return;
-
-    // Get SVG dimensions
-    const svgWidth = svg.getAttribute('width');
-    const svgHeight = svg.getAttribute('height');
-
-    // Create canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = parseInt(svgWidth) * 2; // 2x for better quality
-    canvas.height = parseInt(svgHeight) * 2;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(2, 2);
-
-    // Convert SVG to data URL
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      // Draw white background
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Draw SVG
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-
-      // Download
-      const link = document.createElement('a');
-      link.download = `${selectedShow?.name || 'boat-show-layout'}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    };
-    img.onerror = () => {
-      console.error('Failed to load SVG for export');
-      alert('Failed to export PNG. Please try Print instead.');
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
-  };
-
   const filteredBoats = inventoryBoats.filter(boat => !boatSearch || boat.name?.toLowerCase().includes(boatSearch.toLowerCase()) || boat.model?.toLowerCase().includes(boatSearch.toLowerCase()) || boat.make?.toLowerCase().includes(boatSearch.toLowerCase()));
   const boatsInLayout = new Set(items.filter(i => i.inventoryBoatId).map(i => i.inventoryBoatId));
 
@@ -7272,19 +7301,7 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
       <div className="flex items-center justify-between mb-4">
         <div><h2 className="text-2xl font-bold text-slate-900">Boat Show Planner</h2><p className="text-slate-600">Design your boat show layout with drag and drop</p></div>
         <div className="flex items-center gap-2">
-          {selectedShow && (
-            <>
-              <button onClick={handleExportPNG} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors" title="Export as PNG">
-                <Download className="w-4 h-4" />Export
-              </button>
-              <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">
-                <Printer className="w-4 h-4" />Print
-              </button>
-              <button onClick={() => setShowEditModal(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">
-                <Edit2 className="w-4 h-4" />Edit
-              </button>
-            </>
-          )}
+          {selectedShow && (<><button onClick={handlePrint} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"><Printer className="w-4 h-4" />Print</button><button onClick={() => setShowEditModal(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"><Edit2 className="w-4 h-4" />Edit Show</button></>)}
           <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"><Plus className="w-4 h-4" />New Show</button>
         </div>
       </div>
@@ -7310,7 +7327,6 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
               <button onClick={() => setZoom(Math.max(zoom - 0.1, 0.3))} className="p-2 hover:bg-slate-100 rounded" title="Zoom out"><ZoomOut className="w-4 h-4" /></button>
               <div className="w-px h-6 bg-slate-200" />
               <button onClick={() => setShowGridLines(!showGridLines)} className={`p-2 rounded ${showGridLines ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100'}`} title="Toggle grid"><Grid className="w-4 h-4" /></button>
-              <button onClick={() => setSnapToGrid(!snapToGrid)} className={`p-2 rounded ${snapToGrid ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100'}`} title={`Snap to grid (${SNAP_SIZE}ft)`}><Magnet className="w-4 h-4" /></button>
               <button onClick={() => { setZoom(1); setPanOffset({ x: 0, y: 0 }); }} className="p-2 hover:bg-slate-100 rounded" title="Reset view"><Move className="w-4 h-4" /></button>
             </div>
             <div className="absolute top-4 right-4 z-10 bg-white rounded-lg shadow-md px-3 py-2"><p className="text-sm font-medium text-slate-700">{selectedShow.widthFt}' × {selectedShow.heightFt}'</p></div>
@@ -7324,82 +7340,16 @@ function BoatShowPlanner({ inventoryBoats = [] }) {
                     const x = item.x * PIXELS_PER_FOOT;
                     const y = item.y * PIXELS_PER_FOOT;
                     const isSelected = selectedItem?.id === item.id;
-                    const isBeingDragged = isDragging && dragItem?.id === item.id;
                     const typeConfig = SHOW_ITEM_TYPES[item.itemType] || SHOW_ITEM_TYPES.furniture;
                     const boat = item.boat;
                     const displayName = boat ? `${boat.year || ''} ${boat.name}`.trim() : item.label;
                     const bgColor = item.itemType === 'boat' ? '#3b82f6' : (item.color || typeConfig.color);
-
-                    // More realistic boat hull shape with curved bow and stern
-                    const boatPath = `
-                      M ${width * 0.12} ${height * 0.15}
-                      Q ${width * 0.02} ${height * 0.15}, ${width * 0.02} ${height * 0.5}
-                      Q ${width * 0.02} ${height * 0.85}, ${width * 0.12} ${height * 0.85}
-                      L ${width * 0.75} ${height * 0.85}
-                      Q ${width * 0.95} ${height * 0.85}, ${width * 0.98} ${height * 0.5}
-                      Q ${width * 0.95} ${height * 0.15}, ${width * 0.75} ${height * 0.15}
-                      Z
-                    `;
-
                     return (
-                      <g
-                        key={item.id}
-                        transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`}
-                        onMouseDown={(e) => handleItemMouseDown(e, item)}
-                        onTouchStart={(e) => handleItemTouchStart(e, item)}
-                        style={{ cursor: 'move', touchAction: 'none' }}
-                      >
-                        {/* Drag feedback - dashed border */}
-                        {isBeingDragged && (
-                          <rect
-                            x={-3} y={-3}
-                            width={width + 6} height={height + 6}
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeWidth={2}
-                            strokeDasharray="6 3"
-                            rx={8}
-                          />
-                        )}
-
-                        {/* Item shape */}
-                        {item.itemType === 'boat' ? (
-                          <path
-                            d={boatPath}
-                            fill={bgColor}
-                            stroke={isSelected ? '#1d4ed8' : '#2563eb'}
-                            strokeWidth={isSelected ? 3 : 1.5}
-                            style={{ filter: isBeingDragged ? 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' : 'none' }}
-                          />
-                        ) : (
-                          <rect
-                            width={width} height={height}
-                            fill={bgColor}
-                            stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'}
-                            strokeWidth={isSelected ? 3 : 1}
-                            rx={item.itemType === 'plant' ? width/2 : 4}
-                            ry={item.itemType === 'plant' ? height/2 : 4}
-                            style={{ filter: isBeingDragged ? 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' : 'none' }}
-                          />
-                        )}
-
-                        {/* Labels */}
-                        <text x={width / 2} y={height / 2 - 5} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.max(10, Math.min(width, height) * 0.14)} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                          {displayName?.substring(0, 18)}
-                        </text>
-                        <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.18} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.9)" fontSize={Math.max(8, Math.min(width, height) * 0.1)} style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                          {item.widthFt}' × {item.heightFt}'
-                        </text>
-
-                        {/* Selection handles */}
-                        {isSelected && !isBeingDragged && (
-                          <>
-                            <rect x={-5} y={-5} width={10} height={10} fill="#1d4ed8" rx={2} />
-                            <rect x={width-5} y={-5} width={10} height={10} fill="#1d4ed8" rx={2} />
-                            <rect x={-5} y={height-5} width={10} height={10} fill="#1d4ed8" rx={2} />
-                            <rect x={width-5} y={height-5} width={10} height={10} fill="#1d4ed8" rx={2} />
-                          </>
-                        )}
+                      <g key={item.id} transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`} onMouseDown={(e) => handleItemMouseDown(e, item)} style={{ cursor: 'move' }}>
+                        {item.itemType === 'boat' ? <path d={`M ${width * 0.1} 0 L ${width * 0.9} 0 L ${width} ${height * 0.5} L ${width * 0.9} ${height} L ${width * 0.1} ${height} L 0 ${height * 0.5} Z`} fill={bgColor} stroke={isSelected ? '#1d4ed8' : '#2563eb'} strokeWidth={isSelected ? 3 : 1} /> : <rect width={width} height={height} fill={bgColor} stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'} strokeWidth={isSelected ? 3 : 1} rx={item.itemType === 'plant' ? width/2 : 4} ry={item.itemType === 'plant' ? height/2 : 4} />}
+                        <text x={width / 2} y={height / 2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.min(width, height) * 0.15} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>{displayName?.substring(0, 20)}</text>
+                        <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.2} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.8)" fontSize={Math.min(width, height) * 0.1} style={{ pointerEvents: 'none', userSelect: 'none' }}>{item.widthFt}'×{item.heightFt}'</text>
+                        {isSelected && <><rect x={-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={-4} y={height-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={height-4} width={8} height={8} fill="#1d4ed8" /></>}
                       </g>
                     );
                   })}
