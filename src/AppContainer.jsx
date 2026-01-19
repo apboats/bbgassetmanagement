@@ -130,6 +130,8 @@ function AppContainer() {
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
         hullId: boat.hull_id,
+        completedBy: boat.completed_by,
+        completedAt: boat.completed_at,
       }))
 
       setBoats(transformedData)
@@ -290,14 +292,14 @@ function AppContainer() {
   const handleUpdateBoat = async (boatId, updates) => {
     try {
       // Filter out fields that don't belong in boats table or would conflict
-      const { 
-        sales_status, 
-        last_synced, 
+      const {
+        sales_status,
+        last_synced,
         isInventory,
         // UI-only fields that shouldn't be saved
         currentLocation,
         currentSlot,
-        // Remove camelCase versions
+        // Remove camelCase versions (we'll map them to snake_case)
         qrCode,
         nfcTag,
         workOrderNumber,
@@ -310,6 +312,8 @@ function AppContainer() {
         dockmasterId,
         customerId,
         hullId,
+        completedBy,
+        completedAt,
         // Also remove snake_case versions (we'll add them back correctly)
         qr_code,
         nfc_tag,
@@ -323,14 +327,16 @@ function AppContainer() {
         dockmaster_id,
         customer_id,
         hull_id,
+        completed_by,
+        completed_at,
         ...cleanUpdates
       } = updates
-      
+
       // Build updateData with only fields that exist in updates
       const updateData = {
         ...cleanUpdates,
       };
-      
+
       // Add snake_case versions only if camelCase version exists in original updates
       if ('qrCode' in updates) updateData.qr_code = updates.qrCode;
       if ('nfcTag' in updates) updateData.nfc_tag = updates.nfcTag;
@@ -344,6 +350,8 @@ function AppContainer() {
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
+      if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
+      if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
       
       await boatsService.update(boatId, updateData)
       await loadBoats()
