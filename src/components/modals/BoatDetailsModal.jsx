@@ -5,7 +5,7 @@
 // Includes work phases, status updates, location management, and work orders
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
@@ -58,16 +58,25 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [notesText, setNotesText] = useState(boat.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Load movement history when modal opens
-  useEffect(() => {
+  // Extract movement history loading to reusable function
+  const loadMovementHistory = useCallback(async () => {
     if (boat?.id) {
       setLoadingMovements(true);
-      supabaseService.boatMovements.getForBoat(boat.id, 5)
-        .then(movements => setMovementHistory(movements))
-        .catch(err => console.error('Error loading movement history:', err))
-        .finally(() => setLoadingMovements(false));
+      try {
+        const movements = await supabaseService.boatMovements.getForBoat(boat.id, 5);
+        setMovementHistory(movements);
+      } catch (err) {
+        console.error('Error loading movement history:', err);
+      } finally {
+        setLoadingMovements(false);
+      }
     }
-  }, [boat?.id, boat?.location, boat?.slot]);
+  }, [boat?.id]);
+
+  // Load movement history when modal opens
+  useEffect(() => {
+    loadMovementHistory();
+  }, [loadMovementHistory]);
 
   const statusLabels = {
     'needs-approval': 'Needs Approval',
@@ -812,6 +821,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                           if (onMoveBoat) {
                             await onMoveBoat(boat, null, null);
                             setShowLocationPicker(false);
+                            // Refresh movement history after move completes
+                            await loadMovementHistory();
                           }
                         }}
                         className="w-full p-4 text-left rounded-lg border-2 border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100 transition-colors"
@@ -882,6 +893,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 if (onMoveBoat) {
                                   await onMoveBoat(boat, loc, 'pool');
                                   setShowLocationPicker(false);
+                                  // Refresh movement history after move completes
+                                  await loadMovementHistory();
                                 }
                               }}
                               className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
@@ -980,6 +993,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             if (onMoveBoat) {
                               await onMoveBoat(boat, loc, 'pool');
                               setShowLocationPicker(false);
+                              // Refresh movement history after move completes
+                              await loadMovementHistory();
                             }
                           }}
                           className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
@@ -1061,6 +1076,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 if (isPool && onMoveBoat) {
                                   await onMoveBoat(boat, loc, 'pool');
                                   setShowLocationPicker(false);
+                                  // Refresh movement history after move completes
+                                  await loadMovementHistory();
                                 } else {
                                   setSelectedMoveLocation(loc);
                                 }
@@ -1137,6 +1154,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 await onMoveBoat(boat, selectedMoveLocation, slotId);
                                 setShowLocationPicker(false);
                                 setSelectedMoveLocation(null);
+                                // Refresh movement history after move completes
+                                await loadMovementHistory();
                               }
                             }}
                             disabled={isOccupied && !isCurrentBoat}

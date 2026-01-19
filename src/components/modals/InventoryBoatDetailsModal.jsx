@@ -5,7 +5,7 @@
 // with location assignment capability
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, ChevronRight, History } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
@@ -45,16 +45,25 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
   const [notesText, setNotesText] = useState(boat.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Load movement history when modal opens
-  useEffect(() => {
+  // Extract movement history loading to reusable function
+  const loadMovementHistory = useCallback(async () => {
     if (boat?.id) {
       setLoadingMovements(true);
-      supabaseService.boatMovements.getForBoat(boat.id, 5)
-        .then(movements => setMovementHistory(movements))
-        .catch(err => console.error('Error loading movement history:', err))
-        .finally(() => setLoadingMovements(false));
+      try {
+        const movements = await supabaseService.boatMovements.getForBoat(boat.id, 5);
+        setMovementHistory(movements);
+      } catch (err) {
+        console.error('Error loading movement history:', err);
+      } finally {
+        setLoadingMovements(false);
+      }
     }
-  }, [boat?.id, boat?.location, boat?.slot]);
+  }, [boat?.id]);
+
+  // Load movement history when modal opens
+  useEffect(() => {
+    loadMovementHistory();
+  }, [loadMovementHistory]);
 
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);
@@ -142,6 +151,8 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
       console.log('[InventoryBoatDetailsModal.handleMove] Calling onMoveBoat with boat:', boat.id);
       await onMoveBoat(boat, targetLocation, targetSlot);
       console.log('[InventoryBoatDetailsModal.handleMove] onMoveBoat complete');
+      // Refresh movement history after move completes
+      await loadMovementHistory();
     } else {
       console.log('[InventoryBoatDetailsModal.handleMove] No onMoveBoat handler!');
     }
