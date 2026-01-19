@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, Building2 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
@@ -9,6 +9,7 @@ import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation
 import { PoolLocation } from './components/locations/PoolLocation';
 import { LocationGrid } from './components/locations/LocationGrid';
 import { LocationSection } from './components/locations/LocationSection';
+import { SiteManagementModal } from './components/modals/SiteManagementModal';
 import { useRemoveBoat } from './hooks/useRemoveBoat';
 import { useAssignBoat } from './hooks/useAssignBoat';
 import { useBoatDragDrop } from './hooks/useBoatDragDrop';
@@ -590,7 +591,7 @@ export default function BoatsByGeorgeAssetManager({
               // If same ID exists in both, keep the inventory version
               const seen = {};
               const combined = [];
-              
+
               // Add regular boats first
               boats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -598,7 +599,7 @@ export default function BoatsByGeorgeAssetManager({
                   combined.push(boat);
                 }
               });
-              
+
               // Add inventory boats (will replace duplicates)
               inventoryBoats.forEach(boat => {
                 if (!seen[boat.id]) {
@@ -610,7 +611,7 @@ export default function BoatsByGeorgeAssetManager({
                   if (index !== -1) combined[index] = boat;
                 }
               });
-              
+
               return combined;
             })()}
             onUpdateLocations={saveLocations}
@@ -622,6 +623,10 @@ export default function BoatsByGeorgeAssetManager({
               saveInventoryBoats(invBoats);
             }}
             onMoveBoat={onMoveBoat}
+            onAddSite={onAddSite}
+            onUpdateSite={onUpdateSite}
+            onDeleteSite={onDeleteSite}
+            currentUser={currentUser}
           />
         )}
         {currentView === 'boats' && (
@@ -2457,10 +2462,11 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, currentUser }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
+  const [showSiteManagement, setShowSiteManagement] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [viewingBoat, setViewingBoat] = useState(null);
@@ -2833,15 +2839,28 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Storage Locations</h2>
-          <p className="text-slate-600">Manage boat storage facilities and assignments</p>
+          <p className="text-slate-600">Manage boat storage facilities and site organization</p>
         </div>
-        <button
-          onClick={() => setShowAddLocation(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
-        >
-          <Plus className="w-5 h-5" />
-          Add Location
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddLocation(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
+          >
+            <Plus className="w-5 h-5" />
+            Add Location
+          </button>
+
+          {/* Only show to managers/admins */}
+          {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+            <button
+              onClick={() => setShowSiteManagement(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-md"
+            >
+              <Building2 className="w-5 h-5" />
+              Manage Sites
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Instructions Banner */}
@@ -2974,6 +2993,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
       {showAddLocation && (
         <EditLocationModal
           location={null}
+          sites={sites}
           onSave={handleAddLocation}
           onCancel={() => setShowAddLocation(false)}
         />
@@ -2981,6 +3001,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
       {editingLocation && (
         <EditLocationModal
           location={editingLocation}
+          sites={sites}
           onSave={handleUpdateLocation}
           onCancel={() => setEditingLocation(null)}
         />
@@ -3032,6 +3053,18 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onClose={() => setMaximizedLocation(null)}
+        />
+      )}
+
+      {/* Site Management Modal */}
+      {showSiteManagement && (
+        <SiteManagementModal
+          sites={sites}
+          locations={locations}
+          onAddSite={onAddSite}
+          onUpdateSite={onUpdateSite}
+          onDeleteSite={onDeleteSite}
+          onClose={() => setShowSiteManagement(false)}
         />
       )}
     </div>
@@ -3213,7 +3246,7 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
   );
 }
 
-function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat }) {
+function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, currentUser }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
@@ -4172,7 +4205,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 // with location assignment capability
 // ============================================================================
 
-function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }) {
+function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onClose }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
@@ -4447,7 +4480,7 @@ function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }
   );
 }
 
-function EditLocationModal({ location, onSave, onCancel }) {
+function EditLocationModal({ location, sites = [], onSave, onCancel }) {
   const [formData, setFormData] = useState(location || {
     name: '',
     type: 'rack-building',
@@ -4466,13 +4499,14 @@ function EditLocationModal({ location, onSave, onCancel }) {
       layout: formData.type === 'pool' ? 'grid' : (formData.layout || 'grid'),
       rows: formData.type === 'pool' ? 1 : formData.rows,
       columns: formData.type === 'pool' ? 1 : formData.columns,
+      site_id: formData.site_id || null,
     };
-    
+
     // Preserve id if editing existing location
     if (formData.id) {
       dataToSave.id = formData.id;
     }
-    
+
     // Preserve boats data if it exists
     if (formData.boats) {
       dataToSave.boats = formData.boats;
@@ -4506,6 +4540,25 @@ function EditLocationModal({ location, onSave, onCancel }) {
               placeholder="e.g., Rack Building A"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Site</label>
+            <select
+              value={formData.site_id || ''}
+              onChange={(e) => setFormData({ ...formData, site_id: e.target.value || null })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Unassigned</option>
+              {sites.map(site => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Group this location under a physical site (optional)
+            </p>
           </div>
 
           <div>
