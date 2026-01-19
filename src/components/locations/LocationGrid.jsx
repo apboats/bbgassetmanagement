@@ -340,6 +340,9 @@ export function LocationGrid({
   onDelete,
   onRemove
 }) {
+  // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
+  const [viewMode, setViewMode] = useState('layout');
+
   // Combine boats and inventory boats
   const allBoats = [...(boats || []), ...(inventoryBoats || [])];
 
@@ -548,6 +551,90 @@ export function LocationGrid({
     );
   };
 
+  // Render a single slot for concise view
+  const renderConciseSlot = (row, col) => {
+    const slotId = `${row}-${col}`;
+    const boatId = location.boats?.[slotId];
+    const boat = allBoats.find(b => b.id === boatId);
+    const isDragging = draggingBoat !== null;
+
+    return (
+      <div
+        key={slotId}
+        draggable={!!boat}
+        title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
+        onDragStart={(e) => {
+          if (boat && onDragStart) {
+            onDragStart(e, boat, location, slotId);
+          }
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={(e) => {
+          if (onDrop) onDrop(e, location, row, col);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (boat && onBoatClick) {
+            onBoatClick(boat);
+          } else if (!boat && onSlotClick) {
+            onSlotClick(location, row, col);
+          }
+        }}
+        className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
+          boat
+            ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105`
+            : isDragging
+              ? 'border-blue-400 bg-blue-50 cursor-pointer'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+        }`}
+        style={{ minWidth: '100px', minHeight: '100px' }}
+      >
+        {renderSlotContent(boat, row, col)}
+      </div>
+    );
+  };
+
+  // Render Concise View for U-shaped layouts (three horizontal strips)
+  const renderConciseView = () => {
+    // Collect slots for each section
+    const leftArmSlots = [];
+    const bottomSlots = [];
+    const rightArmSlots = [];
+
+    // Left arm: column 0, rows 0 to rows-2 (not including bottom row)
+    for (let row = 0; row < location.rows - 1; row++) {
+      leftArmSlots.push({ row, col: 0 });
+    }
+
+    // Bottom row: all columns in the last row
+    for (let col = 0; col < location.columns; col++) {
+      bottomSlots.push({ row: location.rows - 1, col });
+    }
+
+    // Right arm: last column, rows 0 to rows-2 (not including bottom row)
+    for (let row = 0; row < location.rows - 1; row++) {
+      rightArmSlots.push({ row, col: location.columns - 1 });
+    }
+
+    const renderSection = (title, slots) => (
+      <div className="mb-3">
+        <p className="text-xs font-semibold text-slate-500 mb-1.5 px-0.5">{title}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {slots.map(({ row, col }) => renderConciseSlot(row, col))}
+        </div>
+      </div>
+    );
+
+    return (
+      <div>
+        {renderSection(`Left Arm (${leftArmSlots.length})`, leftArmSlots)}
+        {renderSection(`Bottom (${bottomSlots.length})`, bottomSlots)}
+        {renderSection(`Right Arm (${rightArmSlots.length})`, rightArmSlots)}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
       <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
@@ -593,21 +680,56 @@ export function LocationGrid({
           </p>
           <p className="text-slate-700 font-medium">{occupiedSlots}/{totalSlots} ({occupancyRate}%)</p>
         </div>
+
+        {/* View mode toggle for U-shaped layouts */}
+        {isUShape && (
+          <div className="flex mt-3 bg-slate-200 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('layout')}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'layout'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid className="w-3 h-3" />
+              Layout
+            </button>
+            <button
+              onClick={() => setViewMode('concise')}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'concise'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <List className="w-3 h-3" />
+              Concise
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="p-4 bg-slate-50">
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full">
-            <div
-              className="grid gap-1.5"
-              style={{
-                gridTemplateColumns: `repeat(${location.columns}, minmax(100px, 100px))`
-              }}
-            >
-              {isUShape ? renderUShapedGrid() : renderStandardGrid()}
+        {/* Concise view for U-shaped layouts */}
+        {isUShape && viewMode === 'concise' ? (
+          <div className="overflow-x-auto">
+            {renderConciseView()}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full">
+              <div
+                className="grid gap-1.5"
+                style={{
+                  gridTemplateColumns: `repeat(${location.columns}, minmax(100px, 100px))`
+                }}
+              >
+                {isUShape ? renderUShapedGrid() : renderStandardGrid()}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="mt-3 pt-3 border-t border-slate-200">
           <p className="text-xs text-slate-500 text-center">
             💡 Drag boats to move them between slots
