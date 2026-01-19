@@ -14,6 +14,7 @@ const {
   boats: boatsService,
   inventoryBoats: inventoryBoatsService,
   locations: locationsService,
+  sites: sitesService,
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
@@ -26,8 +27,9 @@ function AppContainer() {
   const [boats, setBoats] = useState([])
   const [inventoryBoats, setInventoryBoats] = useState([])
   const [locations, setLocations] = useState([])
+  const [sites, setSites] = useState([])
   const [userPreferences, setUserPreferences] = useState({})
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState([]]
   const [dockmasterConfig, setDockmasterConfig] = useState(null)
   const [lastInventorySync, setLastInventorySync] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -91,6 +93,7 @@ function AppContainer() {
           loadBoats().then(() => console.log('✓ Boats loaded')),
           loadInventoryBoats().then(() => console.log('✓ Inventory boats loaded')),
           loadLocations().then(() => console.log('✓ Locations loaded')),
+          loadSites().then(() => console.log('✓ Sites loaded')),
           loadUserPreferences().then(() => console.log('✓ User preferences loaded')),
           loadUsers().then(() => console.log('✓ Users loaded')),
           loadDockmasterConfig().then(() => console.log('✓ Dockmaster config loaded')),
@@ -169,6 +172,16 @@ function AppContainer() {
       setLocations(data)
     } catch (error) {
       console.error('Error loading locations:', error)
+    }
+  }
+
+  // Load sites
+  const loadSites = async () => {
+    try {
+      const data = await sitesService.getAll()
+      setSites(data || [])
+    } catch (error) {
+      console.error('Error loading sites:', error)
     }
   }
 
@@ -575,6 +588,50 @@ function AppContainer() {
   }
 
   // ============================================================================
+  // SITES OPERATIONS
+  // ============================================================================
+
+  const handleAddSite = async (siteData) => {
+    try {
+      await sitesService.create(siteData)
+      await loadSites()
+    } catch (error) {
+      console.error('Error adding site:', error)
+      throw error
+    }
+  }
+
+  const handleUpdateSite = async (siteId, updates) => {
+    try {
+      await sitesService.update(siteId, updates)
+      await loadSites()
+    } catch (error) {
+      console.error('Error updating site:', error)
+      throw error
+    }
+  }
+
+  const handleDeleteSite = async (siteId) => {
+    try {
+      await sitesService.delete(siteId)
+      await loadSites()
+    } catch (error) {
+      console.error('Error deleting site:', error)
+      throw error
+    }
+  }
+
+  const handleReorderSites = async (newOrder) => {
+    try {
+      await sitesService.reorder(newOrder)
+      await loadSites()
+    } catch (error) {
+      console.error('Error reordering sites:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
   // USER PREFERENCES OPERATIONS
   // ============================================================================
 
@@ -649,7 +706,14 @@ function AppContainer() {
       onAssignBoatToSlot={handleAssignBoatToSlot}
       onRemoveBoatFromSlot={handleRemoveBoatFromSlot}
       onMoveBoat={handleMoveBoat}
-      
+
+      // Sites
+      sites={sites}
+      onAddSite={handleAddSite}
+      onUpdateSite={handleUpdateSite}
+      onDeleteSite={handleDeleteSite}
+      onReorderSites={handleReorderSites}
+
       // User Preferences
       userPreferences={userPreferences}
       onSavePreferences={handleSavePreferences}

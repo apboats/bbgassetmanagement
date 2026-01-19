@@ -89,7 +89,14 @@ export default function BoatsByGeorgeAssetManager({
   onAssignBoatToSlot,
   onRemoveBoatFromSlot,
   onMoveBoat,
-  
+
+  // Sites
+  sites = [],
+  onAddSite,
+  onUpdateSite,
+  onDeleteSite,
+  onReorderSites,
+
   // User Preferences
   userPreferences = {},
   onSavePreferences,
@@ -572,11 +579,12 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
+          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
         )}
         {currentView === 'locations' && (
           <LocationsView
             locations={locations}
+            sites={sites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               // If same ID exists in both, keep the inventory version
@@ -620,6 +628,7 @@ export default function BoatsByGeorgeAssetManager({
           <BoatsView
             boats={boats}
             locations={locations}
+            sites={sites}
             onUpdateBoats={saveBoats}
             onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
@@ -636,6 +645,7 @@ export default function BoatsByGeorgeAssetManager({
         {currentView === 'myview' && (
           <MyViewEditor
             locations={locations}
+            sites={sites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               const seen = {};
@@ -672,9 +682,10 @@ export default function BoatsByGeorgeAssetManager({
           />
         )}
         {currentView === 'inventory' && (
-          <InventoryView 
+          <InventoryView
             inventoryBoats={inventoryBoats}
             locations={locations}
+            sites={sites}
             lastSync={lastInventorySync}
             onSyncNow={syncInventoryBoats}
             onUpdateInventoryBoats={saveInventoryBoats}
@@ -802,7 +813,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
+function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   // Use unified remove boat hook
@@ -1034,6 +1045,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -1042,6 +1054,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -1089,7 +1102,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBoat }) {
+function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1736,6 +1749,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -2443,7 +2457,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
@@ -2990,6 +3004,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -2998,6 +3013,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -5279,7 +5295,7 @@ function WorkPhaseToggle({ label, checked, onChange }) {
  * - Reordering locations via drag and drop
  * - Preferences are saved per user
  */
-function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
     userPreferences.selectedLocations || locations.map(l => l.id)
   );
@@ -5920,6 +5936,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -5928,6 +5945,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
@@ -5961,7 +5979,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
  * - Include last_synced_at timestamp
  * - Mark as active/inactive based on Status field rather than deleting
  */
-function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -6392,6 +6410,7 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
