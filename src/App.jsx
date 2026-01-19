@@ -1206,7 +1206,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
       });
 
       // Reload boats from database to get fresh data
-      const updatedBoats = await supabaseService.boatsService.getAll();
+      const updatedBoats = await boatsService.getAll();
       onUpdateBoats(updatedBoats);
       setShowAddBoat(false);
 
