@@ -620,7 +620,7 @@ export default function BoatsByGeorgeAssetManager({
             boats={boats}
             locations={locations}
             onUpdateBoats={saveBoats}
-            onMoveBoat={handleMoveBoat}
+            onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
           />
         )}
