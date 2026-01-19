@@ -18,6 +18,7 @@ const {
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
+  boatMovements: boatMovementsService,
 } = supabaseService
 
 function AppContainer() {
@@ -617,6 +618,18 @@ function AppContainer() {
   const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
     console.log('[AppContainer.handleMoveBoat] Called with:', { boatId, toLocationId, toSlotId, isInventory })
     try {
+      // Get current boat location before move (for logging)
+      const currentBoat = isInventory
+        ? inventoryBoats.find(b => b.id === boatId)
+        : boats.find(b => b.id === boatId)
+      const fromLocation = currentBoat?.location || null
+      const fromSlot = currentBoat?.slot || null
+
+      // Get destination location name
+      const toLocation = toLocationId
+        ? locations.find(l => l.id === toLocationId)?.name || null
+        : null
+
       // If toLocationId is null, this is a removal
       if (!toLocationId) {
         console.log('[AppContainer.handleMoveBoat] Removing boat from location')
@@ -640,6 +653,24 @@ function AppContainer() {
           await loadBoats()
         }
       }
+
+      // Log the movement (don't block on this)
+      try {
+        await boatMovementsService.logMovement({
+          boatId,
+          boatType: isInventory ? 'inventory' : 'customer',
+          fromLocation,
+          fromSlot,
+          toLocation,
+          toSlot: toSlotId || null,
+          movedBy: user?.id || null,
+        })
+        console.log('[AppContainer.handleMoveBoat] Movement logged')
+      } catch (logError) {
+        // Don't fail the move if logging fails
+        console.error('Error logging boat movement:', logError)
+      }
+
       console.log('[AppContainer.handleMoveBoat] Reloading locations')
       await loadLocations()
       console.log('[AppContainer.handleMoveBoat] Complete')
