@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, Building2 } from 'lucide-react';
+import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map, Package, Settings, Menu, Grid, ChevronRight, Home, Wrench, Sparkles, Layers, Shield, Maximize2, Minimize2, ChevronLeft, ChevronDown, Pencil, Anchor, RotateCw, RotateCcw, Printer, ZoomIn, ZoomOut, Move, Flower2, Armchair, Tent, Flag, Table, ArrowUp, ArrowDown, Copy, Building2 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
@@ -2472,6 +2472,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [maximizedLocation, setMaximizedLocation] = useState(null);
+  const [expandedSites, setExpandedSites] = useState(new Set(sites.map(s => s.id)));
   const mouseYRef = useRef(0);
 
   // Use unified remove boat hook
@@ -2503,6 +2504,28 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
+
+  // Keep expandedSites in sync with sites (expand new sites by default)
+  useEffect(() => {
+    setExpandedSites(prev => {
+      const newSet = new Set(prev);
+      sites.forEach(site => newSet.add(site.id));
+      return newSet;
+    });
+  }, [sites]);
+
+  // Toggle site expansion
+  const toggleSiteExpansion = (siteId) => {
+    setExpandedSites(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(siteId)) {
+        newSet.delete(siteId);
+      } else {
+        newSet.add(siteId);
+      }
+      return newSet;
+    });
+  };
 
   // Sync viewingBoat with boats array when it updates (real-time changes)
   useEffect(() => {
@@ -2818,11 +2841,26 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
   });
   const unassignedBoats = boats.filter(b => b.status !== 'archived' && !assignedBoatIds.has(b.id));
 
-  // Group locations by type
-  const racks = locations.filter(l => l.type === 'rack-building');
-  const parking = locations.filter(l => l.type === 'parking-lot');
-  const workshops = locations.filter(l => l.type === 'shop');
-  const pools = locations.filter(l => l.type === 'pool');
+  // Group locations by site, then by type within each site
+  const sortedSites = [...sites].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+  const locationsBySite = sortedSites.map(site => {
+    const siteLocations = locations.filter(l => l.site_id === site.id);
+    return {
+      site,
+      racks: siteLocations.filter(l => l.type === 'rack-building'),
+      parking: siteLocations.filter(l => l.type === 'parking-lot'),
+      workshops: siteLocations.filter(l => l.type === 'shop'),
+      pools: siteLocations.filter(l => l.type === 'pool')
+    };
+  });
+
+  // Unassigned locations (no site_id)
+  const unassignedLocations = locations.filter(l => !l.site_id);
+  const unassignedRacks = unassignedLocations.filter(l => l.type === 'rack-building');
+  const unassignedParking = unassignedLocations.filter(l => l.type === 'parking-lot');
+  const unassignedWorkshops = unassignedLocations.filter(l => l.type === 'shop');
+  const unassignedPools = unassignedLocations.filter(l => l.type === 'pool');
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -2882,96 +2920,241 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
         </div>
       </div>
 
-      {/* Locations by Type */}
-      {racks.length > 0 && (
-        <LocationSection
-          title="Rack Buildings"
-          icon={Grid}
-          color="blue"
-          locations={racks}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
+      {/* Locations Grouped by Site */}
+      {locationsBySite.map(({ site, racks, parking, workshops, pools }) => {
+        const isExpanded = expandedSites.has(site.id);
+        const totalLocations = racks.length + parking.length + workshops.length + pools.length;
 
-      {parking.length > 0 && (
-        <LocationSection
-          title="Parking Lots"
-          icon={Map}
-          color="purple"
-          locations={parking}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
+        if (totalLocations === 0) return null;
 
-      {workshops.length > 0 && (
-        <LocationSection
-          title="Service Workshops"
-          icon={Settings}
-          color="orange"
-          locations={workshops}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={setEditingLocation}
-          onDelete={handleDeleteLocation}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
-
-      {/* Pool Locations */}
-      {pools.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-white" />
+        return (
+          <div key={site.id} className="space-y-4">
+            {/* Site Header */}
+            <div
+              className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => toggleSiteExpansion(site.id)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900">{site.name}</h3>
+                    <p className="text-sm text-slate-600">{totalLocations} location{totalLocations !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`w-6 h-6 text-indigo-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+
+            {/* Site Locations (collapsible) */}
+            {isExpanded && (
+              <div className="space-y-6 pl-4 border-l-4 border-indigo-200">
+                {racks.length > 0 && (
+                  <LocationSection
+                    title="Rack Buildings"
+                    icon={Grid}
+                    color="blue"
+                    locations={racks}
+                    boats={boats}
+                    onSlotClick={handleSlotClick}
+                    onBoatClick={(boat) => setViewingBoat(boat)}
+                    onEdit={setEditingLocation}
+                    onDelete={handleDeleteLocation}
+                    onDragStart={handleDragStart}
+                    onDrop={handleGridDrop}
+                    onDragEnd={handleDragEnd}
+                    draggingBoat={draggingBoat}
+                    onMaximize={setMaximizedLocation}
+                  />
+                )}
+
+                {parking.length > 0 && (
+                  <LocationSection
+                    title="Parking Lots"
+                    icon={Map}
+                    color="purple"
+                    locations={parking}
+                    boats={boats}
+                    onSlotClick={handleSlotClick}
+                    onBoatClick={(boat) => setViewingBoat(boat)}
+                    onEdit={setEditingLocation}
+                    onDelete={handleDeleteLocation}
+                    onDragStart={handleDragStart}
+                    onDrop={handleGridDrop}
+                    onDragEnd={handleDragEnd}
+                    draggingBoat={draggingBoat}
+                    onMaximize={setMaximizedLocation}
+                  />
+                )}
+
+                {workshops.length > 0 && (
+                  <LocationSection
+                    title="Service Workshops"
+                    icon={Settings}
+                    color="orange"
+                    locations={workshops}
+                    boats={boats}
+                    onSlotClick={handleSlotClick}
+                    onBoatClick={(boat) => setViewingBoat(boat)}
+                    onEdit={setEditingLocation}
+                    onDelete={handleDeleteLocation}
+                    onDragStart={handleDragStart}
+                    onDrop={handleGridDrop}
+                    onDragEnd={handleDragEnd}
+                    draggingBoat={draggingBoat}
+                    onMaximize={setMaximizedLocation}
+                  />
+                )}
+
+                {pools.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+                        <Package className="w-6 h-6 text-white" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+                    </div>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      {pools.map(pool => (
+                        <PoolLocation
+                          key={pool.id}
+                          location={pool}
+                          boats={boats}
+                          onEdit={() => setEditingLocation(pool)}
+                          onDelete={() => handleDeleteLocation(pool.id)}
+                          onDragStart={handleDragStart}
+                          onDrop={handlePoolDrop}
+                          onDragEnd={handleDragEnd}
+                          isDragging={!!draggingBoat}
+                          onBoatClick={(boat) => {
+                            setViewingBoat(boat);
+                          }}
+                          onAddBoat={() => {
+                            setSelectedLocation(pool);
+                            setSelectedSlot('pool');
+                            setShowBoatAssignModal(true);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {pools.map(pool => (
-              <PoolLocation
-                key={pool.id}
-                location={pool}
+        );
+      })}
+
+      {/* Unassigned Locations (no site) */}
+      {unassignedLocations.length > 0 && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-300 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-slate-400 to-slate-500 rounded-lg flex items-center justify-center">
+                <Map className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900">Unassigned Locations</h3>
+                <p className="text-sm text-slate-600">{unassignedLocations.length} location{unassignedLocations.length !== 1 ? 's' : ''} without a site</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6 pl-4 border-l-4 border-slate-300">
+            {unassignedRacks.length > 0 && (
+              <LocationSection
+                title="Rack Buildings"
+                icon={Grid}
+                color="blue"
+                locations={unassignedRacks}
                 boats={boats}
-                onEdit={() => setEditingLocation(pool)}
-                onDelete={() => handleDeleteLocation(pool.id)}
+                onSlotClick={handleSlotClick}
+                onBoatClick={(boat) => setViewingBoat(boat)}
+                onEdit={setEditingLocation}
+                onDelete={handleDeleteLocation}
                 onDragStart={handleDragStart}
-                onDrop={handlePoolDrop}
+                onDrop={handleGridDrop}
                 onDragEnd={handleDragEnd}
-                isDragging={!!draggingBoat}
-                onBoatClick={(boat) => {
-                  // Modal will handle finding location data - just pass the boat
-                  setViewingBoat(boat);
-                }}
-                onAddBoat={() => {
-                  setSelectedLocation(pool);
-                  setSelectedSlot('pool');
-                  setShowBoatAssignModal(true);
-                }}
+                draggingBoat={draggingBoat}
+                onMaximize={setMaximizedLocation}
               />
-            ))}
+            )}
+
+            {unassignedParking.length > 0 && (
+              <LocationSection
+                title="Parking Lots"
+                icon={Map}
+                color="purple"
+                locations={unassignedParking}
+                boats={boats}
+                onSlotClick={handleSlotClick}
+                onBoatClick={(boat) => setViewingBoat(boat)}
+                onEdit={setEditingLocation}
+                onDelete={handleDeleteLocation}
+                onDragStart={handleDragStart}
+                onDrop={handleGridDrop}
+                onDragEnd={handleDragEnd}
+                draggingBoat={draggingBoat}
+                onMaximize={setMaximizedLocation}
+              />
+            )}
+
+            {unassignedWorkshops.length > 0 && (
+              <LocationSection
+                title="Service Workshops"
+                icon={Settings}
+                color="orange"
+                locations={unassignedWorkshops}
+                boats={boats}
+                onSlotClick={handleSlotClick}
+                onBoatClick={(boat) => setViewingBoat(boat)}
+                onEdit={setEditingLocation}
+                onDelete={handleDeleteLocation}
+                onDragStart={handleDragStart}
+                onDrop={handleGridDrop}
+                onDragEnd={handleDragEnd}
+                draggingBoat={draggingBoat}
+                onMaximize={setMaximizedLocation}
+              />
+            )}
+
+            {unassignedPools.length > 0 && (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+                    <Package className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {unassignedPools.map(pool => (
+                    <PoolLocation
+                      key={pool.id}
+                      location={pool}
+                      boats={boats}
+                      onEdit={() => setEditingLocation(pool)}
+                      onDelete={() => handleDeleteLocation(pool.id)}
+                      onDragStart={handleDragStart}
+                      onDrop={handlePoolDrop}
+                      onDragEnd={handleDragEnd}
+                      isDragging={!!draggingBoat}
+                      onBoatClick={(boat) => {
+                        setViewingBoat(boat);
+                      }}
+                      onAddBoat={() => {
+                        setSelectedLocation(pool);
+                        setSelectedSlot('pool');
+                        setShowBoatAssignModal(true);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
