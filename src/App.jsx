@@ -3025,44 +3025,6 @@ function LocationsView({
 
     return (
       <>
-        {racks.length > 0 && (
-          <LocationSection
-            title="Rack Buildings"
-            icon={Grid}
-            color="blue"
-            locations={racks}
-            boats={boats}
-            onSlotClick={handleSlotClick}
-            onBoatClick={(boat) => setViewingBoat(boat)}
-            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-            onDragStart={handleDragStart}
-            onDrop={handleGridDrop}
-            onDragEnd={handleDragEnd}
-            draggingBoat={draggingBoat}
-            onMaximize={setMaximizedLocation}
-          />
-        )}
-
-        {parking.length > 0 && (
-          <LocationSection
-            title="Parking Lots"
-            icon={Map}
-            color="purple"
-            locations={parking}
-            boats={boats}
-            onSlotClick={handleSlotClick}
-            onBoatClick={(boat) => setViewingBoat(boat)}
-            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-            onDragStart={handleDragStart}
-            onDrop={handleGridDrop}
-            onDragEnd={handleDragEnd}
-            draggingBoat={draggingBoat}
-            onMaximize={setMaximizedLocation}
-          />
-        )}
-
         {workshops.length > 0 && (
           <LocationSection
             title="Service Workshops"
@@ -3112,6 +3074,44 @@ function LocationsView({
               ))}
             </div>
           </div>
+        )}
+
+        {racks.length > 0 && (
+          <LocationSection
+            title="Rack Buildings"
+            icon={Grid}
+            color="blue"
+            locations={racks}
+            boats={boats}
+            onSlotClick={handleSlotClick}
+            onBoatClick={(boat) => setViewingBoat(boat)}
+            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
+            onDragStart={handleDragStart}
+            onDrop={handleGridDrop}
+            onDragEnd={handleDragEnd}
+            draggingBoat={draggingBoat}
+            onMaximize={setMaximizedLocation}
+          />
+        )}
+
+        {parking.length > 0 && (
+          <LocationSection
+            title="Parking Lots"
+            icon={Map}
+            color="purple"
+            locations={parking}
+            boats={boats}
+            onSlotClick={handleSlotClick}
+            onBoatClick={(boat) => setViewingBoat(boat)}
+            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
+            onDragStart={handleDragStart}
+            onDrop={handleGridDrop}
+            onDragEnd={handleDragEnd}
+            draggingBoat={draggingBoat}
+            onMaximize={setMaximizedLocation}
+          />
         )}
       </>
     );
