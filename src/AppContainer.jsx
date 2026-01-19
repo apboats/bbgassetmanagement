@@ -610,7 +610,7 @@ function AppContainer() {
           fromSlot: fromSlot,
           toLocation: toLocation,
           toSlot: toSlotId || null,
-          movedBy: user?.name || user?.email || 'Unknown',
+          movedBy: user?.id,
           notes: null
         });
         console.log('[AppContainer.handleMoveBoat] Movement logged successfully');
