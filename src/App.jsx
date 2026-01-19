@@ -90,7 +90,14 @@ export default function BoatsByGeorgeAssetManager({
   onAssignBoatToSlot,
   onRemoveBoatFromSlot,
   onMoveBoat,
-  
+
+  // Sites
+  sites = [],
+  onAddSite,
+  onUpdateSite,
+  onDeleteSite,
+  onReorderSites,
+
   // User Preferences
   userPreferences = {},
   onSavePreferences,
@@ -595,11 +602,16 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
+          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
         )}
         {currentView === 'locations' && (
           <LocationsView
             locations={locations}
+            sites={sites}
+            onAddSite={onAddSite}
+            onUpdateSite={onUpdateSite}
+            onDeleteSite={onDeleteSite}
+            onReorderSites={onReorderSites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               // If same ID exists in both, keep the inventory version
@@ -644,6 +656,7 @@ export default function BoatsByGeorgeAssetManager({
           <BoatsView
             boats={boats}
             locations={locations}
+            sites={sites}
             onUpdateBoats={saveBoats}
             onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
@@ -660,6 +673,7 @@ export default function BoatsByGeorgeAssetManager({
         {currentView === 'myview' && (
           <MyViewEditor
             locations={locations}
+            sites={sites}
             boats={(() => {
               // Combine boats and inventory boats, removing duplicates
               const seen = {};
@@ -696,9 +710,10 @@ export default function BoatsByGeorgeAssetManager({
           />
         )}
         {currentView === 'inventory' && (
-          <InventoryView 
+          <InventoryView
             inventoryBoats={inventoryBoats}
             locations={locations}
+            sites={sites}
             lastSync={lastInventorySync}
             onSyncNow={syncInventoryBoats}
             onUpdateInventoryBoats={saveInventoryBoats}
@@ -826,7 +841,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
+function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   // Use unified remove boat hook
@@ -1058,6 +1073,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -1066,6 +1082,7 @@ function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLo
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -1112,7 +1129,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBoat }) {
+function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1811,6 +1828,7 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -2550,11 +2568,25 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
+function LocationsView({
+  locations,
+  sites = [],
+  onAddSite,
+  onUpdateSite,
+  onDeleteSite,
+  onReorderSites,
+  boats,
+  onUpdateLocations,
+  onUpdateBoats,
+  onMoveBoat: onMoveBoatFromContainer,
+  currentUser
+}) {
   // Role check for location management permissions
   const isManagerOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
 
   const [showAddLocation, setShowAddLocation] = useState(false);
+  const [showAddSite, setShowAddSite] = useState(false);
+  const [editingSite, setEditingSite] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -2699,6 +2731,74 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       }
       onUpdateLocations(locations.filter(l => l.id !== locationId));
     }
+  };
+
+  // Site handlers
+  const handleSaveSite = async (siteData) => {
+    try {
+      if (editingSite) {
+        await onUpdateSite(editingSite.id, siteData);
+        setEditingSite(null);
+      } else {
+        await onAddSite(siteData);
+        setShowAddSite(false);
+      }
+    } catch (error) {
+      console.error('Error saving site:', error);
+      alert(error.message || 'Failed to save site');
+    }
+  };
+
+  const handleDeleteSite = async (siteId) => {
+    const siteLocations = locations.filter(l => l.site_id === siteId);
+    if (siteLocations.length > 0) {
+      alert('Cannot delete site with assigned locations. Please move or delete all locations from this site first.');
+      return;
+    }
+    if (confirm('Are you sure you want to delete this site?')) {
+      try {
+        await onDeleteSite(siteId);
+      } catch (error) {
+        console.error('Error deleting site:', error);
+        alert(error.message || 'Failed to delete site');
+      }
+    }
+  };
+
+  // Site drag reorder handlers
+  const [draggedSite, setDraggedSite] = useState(null);
+
+  const handleSiteDragStart = (e, site) => {
+    setDraggedSite(site);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleSiteDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleSiteDrop = async (e, targetSite) => {
+    e.preventDefault();
+    if (!draggedSite || draggedSite.id === targetSite.id) {
+      setDraggedSite(null);
+      return;
+    }
+
+    // Reorder sites
+    const currentOrder = sites.map(s => s.id);
+    const dragIndex = currentOrder.indexOf(draggedSite.id);
+    const targetIndex = currentOrder.indexOf(targetSite.id);
+
+    currentOrder.splice(dragIndex, 1);
+    currentOrder.splice(targetIndex, 0, draggedSite.id);
+
+    try {
+      await onReorderSites(currentOrder);
+    } catch (error) {
+      console.error('Error reordering sites:', error);
+    }
+    setDraggedSite(null);
   };
 
   const handleSlotClick = (location, row, col) => {
@@ -2908,11 +3008,114 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
   });
   const unassignedBoats = boats.filter(b => b.status !== 'archived' && !assignedBoatIds.has(b.id));
 
-  // Group locations by type
-  const racks = locations.filter(l => l.type === 'rack-building');
-  const parking = locations.filter(l => l.type === 'parking-lot');
-  const workshops = locations.filter(l => l.type === 'shop');
-  const pools = locations.filter(l => l.type === 'pool');
+  // Helper to get locations for a site
+  const getLocationsForSite = (siteId) => {
+    return locations.filter(l => l.site_id === siteId);
+  };
+
+  // Get locations without a site (for migration purposes)
+  const unassignedLocations = locations.filter(l => !l.site_id);
+
+  // Helper to render locations grouped by type within a site
+  const renderLocationsByType = (siteLocations) => {
+    const racks = siteLocations.filter(l => l.type === 'rack-building');
+    const parking = siteLocations.filter(l => l.type === 'parking-lot');
+    const workshops = siteLocations.filter(l => l.type === 'shop');
+    const pools = siteLocations.filter(l => l.type === 'pool');
+
+    return (
+      <>
+        {racks.length > 0 && (
+          <LocationSection
+            title="Rack Buildings"
+            icon={Grid}
+            color="blue"
+            locations={racks}
+            boats={boats}
+            onSlotClick={handleSlotClick}
+            onBoatClick={(boat) => setViewingBoat(boat)}
+            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
+            onDragStart={handleDragStart}
+            onDrop={handleGridDrop}
+            onDragEnd={handleDragEnd}
+            draggingBoat={draggingBoat}
+            onMaximize={setMaximizedLocation}
+          />
+        )}
+
+        {parking.length > 0 && (
+          <LocationSection
+            title="Parking Lots"
+            icon={Map}
+            color="purple"
+            locations={parking}
+            boats={boats}
+            onSlotClick={handleSlotClick}
+            onBoatClick={(boat) => setViewingBoat(boat)}
+            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
+            onDragStart={handleDragStart}
+            onDrop={handleGridDrop}
+            onDragEnd={handleDragEnd}
+            draggingBoat={draggingBoat}
+            onMaximize={setMaximizedLocation}
+          />
+        )}
+
+        {workshops.length > 0 && (
+          <LocationSection
+            title="Service Workshops"
+            icon={Settings}
+            color="orange"
+            locations={workshops}
+            boats={boats}
+            onSlotClick={handleSlotClick}
+            onBoatClick={(boat) => setViewingBoat(boat)}
+            onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
+            onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
+            onDragStart={handleDragStart}
+            onDrop={handleGridDrop}
+            onDragEnd={handleDragEnd}
+            draggingBoat={draggingBoat}
+            onMaximize={setMaximizedLocation}
+          />
+        )}
+
+        {pools.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {pools.map(pool => (
+                <PoolLocation
+                  key={pool.id}
+                  location={pool}
+                  boats={boats}
+                  onEdit={isManagerOrAdmin ? () => setEditingLocation(pool) : undefined}
+                  onDelete={isManagerOrAdmin ? () => handleDeleteLocation(pool.id) : undefined}
+                  onDragStart={handleDragStart}
+                  onDrop={handlePoolDrop}
+                  onDragEnd={handleDragEnd}
+                  isDragging={!!draggingBoat}
+                  onBoatClick={(boat) => setViewingBoat(boat)}
+                  onAddBoat={() => {
+                    setSelectedLocation(pool);
+                    setSelectedSlot('pool');
+                    setShowBoatAssignModal(true);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -2925,20 +3128,29 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
           </div>
         </div>
       )}
-      
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Storage Locations</h2>
           <p className="text-slate-600">Manage boat storage facilities and assignments</p>
         </div>
         {isManagerOrAdmin && (
-          <button
-            onClick={() => setShowAddLocation(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
-          >
-            <Plus className="w-5 h-5" />
-            Add Location
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddSite(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              Add Site
+            </button>
+            <button
+              onClick={() => setShowAddLocation(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              Add Location
+            </button>
+          </div>
         )}
       </div>
 
@@ -2961,110 +3173,119 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         </div>
       </div>
 
-      {/* Locations by Type */}
-      {racks.length > 0 && (
-        <LocationSection
-          title="Rack Buildings"
-          icon={Grid}
-          color="blue"
-          locations={racks}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
+      {/* Sites with their locations */}
+      {sites.map(site => {
+        const siteLocations = getLocationsForSite(site.id);
+        if (siteLocations.length === 0) return null;
 
-      {parking.length > 0 && (
-        <LocationSection
-          title="Parking Lots"
-          icon={Map}
-          color="purple"
-          locations={parking}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
-
-      {workshops.length > 0 && (
-        <LocationSection
-          title="Service Workshops"
-          icon={Settings}
-          color="orange"
-          locations={workshops}
-          boats={boats}
-          onSlotClick={handleSlotClick}
-          onBoatClick={(boat) => setViewingBoat(boat)}
-          onEdit={isManagerOrAdmin ? setEditingLocation : undefined}
-          onDelete={isManagerOrAdmin ? handleDeleteLocation : undefined}
-          onDragStart={handleDragStart}
-          onDrop={handleGridDrop}
-          onDragEnd={handleDragEnd}
-          draggingBoat={draggingBoat}
-          onMaximize={setMaximizedLocation}
-        />
-      )}
-
-      {/* Pool Locations */}
-      {pools.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-white" />
+        return (
+          <div
+            key={site.id}
+            className="space-y-4"
+            draggable={isManagerOrAdmin}
+            onDragStart={(e) => handleSiteDragStart(e, site)}
+            onDragOver={handleSiteDragOver}
+            onDrop={(e) => handleSiteDrop(e, site)}
+          >
+            {/* Site Header */}
+            <div className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 ${draggedSite?.id === site.id ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isManagerOrAdmin && (
+                    <div className="cursor-grab text-indigo-400 hover:text-indigo-600">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <Map className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-indigo-900">{site.name}</h3>
+                    <p className="text-sm text-indigo-600">{siteLocations.length} location{siteLocations.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                {isManagerOrAdmin && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingSite(site)}
+                      className="p-2 text-indigo-600 hover:bg-indigo-200 rounded-lg transition-colors"
+                      title="Edit Site"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSite(site.id)}
+                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Delete Site"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-900">Pools</h3>
+
+            {/* Site's locations grouped by type */}
+            <div className="pl-4 border-l-4 border-indigo-200 space-y-6">
+              {renderLocationsByType(siteLocations)}
+            </div>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {pools.map(pool => (
-              <PoolLocation
-                key={pool.id}
-                location={pool}
-                boats={boats}
-                onEdit={isManagerOrAdmin ? () => setEditingLocation(pool) : undefined}
-                onDelete={isManagerOrAdmin ? () => handleDeleteLocation(pool.id) : undefined}
-                onDragStart={handleDragStart}
-                onDrop={handlePoolDrop}
-                onDragEnd={handleDragEnd}
-                isDragging={!!draggingBoat}
-                onBoatClick={(boat) => {
-                  // Modal will handle finding location data - just pass the boat
-                  setViewingBoat(boat);
-                }}
-                onAddBoat={() => {
-                  setSelectedLocation(pool);
-                  setSelectedSlot('pool');
-                  setShowBoatAssignModal(true);
-                }}
-              />
-            ))}
+        );
+      })}
+
+      {/* Unassigned locations (no site) - shown for migration purposes */}
+      {unassignedLocations.length > 0 && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-200 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-slate-400 to-slate-500 rounded-lg flex items-center justify-center">
+                <Map className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-700">Unassigned Locations</h3>
+                <p className="text-sm text-slate-500">These locations need to be assigned to a site</p>
+              </div>
+            </div>
+          </div>
+          <div className="pl-4 border-l-4 border-slate-200 space-y-6">
+            {renderLocationsByType(unassignedLocations)}
           </div>
         </div>
       )}
 
-      {locations.length === 0 && (
+      {/* Empty state - no sites and no locations */}
+      {sites.length === 0 && locations.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
           <Map className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 mb-4">No storage locations yet</p>
+          <p className="text-slate-500 mb-4">No sites or storage locations yet</p>
+          {isManagerOrAdmin ? (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowAddSite(true)}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Create First Site
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">Contact a manager to create sites and locations</p>
+          )}
+        </div>
+      )}
+
+      {/* Has sites but no locations */}
+      {sites.length > 0 && locations.length === 0 && (
+        <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
+          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500 mb-4">Sites created, but no locations yet</p>
           {isManagerOrAdmin ? (
             <button
               onClick={() => setShowAddLocation(true)}
               className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
             >
-              Create First Location
+              Add First Location
             </button>
           ) : (
             <p className="text-sm text-slate-400">Contact a manager to create locations</p>
@@ -3073,9 +3294,23 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       )}
 
       {/* Modals */}
+      {/* Site Modals */}
+      {(showAddSite || editingSite) && (
+        <EditSiteModal
+          site={editingSite}
+          onSave={handleSaveSite}
+          onCancel={() => {
+            setShowAddSite(false);
+            setEditingSite(null);
+          }}
+        />
+      )}
+
+      {/* Location Modals */}
       {showAddLocation && (
         <EditLocationModal
           location={null}
+          sites={sites}
           onSave={handleAddLocation}
           onCancel={() => setShowAddLocation(false)}
         />
@@ -3083,6 +3318,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
       {editingLocation && (
         <EditLocationModal
           location={editingLocation}
+          sites={sites}
           onSave={handleUpdateLocation}
           onCancel={() => setEditingLocation(null)}
         />
@@ -3106,6 +3342,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -3114,6 +3351,7 @@ function LocationsView({ locations, boats, onUpdateLocations, onUpdateBoats, onM
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -3319,18 +3557,88 @@ function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCreateBoat
 // See: src/components/modals/BoatDetailsModal.jsx
 // See: src/components/modals/InventoryBoatDetailsModal.jsx
 
-function EditLocationModal({ location, onSave, onCancel }) {
+// Edit Site Modal - Simple modal for creating/editing sites
+function EditSiteModal({ site, onSave, onCancel }) {
+  const [name, setName] = useState(site?.name || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onSave({ name: name.trim() });
+    } catch (error) {
+      console.error('Error saving site:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-slide-in">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-slate-900">{site ? 'Edit Site' : 'Add New Site'}</h3>
+          <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Site Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., Main Marina, Overflow Yard"
+              required
+              autoFocus
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              A site represents a physical location where storage areas are located.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:bg-indigo-400"
+              disabled={isSubmitting || !name.trim()}
+            >
+              {isSubmitting ? 'Saving...' : (site ? 'Save Changes' : 'Add Site')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditLocationModal({ location, sites = [], onSave, onCancel }) {
   const [formData, setFormData] = useState(location || {
     name: '',
     type: 'rack-building',
     layout: 'grid',
     rows: 4,
-    columns: 8
+    columns: 8,
+    site_id: sites.length > 0 ? sites[0].id : null
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Clean up the data before saving
     const dataToSave = {
       name: formData.name,
@@ -3338,18 +3646,19 @@ function EditLocationModal({ location, onSave, onCancel }) {
       layout: formData.type === 'pool' ? 'grid' : (formData.layout || 'grid'),
       rows: formData.type === 'pool' ? 1 : formData.rows,
       columns: formData.type === 'pool' ? 1 : formData.columns,
+      site_id: formData.site_id,
     };
-    
+
     // Preserve id if editing existing location
     if (formData.id) {
       dataToSave.id = formData.id;
     }
-    
+
     // Preserve boats data if it exists
     if (formData.boats) {
       dataToSave.boats = formData.boats;
     }
-    
+
     onSave(dataToSave);
   };
 
@@ -3379,6 +3688,26 @@ function EditLocationModal({ location, onSave, onCancel }) {
               required
             />
           </div>
+
+          {sites.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Site</label>
+              <select
+                value={formData.site_id || ''}
+                onChange={(e) => setFormData({ ...formData, site_id: e.target.value || null })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select a site...</option>
+                {sites.map(site => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Which physical site/facility is this location at?
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
@@ -4545,7 +4874,7 @@ function WorkPhaseToggle({ label, checked, onChange }) {
  * - Reordering locations via drag and drop
  * - Preferences are saved per user
  */
-function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
     userPreferences.selectedLocations || locations.map(l => l.id)
   );
@@ -5014,57 +5343,135 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
             </div>
           </div>
 
-          <div className="p-4 space-y-2">
-            {allOrderedLocations.map((location) => (
-              <div
-                key={location.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, location.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, location.id)}
-                className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ${
-                  draggedItem === location.id
-                    ? 'border-blue-400 bg-blue-50 opacity-50'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                }`}
-              >
-                {/* Drag Handle */}
-                <div className="flex-shrink-0 text-slate-400">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                  </svg>
+          <div className="p-4 space-y-4">
+            {/* Group locations by site */}
+            {sites.map(site => {
+              const siteLocations = allOrderedLocations.filter(l => l.site_id === site.id);
+              if (siteLocations.length === 0) return null;
+
+              return (
+                <div key={site.id} className="space-y-2">
+                  {/* Site Header (non-draggable) */}
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <Map className="w-4 h-4 text-indigo-500" />
+                    <span className="text-sm font-semibold text-indigo-700">{site.name}</span>
+                    <div className="flex-1 border-t border-indigo-200 ml-2" />
+                  </div>
+
+                  {/* Site's locations */}
+                  {siteLocations.map((location) => (
+                    <div
+                      key={location.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, location.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, location.id)}
+                      className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ml-4 ${
+                        draggedItem === location.id
+                          ? 'border-blue-400 bg-blue-50 opacity-50'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                      }`}
+                    >
+                      {/* Drag Handle */}
+                      <div className="flex-shrink-0 text-slate-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={selectedLocations.includes(location.id)}
+                        onChange={() => handleToggleLocation(location.id)}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+
+                      {/* Location Info */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-slate-900">{location.name}</h4>
+                        <p className="text-sm text-slate-600 capitalize">
+                          {location.type} • {location.rows} × {location.columns}
+                          {location.layout === 'u-shaped' && ' (U-shaped)'}
+                        </p>
+                      </div>
+
+                      {/* Visibility Badge */}
+                      {selectedLocations.includes(location.id) ? (
+                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
+                          Visible
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
+                          Hidden
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              );
+            })}
 
-                {/* Checkbox */}
-                <input
-                  type="checkbox"
-                  checked={selectedLocations.includes(location.id)}
-                  onChange={() => handleToggleLocation(location.id)}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  onClick={(e) => e.stopPropagation()}
-                />
+            {/* Unassigned locations (no site) */}
+            {(() => {
+              const unassignedLocs = allOrderedLocations.filter(l => !l.site_id);
+              if (unassignedLocs.length === 0) return null;
 
-                {/* Location Info */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-slate-900">{location.name}</h4>
-                  <p className="text-sm text-slate-600 capitalize">
-                    {location.type} • {location.rows} × {location.columns}
-                    {location.layout === 'u-shaped' && ' (U-shaped)'}
-                  </p>
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <Map className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-500">Unassigned</span>
+                    <div className="flex-1 border-t border-slate-200 ml-2" />
+                  </div>
+
+                  {unassignedLocs.map((location) => (
+                    <div
+                      key={location.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, location.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, location.id)}
+                      className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all cursor-move ml-4 ${
+                        draggedItem === location.id
+                          ? 'border-blue-400 bg-blue-50 opacity-50'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex-shrink-0 text-slate-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedLocations.includes(location.id)}
+                        onChange={() => handleToggleLocation(location.id)}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-slate-900">{location.name}</h4>
+                        <p className="text-sm text-slate-600 capitalize">
+                          {location.type} • {location.rows} × {location.columns}
+                          {location.layout === 'u-shaped' && ' (U-shaped)'}
+                        </p>
+                      </div>
+                      {selectedLocations.includes(location.id) ? (
+                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
+                          Visible
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
+                          Hidden
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-
-                {/* Visibility Badge */}
-                {selectedLocations.includes(location.id) ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
-                    Visible
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded-full flex-shrink-0">
-                    Hidden
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })()}
           </div>
         </div>
       )}
@@ -5186,6 +5593,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -5194,6 +5602,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
@@ -5227,7 +5636,7 @@ function MyViewEditor({ locations, boats, userPreferences, currentUser, onSavePr
  * - Include last_synced_at timestamp
  * - Mark as active/inactive based on Status field rather than deleting
  */
-function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -5777,6 +6186,7 @@ function InventoryView({ inventoryBoats, locations, lastSync, onSyncNow, dockmas
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
+          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />

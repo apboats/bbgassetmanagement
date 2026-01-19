@@ -14,6 +14,7 @@ const {
   boats: boatsService,
   inventoryBoats: inventoryBoatsService,
   locations: locationsService,
+  sites: sitesService,
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
@@ -26,6 +27,7 @@ function AppContainer() {
   const [boats, setBoats] = useState([])
   const [inventoryBoats, setInventoryBoats] = useState([])
   const [locations, setLocations] = useState([])
+  const [sites, setSites] = useState([])
   const [userPreferences, setUserPreferences] = useState({})
   const [users, setUsers] = useState([])
   const [dockmasterConfig, setDockmasterConfig] = useState(null)
@@ -91,6 +93,7 @@ function AppContainer() {
           loadBoats().then(() => console.log('✓ Boats loaded')),
           loadInventoryBoats().then(() => console.log('✓ Inventory boats loaded')),
           loadLocations().then(() => console.log('✓ Locations loaded')),
+          loadSites().then(() => console.log('✓ Sites loaded')),
           loadUserPreferences().then(() => console.log('✓ User preferences loaded')),
           loadUsers().then(() => console.log('✓ Users loaded')),
           loadDockmasterConfig().then(() => console.log('✓ Dockmaster config loaded')),
@@ -169,6 +172,18 @@ function AppContainer() {
       setLocations(data)
     } catch (error) {
       console.error('Error loading locations:', error)
+    }
+  }
+
+  // Load sites (and ensure default site exists)
+  const loadSites = async () => {
+    try {
+      // Ensure at least one site exists
+      await sitesService.ensureDefaultSite()
+      const data = await sitesService.getAll()
+      setSites(data)
+    } catch (error) {
+      console.error('Error loading sites:', error)
     }
   }
 
@@ -627,6 +642,75 @@ function AppContainer() {
   }
 
   // ============================================================================
+  // SITES OPERATIONS
+  // ============================================================================
+
+  const handleAddSite = async (siteData) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Site management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
+    try {
+      const newSite = await sitesService.create(siteData)
+      await loadSites()
+      return newSite
+    } catch (error) {
+      console.error('Error adding site:', error)
+      throw error
+    }
+  }
+
+  const handleUpdateSite = async (siteId, updates) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Site management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
+    try {
+      await sitesService.update(siteId, updates)
+      await loadSites()
+    } catch (error) {
+      console.error('Error updating site:', error)
+      throw error
+    }
+  }
+
+  const handleDeleteSite = async (siteId) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Site management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
+    try {
+      await sitesService.delete(siteId)
+      await loadSites()
+    } catch (error) {
+      console.error('Error deleting site:', error)
+      throw error
+    }
+  }
+
+  const handleReorderSites = async (siteIds) => {
+    // Defense in depth: validate role before proceeding
+    if (!canManageLocations()) {
+      console.error('Permission denied: Site management requires manager or admin role')
+      throw new Error('Permission denied')
+    }
+
+    try {
+      await sitesService.reorder(siteIds)
+      await loadSites()
+    } catch (error) {
+      console.error('Error reordering sites:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
   // USER PREFERENCES OPERATIONS
   // ============================================================================
 
@@ -701,6 +785,13 @@ function AppContainer() {
       onAssignBoatToSlot={handleAssignBoatToSlot}
       onRemoveBoatFromSlot={handleRemoveBoatFromSlot}
       onMoveBoat={handleMoveBoat}
+
+      // Sites
+      sites={sites}
+      onAddSite={handleAddSite}
+      onUpdateSite={handleUpdateSite}
+      onDeleteSite={handleDeleteSite}
+      onReorderSites={handleReorderSites}
       
       // User Preferences
       userPreferences={userPreferences}
