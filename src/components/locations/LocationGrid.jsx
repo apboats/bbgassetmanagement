@@ -202,28 +202,29 @@ export function MaximizedLocationModal({
           </button>
         </div>
 
-        {/* Grid Content */}
-        <div className="flex-1 overflow-auto p-6 bg-slate-50">
+        {/* Grid Content - extra padding and gap for mobile touch scrolling */}
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50">
           {/*
             For narrow grids (1-2 columns): center the content since it won't need horizontal scroll
             For wider grids: use inline-block to allow horizontal scrolling from the left edge
+            Gap increased to gap-5 (20px) for easier touch scrolling on mobile
           */}
           {location.columns <= 2 ? (
-            <div className="flex items-center justify-center min-h-full">
+            <div className="flex items-center justify-center min-h-full p-2">
               <div
-                className="grid gap-3"
+                className="grid gap-5"
                 style={{
                   gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 180px))`,
-                  maxWidth: `${location.columns * 190}px`
+                  maxWidth: `${location.columns * 200}px`
                 }}
               >
                 {renderGrid()}
               </div>
             </div>
           ) : (
-            <div className="inline-block min-w-full">
+            <div className="inline-block min-w-full p-2">
               <div
-                className="grid gap-3"
+                className="grid gap-5"
                 style={{
                   gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 1fr))`
                 }}
