@@ -1053,6 +1053,7 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
           locations={locations}
           sites={sites}
           onMoveBoat={handleMoveBoat}
+          onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -3350,6 +3351,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
           locations={locations}
           sites={sites}
           onMoveBoat={handleMoveBoat}
+          onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -4529,7 +4531,7 @@ function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocat
 // with location assignment capability
 // ============================================================================
 
-function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onClose }) {
+function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onUpdateBoat, onClose }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
@@ -4625,6 +4627,23 @@ function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoa
               <p className="text-xs text-slate-500 mb-0.5">Beam</p>
               <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
             </div>
+          </div>
+
+          {/* Notes Section */}
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <h4 className="text-sm font-medium text-slate-700 mb-2">Notes</h4>
+            <textarea
+              value={boat.notes || ''}
+              onChange={(e) => {
+                if (onUpdateBoat) {
+                  onUpdateBoat({ ...boat, notes: e.target.value });
+                }
+              }}
+              placeholder="Add notes about this inventory boat..."
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-y bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900"
+            />
+            <p className="text-xs text-slate-400 mt-1">Notes are automatically saved as you type</p>
           </div>
 
           {/* Location Assignment */}
@@ -6315,6 +6334,11 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
           locations={locations}
           sites={sites}
           onMoveBoat={handleMoveBoat}
+          onUpdateBoat={(updatedBoat) => {
+            const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
+            onUpdateBoats(updatedBoats);
+            setViewingBoat(updatedBoat);
+          }}
           onClose={() => setViewingBoat(null)}
         />
       )}
@@ -6789,6 +6813,7 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
           locations={locations}
           sites={sites}
           onMoveBoat={handleMoveBoat}
+          onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
         />
       )}
