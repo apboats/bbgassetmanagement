@@ -2776,6 +2776,20 @@ function LocationsView({
   const handleSiteDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    // Auto-scroll when dragging near edges
+    const scrollThreshold = 100; // pixels from edge to start scrolling
+    const scrollSpeed = 15; // pixels per frame
+    const mouseY = e.clientY;
+    const windowHeight = window.innerHeight;
+
+    if (mouseY < scrollThreshold) {
+      // Near top - scroll up
+      window.scrollBy(0, -scrollSpeed);
+    } else if (mouseY > windowHeight - scrollThreshold) {
+      // Near bottom - scroll down
+      window.scrollBy(0, scrollSpeed);
+    }
   };
 
   const handleSiteDrop = async (e, targetSite) => {
