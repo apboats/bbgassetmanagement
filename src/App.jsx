@@ -2934,19 +2934,17 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
               className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => toggleSiteExpansion(site.id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-slate-900">{site.name}</h3>
-                    <p className="text-sm text-slate-600">{totalLocations} location{totalLocations !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-3">
                 <ChevronDown
-                  className={`w-6 h-6 text-indigo-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`w-6 h-6 text-indigo-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
                 />
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900">{site.name}</h3>
+                  <p className="text-sm text-slate-600">{totalLocations} location{totalLocations !== 1 ? 's' : ''}</p>
+                </div>
               </div>
             </div>
 
@@ -3247,6 +3245,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
           onAddSite={onAddSite}
           onUpdateSite={onUpdateSite}
           onDeleteSite={onDeleteSite}
+          onReorderSites={onReorderSites}
           onClose={() => setShowSiteManagement(false)}
         />
       )}
