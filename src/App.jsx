@@ -1113,6 +1113,7 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
   const [filterLocations, setFilterLocations] = useState([]);
+  const [filterSites, setFilterSites] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [showAddBoat, setShowAddBoat] = useState(false);
   const [editingBoat, setEditingBoat] = useState(null);
@@ -1147,11 +1148,45 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
   }, [boats, locations]);
 
   const handleLocationToggle = (locationName) => {
-    setFilterLocations(prev => 
+    setFilterLocations(prev =>
       prev.includes(locationName)
         ? prev.filter(l => l !== locationName)
         : [...prev, locationName]
     );
+  };
+
+  const handleSiteToggle = (siteId) => {
+    // Toggle site in filterSites
+    const newFilterSites = filterSites.includes(siteId)
+      ? filterSites.filter(s => s !== siteId)
+      : [...filterSites, siteId];
+
+    setFilterSites(newFilterSites);
+
+    // Auto-check/uncheck all locations in this site
+    if (newFilterSites.includes(siteId)) {
+      // Site was checked: add all its locations to filterLocations
+      const siteLocationNames = siteId === 'unassigned'
+        ? ['unassigned']  // Special case for unassigned
+        : locations.filter(l => l.site_id === siteId).map(l => l.name);
+
+      setFilterLocations(prev => [
+        ...new Set([...prev, ...siteLocationNames])
+      ]);
+    } else {
+      // Site was unchecked: remove all its locations from filterLocations
+      const siteLocationNames = siteId === 'unassigned'
+        ? ['unassigned']
+        : locations.filter(l => l.site_id === siteId).map(l => l.name);
+
+      setFilterLocations(prev =>
+        prev.filter(locName => !siteLocationNames.includes(locName))
+      );
+    }
+  };
+
+  const handleClearSites = () => {
+    setFilterSites([]);
   };
 
   const filteredBoats = boats.filter(boat => {
@@ -1410,6 +1445,110 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
         </div>
       </div>
 
+      {/* Site Filter */}
+      <div className="bg-white rounded-xl shadow-md p-4 border border-slate-200 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            Filter by Site
+          </h3>
+          {filterSites.length > 0 && (
+            <button
+              onClick={handleClearSites}
+              className="text-xs text-green-600 hover:text-green-700 font-medium"
+            >
+              Clear sites
+            </button>
+          )}
+        </div>
+
+        {/* Active site filter tags */}
+        {filterSites.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-200">
+            {filterSites.map(siteId => {
+              const site = siteId === 'unassigned'
+                ? { name: 'Unassigned' }
+                : sites.find(s => s.id === siteId);
+
+              return (
+                <span
+                  key={siteId}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full"
+                >
+                  {site?.name || 'Unknown'}
+                  <button
+                    onClick={() => handleSiteToggle(siteId)}
+                    className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Site checkboxes grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {/* Unassigned checkbox */}
+          <label
+            className={`flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+              filterSites.includes('unassigned')
+                ? 'border-green-500 bg-green-50'
+                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={filterSites.includes('unassigned')}
+              onChange={() => handleSiteToggle('unassigned')}
+              className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-900 truncate">Unassigned</p>
+              <p className="text-xs text-slate-500">
+                {locations.filter(l => !l.site_id).length} locations
+              </p>
+            </div>
+          </label>
+
+          {/* Site checkboxes */}
+          {sites
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            .map(site => {
+              const siteLocations = locations.filter(l => l.site_id === site.id);
+              const boatsInSite = boats.filter(b =>
+                b.location && siteLocations.some(l => l.name === b.location)
+              ).length;
+
+              return (
+                <label
+                  key={site.id}
+                  className={`flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                    filterSites.includes(site.id)
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterSites.includes(site.id)}
+                    onChange={() => handleSiteToggle(site.id)}
+                    className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{site.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {boatsInSite} boat{boatsInSite !== 1 ? 's' : ''} • {siteLocations.length} loc{siteLocations.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </label>
+              );
+            })
+          }
+        </div>
+      </div>
+
       {/* Location Filter */}
       <div className="bg-white rounded-xl shadow-md p-4 border border-slate-200">
         <div className="flex items-center justify-between mb-3">
@@ -1618,6 +1757,7 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
                   setFilterStatus('all');
                   setFilterWorkPhase('all');
                   setFilterLocations([]);
+                  setFilterSites([]);
                 }}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
@@ -1714,6 +1854,7 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
                   setFilterStatus('all');
                   setFilterWorkPhase('all');
                   setFilterLocations([]);
+                  setFilterSites([]);
                 }}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
               >
