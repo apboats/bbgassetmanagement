@@ -7,18 +7,16 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from './AuthProvider'
-import supabaseService, { getAllBoatsCombined } from './services/supabaseService'
+import supabaseService, { getAllBoatsCombined, boatLifecycleService } from './services/supabaseService'
 import App from './App'
 
 const {
   boats: boatsService,
   inventoryBoats: inventoryBoatsService,
   locations: locationsService,
-  sites: sitesService,
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
-  boatMovements: boatMovementsService,
 } = supabaseService
 
 function AppContainer() {
@@ -28,7 +26,6 @@ function AppContainer() {
   const [boats, setBoats] = useState([])
   const [inventoryBoats, setInventoryBoats] = useState([])
   const [locations, setLocations] = useState([])
-  const [sites, setSites] = useState([])
   const [userPreferences, setUserPreferences] = useState({})
   const [users, setUsers] = useState([])
   const [dockmasterConfig, setDockmasterConfig] = useState(null)
@@ -94,7 +91,6 @@ function AppContainer() {
           loadBoats().then(() => console.log('✓ Boats loaded')),
           loadInventoryBoats().then(() => console.log('✓ Inventory boats loaded')),
           loadLocations().then(() => console.log('✓ Locations loaded')),
-          loadSites().then(() => console.log('✓ Sites loaded')),
           loadUserPreferences().then(() => console.log('✓ User preferences loaded')),
           loadUsers().then(() => console.log('✓ Users loaded')),
           loadDockmasterConfig().then(() => console.log('✓ Dockmaster config loaded')),
@@ -125,15 +121,12 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
-        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
         hullId: boat.hull_id,
-        completedBy: boat.completed_by,
-        completedAt: boat.completed_at,
       }))
-
+      
       setBoats(transformedData)
     } catch (error) {
       console.error('Error loading boats:', error)
@@ -155,7 +148,6 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
-        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         hullId: boat.hull_id,
@@ -177,18 +169,6 @@ function AppContainer() {
       setLocations(data)
     } catch (error) {
       console.error('Error loading locations:', error)
-    }
-  }
-
-  // Load sites (and ensure default site exists)
-  const loadSites = async () => {
-    try {
-      // Ensure at least one site exists
-      await sitesService.ensureDefaultSite()
-      const data = await sitesService.getAll()
-      setSites(data)
-    } catch (error) {
-      console.error('Error loading sites:', error)
     }
   }
 
@@ -246,60 +226,31 @@ function AppContainer() {
 
   const handleAddBoat = async (boatData) => {
     try {
-      // Filter out fields that don't belong in boats table or should be auto-generated
-      const { 
-        id, 
-        dockmaster_id, 
-        sales_status, 
-        last_synced, 
-        isInventory,
-        // Remove camelCase versions that will conflict with snake_case
-        qrCode,
-        nfcTag,
-        workOrderNumber,
-        mechanicalsComplete,
-        cleanComplete,
-        fiberglassComplete,
-        warrantyComplete,
-        archivedDate,
-        dockmasterId,
-        customerId,
-        hullId,
-        ...cleanData 
-      } = boatData
-      
-      const newBoat = await boatsService.create({
-        ...cleanData,
-        qr_code: boatData.qrCode,
-        nfc_tag: boatData.nfcTag,
-        work_order_number: boatData.workOrderNumber,
-        mechanicals_complete: boatData.mechanicalsComplete || false,
-        clean_complete: boatData.cleanComplete || false,
-        fiberglass_complete: boatData.fiberglassComplete || false,
-        warranty_complete: boatData.warrantyComplete || false,
-        dockmaster_id: boatData.dockmasterId || null,
-        customer_id: boatData.customerId || null,
-        hull_id: boatData.hullId || null,
-      })
-      await loadBoats()
-      return newBoat
+      // Use centralized lifecycle service (prevents duplicates)
+      await boatLifecycleService.importOrUpdateBoat(boatData, {
+        targetStatus: 'needs-approval',
+        preserveLocation: false
+      });
+
+      // Reload boats from database
+      await loadBoats();
     } catch (error) {
-      console.error('Error adding boat:', error)
-      throw error
+      console.error('Error adding boat:', error);
+      throw error;
     }
   }
 
   const handleUpdateBoat = async (boatId, updates) => {
     try {
       // Filter out fields that don't belong in boats table or would conflict
-      const {
-        sales_status,
-        last_synced,
+      const { 
+        sales_status, 
+        last_synced, 
         isInventory,
         // UI-only fields that shouldn't be saved
         currentLocation,
         currentSlot,
-        // Remove camelCase versions (we'll map them to snake_case)
+        // Remove camelCase versions
         qrCode,
         nfcTag,
         workOrderNumber,
@@ -307,13 +258,10 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
-        invoicedComplete,
         archivedDate,
         dockmasterId,
         customerId,
         hullId,
-        completedBy,
-        completedAt,
         // Also remove snake_case versions (we'll add them back correctly)
         qr_code,
         nfc_tag,
@@ -322,21 +270,18 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
-        invoiced_complete,
         archived_date,
         dockmaster_id,
         customer_id,
         hull_id,
-        completed_by,
-        completed_at,
-        ...cleanUpdates
+        ...cleanUpdates 
       } = updates
-
+      
       // Build updateData with only fields that exist in updates
       const updateData = {
         ...cleanUpdates,
       };
-
+      
       // Add snake_case versions only if camelCase version exists in original updates
       if ('qrCode' in updates) updateData.qr_code = updates.qrCode;
       if ('nfcTag' in updates) updateData.nfc_tag = updates.nfcTag;
@@ -345,13 +290,10 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
-      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
-      if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
-      if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
       
       await boatsService.update(boatId, updateData)
       await loadBoats()
@@ -411,7 +353,6 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
-        invoicedComplete,
         archivedDate,
         dockmasterId,
         hullId,
@@ -425,7 +366,6 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
-        invoiced_complete,
         archived_date,
         dockmaster_id,
         hull_id,
@@ -434,7 +374,7 @@ function AppContainer() {
         // Don't update location/slot here - use handleMoveBoat for that
         location,
         slot,
-        ...cleanUpdates
+        ...cleanUpdates 
       } = updates
       
       // Build updateData with only fields that exist in updates
@@ -448,8 +388,7 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
-      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
-
+      
       // Only update if there are fields to update
       if (Object.keys(updateData).length > 0) {
         console.log('Inventory boat update - sending to DB:', updateData);
@@ -524,33 +463,22 @@ function AppContainer() {
   // LOCATIONS OPERATIONS
   // ============================================================================
 
-  // Helper to check if current user has location management permissions
-  const canManageLocations = () => {
-    return user?.role === 'admin' || user?.role === 'manager'
-  }
-
   const handleAddLocation = async (locationData) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Location management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
     try {
       // Remove id if present - let database auto-generate UUID
       // Also remove poolBoats (camelCase) and undefined values
       const { id, poolBoats, pool_boats, ...dataToSave } = locationData
-
+      
       const cleanData = {
         ...dataToSave,
         boats: dataToSave.boats || {},
       }
-
+      
       // Only include pool_boats for pool type locations
       if (locationData.type === 'pool') {
         cleanData.pool_boats = pool_boats || []
       }
-
+      
       await locationsService.create(cleanData)
       await loadLocations()
     } catch (error) {
@@ -560,12 +488,6 @@ function AppContainer() {
   }
 
   const handleUpdateLocation = async (locationId, updates) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Location management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
     try {
       await locationsService.update(locationId, updates)
       await loadLocations()
@@ -576,12 +498,6 @@ function AppContainer() {
   }
 
   const handleDeleteLocation = async (locationId) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Location management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
     try {
       await locationsService.delete(locationId)
       await loadLocations()
@@ -626,18 +542,6 @@ function AppContainer() {
   const handleMoveBoat = async (boatId, toLocationId, toSlotId, isInventory = false) => {
     console.log('[AppContainer.handleMoveBoat] Called with:', { boatId, toLocationId, toSlotId, isInventory })
     try {
-      // Get current boat location before move (for logging)
-      const currentBoat = isInventory
-        ? inventoryBoats.find(b => b.id === boatId)
-        : boats.find(b => b.id === boatId)
-      const fromLocation = currentBoat?.location || null
-      const fromSlot = currentBoat?.slot || null
-
-      // Get destination location name
-      const toLocation = toLocationId
-        ? locations.find(l => l.id === toLocationId)?.name || null
-        : null
-
       // If toLocationId is null, this is a removal
       if (!toLocationId) {
         console.log('[AppContainer.handleMoveBoat] Removing boat from location')
@@ -661,98 +565,11 @@ function AppContainer() {
           await loadBoats()
         }
       }
-
-      // Log the movement (don't block on this)
-      try {
-        await boatMovementsService.logMovement({
-          boatId,
-          boatType: isInventory ? 'inventory' : 'customer',
-          fromLocation,
-          fromSlot,
-          toLocation,
-          toSlot: toSlotId || null,
-          movedBy: user?.id || null,
-        })
-        console.log('[AppContainer.handleMoveBoat] Movement logged')
-      } catch (logError) {
-        // Don't fail the move if logging fails
-        console.error('Error logging boat movement:', logError)
-      }
-
       console.log('[AppContainer.handleMoveBoat] Reloading locations')
       await loadLocations()
       console.log('[AppContainer.handleMoveBoat] Complete')
     } catch (error) {
       console.error('Error moving boat:', error)
-      throw error
-    }
-  }
-
-  // ============================================================================
-  // SITES OPERATIONS
-  // ============================================================================
-
-  const handleAddSite = async (siteData) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Site management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
-    try {
-      const newSite = await sitesService.create(siteData)
-      await loadSites()
-      return newSite
-    } catch (error) {
-      console.error('Error adding site:', error)
-      throw error
-    }
-  }
-
-  const handleUpdateSite = async (siteId, updates) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Site management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
-    try {
-      await sitesService.update(siteId, updates)
-      await loadSites()
-    } catch (error) {
-      console.error('Error updating site:', error)
-      throw error
-    }
-  }
-
-  const handleDeleteSite = async (siteId) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Site management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
-    try {
-      await sitesService.delete(siteId)
-      await loadSites()
-    } catch (error) {
-      console.error('Error deleting site:', error)
-      throw error
-    }
-  }
-
-  const handleReorderSites = async (siteIds) => {
-    // Defense in depth: validate role before proceeding
-    if (!canManageLocations()) {
-      console.error('Permission denied: Site management requires manager or admin role')
-      throw new Error('Permission denied')
-    }
-
-    try {
-      await sitesService.reorder(siteIds)
-      await loadSites()
-    } catch (error) {
-      console.error('Error reordering sites:', error)
       throw error
     }
   }
@@ -832,13 +649,6 @@ function AppContainer() {
       onAssignBoatToSlot={handleAssignBoatToSlot}
       onRemoveBoatFromSlot={handleRemoveBoatFromSlot}
       onMoveBoat={handleMoveBoat}
-
-      // Sites
-      sites={sites}
-      onAddSite={handleAddSite}
-      onUpdateSite={handleUpdateSite}
-      onDeleteSite={handleDeleteSite}
-      onReorderSites={handleReorderSites}
       
       // User Preferences
       userPreferences={userPreferences}
