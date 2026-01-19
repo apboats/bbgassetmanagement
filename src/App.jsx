@@ -571,7 +571,7 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
+          <DashboardView boats={boats} locations={locations} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
         )}
         {currentView === 'locations' && (
           <LocationsView
@@ -801,7 +801,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
+function DashboardView({ boats, locations, onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   // Use unified remove boat hook
@@ -1033,7 +1033,6 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
         <InventoryBoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
         />
@@ -1042,7 +1041,6 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
         <BoatDetailsModal
           boat={viewingBoat}
           locations={locations}
-          sites={sites}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
