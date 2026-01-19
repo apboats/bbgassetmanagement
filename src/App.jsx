@@ -660,6 +660,7 @@ export default function BoatsByGeorgeAssetManager({
             onUpdateBoats={saveBoats}
             onMoveBoat={onMoveBoat}
             dockmasterConfig={dockmasterConfig}
+            currentUser={currentUser}
           />
         )}
         {currentView === 'scan' && (
@@ -1087,6 +1088,7 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
     </div>
@@ -1129,7 +1131,7 @@ function StatusCard({ status, count, label }) {
   );
 }
 
-function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat }) {
+function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat, currentUser }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -1833,6 +1835,7 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
     </div>
@@ -5696,6 +5699,7 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
           }}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
     </div>
