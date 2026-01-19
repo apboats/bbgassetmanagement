@@ -3208,14 +3208,21 @@ function LocationsView({
           <div
             key={site.id}
             className="space-y-4"
-            onDragOver={handleSiteDragOver}
-            onDrop={(e) => handleSiteDrop(e, site)}
           >
             {/* Site Header */}
             <div
-              className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 ${draggedSite?.id === site.id ? 'opacity-50' : ''} ${isManagerOrAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              className={`bg-gradient-to-r from-indigo-50 to-indigo-100 border-2 rounded-xl p-4 transition-all ${
+                draggedSite?.id === site.id
+                  ? 'opacity-50 border-indigo-200'
+                  : draggedSite && draggedSite.id !== site.id
+                  ? 'border-indigo-400 border-dashed'
+                  : 'border-indigo-200'
+              } ${isManagerOrAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
               draggable={isManagerOrAdmin}
               onDragStart={(e) => handleSiteDragStart(e, site)}
+              onDragEnd={() => setDraggedSite(null)}
+              onDragOver={handleSiteDragOver}
+              onDrop={(e) => handleSiteDrop(e, site)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
