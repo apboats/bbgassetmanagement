@@ -430,6 +430,26 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             </div>
           </div>
 
+          {/* Notes Section */}
+          <div>
+            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-3">Notes</h4>
+            <textarea
+              value={boat.notes || ''}
+              onChange={(e) => onUpdateBoat({ ...boat, notes: e.target.value })}
+              disabled={isArchived}
+              placeholder={isArchived ? 'No notes' : 'Add notes about this boat...'}
+              rows={4}
+              className={`w-full px-3 py-2 border rounded-lg text-sm resize-y ${
+                isArchived
+                  ? 'bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed'
+                  : 'bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900'
+              }`}
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              {isArchived ? 'Notes are read-only for archived boats' : 'Notes are automatically saved as you type'}
+            </p>
+          </div>
+
           <div>
             <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
             <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
