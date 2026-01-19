@@ -41,6 +41,10 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
   const [movementHistory, setMovementHistory] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
 
+  // Notes state
+  const [notesText, setNotesText] = useState(boat.notes || '');
+  const [savingNotes, setSavingNotes] = useState(false);
+
   // Load movement history when modal opens
   useEffect(() => {
     if (boat?.id) {
@@ -110,6 +114,26 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
     'S': 'Sold',
     'R': 'Reserved',
     'FP': 'Floor Planned'
+  };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      const updatedBoat = {
+        ...boat,
+        notes: notesText.trim(),
+        notes_updated_by: 'User', // Inventory boats don't have currentUser prop, could add if needed
+        notes_updated_at: new Date().toISOString()
+      };
+      if (onUpdateBoat) {
+        await onUpdateBoat(updatedBoat);
+      }
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      alert('Failed to save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   const handleMove = async (targetLocation, targetSlot) => {
@@ -190,19 +214,33 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
 
           {/* Notes Section */}
           <div className="p-4 bg-slate-50 rounded-xl">
-            <h4 className="text-sm font-medium text-slate-700 mb-2">Notes</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-slate-700">Notes</h4>
+              {boat.notes_updated_by && boat.notes_updated_at && (
+                <p className="text-xs text-slate-500">
+                  Updated by {boat.notes_updated_by} on {new Date(boat.notes_updated_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
             <textarea
-              value={boat.notes || ''}
-              onChange={(e) => {
-                if (onUpdateBoat) {
-                  onUpdateBoat({ ...boat, notes: e.target.value });
-                }
-              }}
+              value={notesText}
+              onChange={(e) => setNotesText(e.target.value)}
               placeholder="Add notes about this inventory boat..."
               rows={3}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-y bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900"
             />
-            <p className="text-xs text-slate-400 mt-1">Notes are automatically saved as you type</p>
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={handleSaveNotes}
+                disabled={savingNotes || notesText.trim() === (boat.notes || '')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+              >
+                {savingNotes ? 'Saving...' : 'Save Note'}
+              </button>
+              <p className="text-xs text-slate-400">
+                Click "Save Note" to record your changes
+              </p>
+            </div>
           </div>
 
           {/* Location Assignment */}

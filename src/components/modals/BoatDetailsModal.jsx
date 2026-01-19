@@ -55,6 +55,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [isProcessing, setIsProcessing] = useState(false);
   const [movementHistory, setMovementHistory] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
+  const [notesText, setNotesText] = useState(boat.notes || '');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   // Load movement history when modal opens
   useEffect(() => {
@@ -255,6 +257,26 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
     }
   };
 
+  const handleSaveNotes = async () => {
+    if (isArchived) return; // Can't save notes for archived boats
+
+    setSavingNotes(true);
+    try {
+      const updatedBoat = {
+        ...boat,
+        notes: notesText.trim(),
+        notes_updated_by: currentUser?.name || currentUser?.username || 'Unknown',
+        notes_updated_at: new Date().toISOString()
+      };
+      await onUpdateBoat(updatedBoat);
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      alert('Failed to save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
   const handleReleaseBoat = async () => {
     if (confirm(`Release ${boat.name} back to owner? This will remove it from its current location and archive it. This action cannot be undone.`)) {
       try {
@@ -432,10 +454,17 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
 
           {/* Notes Section */}
           <div>
-            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-3">Notes</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-base md:text-lg font-bold text-slate-900">Notes</h4>
+              {boat.notes_updated_by && boat.notes_updated_at && (
+                <p className="text-xs text-slate-500">
+                  Last updated by {boat.notes_updated_by} on {new Date(boat.notes_updated_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
             <textarea
-              value={boat.notes || ''}
-              onChange={(e) => onUpdateBoat({ ...boat, notes: e.target.value })}
+              value={notesText}
+              onChange={(e) => setNotesText(e.target.value)}
               disabled={isArchived}
               placeholder={isArchived ? 'No notes' : 'Add notes about this boat...'}
               rows={4}
@@ -445,9 +474,23 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                   : 'bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900'
               }`}
             />
-            <p className="text-xs text-slate-500 mt-1">
-              {isArchived ? 'Notes are read-only for archived boats' : 'Notes are automatically saved as you type'}
-            </p>
+            {!isArchived && (
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={handleSaveNotes}
+                  disabled={savingNotes || notesText.trim() === (boat.notes || '')}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+                >
+                  {savingNotes ? 'Saving...' : 'Save Note'}
+                </button>
+                <p className="text-xs text-slate-500">
+                  Click "Save Note" to record your changes
+                </p>
+              </div>
+            )}
+            {isArchived && (
+              <p className="text-xs text-slate-500 mt-2">Notes are read-only for archived boats</p>
+            )}
           </div>
 
           <div>
