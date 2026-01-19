@@ -587,13 +587,10 @@ export const boatLifecycleService = {
     const cleanData = {
       name: boatData.name || 'Unknown Boat',
       model: boatData.model || '',
-      make: boatData.make || '',
       hull_id: boatData.hullId || boatData.hull_id || null,
       dockmaster_id: boatData.dockmasterId || boatData.dockmaster_id || null,
       owner: boatData.owner || '',
       customer_id: boatData.customerId || boatData.customer_id || null,
-      year: boatData.year || null,
-      length: boatData.length || null,
       work_order_number: boatData.workOrderNumber || boatData.work_order_number || null,
     };
 
