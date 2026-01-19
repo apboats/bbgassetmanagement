@@ -3846,7 +3846,7 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
                   <input
                     type="number"
                     min="1"
-                    max="20"
+                    max="50"
                     value={formData.rows}
                     onChange={(e) => setFormData({ ...formData, rows: parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -3863,7 +3863,7 @@ function EditLocationModal({ location, sites = [], onSave, onCancel }) {
                   <input
                     type="number"
                     min="1"
-                    max="20"
+                    max="50"
                     value={formData.columns}
                     onChange={(e) => setFormData({ ...formData, columns: parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
