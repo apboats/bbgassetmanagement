@@ -35,7 +35,14 @@ export function PoolLocation({
     const query = searchQuery.toLowerCase();
     return boat.name?.toLowerCase().includes(query) ||
            boat.model?.toLowerCase().includes(query) ||
-           boat.owner?.toLowerCase().includes(query);
+           boat.make?.toLowerCase().includes(query) ||
+           boat.owner?.toLowerCase().includes(query) ||
+           boat.hullId?.toLowerCase().includes(query) ||
+           boat.dockmasterId?.toLowerCase().includes(query) ||
+           boat.workOrderNumber?.toLowerCase().includes(query) ||
+           boat.year?.toString().toLowerCase().includes(query) ||
+           boat.status?.toLowerCase().includes(query) ||
+           boat.salesStatus?.toLowerCase().includes(query);
   });
 
   const handleDragOver = (e) => {
