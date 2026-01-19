@@ -29,7 +29,7 @@ function AppContainer() {
   const [locations, setLocations] = useState([])
   const [sites, setSites] = useState([])
   const [userPreferences, setUserPreferences] = useState({})
-  const [users, setUsers] = useState([]]
+  const [users, setUsers] = useState([])
   const [dockmasterConfig, setDockmasterConfig] = useState(null)
   const [lastInventorySync, setLastInventorySync] = useState(null)
   const [loading, setLoading] = useState(true)
