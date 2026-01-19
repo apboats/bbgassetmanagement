@@ -204,23 +204,34 @@ export function MaximizedLocationModal({
 
         {/* Grid Content */}
         <div className="flex-1 overflow-auto p-6 bg-slate-50">
-          <div className="flex items-center justify-center min-h-full">
-            <div
-              className="grid gap-3"
-              style={{
-                // For narrow grids (1-2 columns), cap cell width at 180px to prevent huge squares
-                // For wider grids, allow cells to grow with 1fr but maintain minimum 140px
-                gridTemplateColumns: location.columns <= 2
-                  ? `repeat(${location.columns}, minmax(140px, 180px))`
-                  : `repeat(${location.columns}, minmax(140px, 1fr))`,
-                // For short grids (1-2 rows), cap cell height to prevent vertical stretching
-                // We don't want aspect-square to make cells huge when there's lots of vertical space
-                maxWidth: location.columns <= 2 ? `${location.columns * 190}px` : undefined
-              }}
-            >
-              {renderGrid()}
+          {/*
+            For narrow grids (1-2 columns): center the content since it won't need horizontal scroll
+            For wider grids: use inline-block to allow horizontal scrolling from the left edge
+          */}
+          {location.columns <= 2 ? (
+            <div className="flex items-center justify-center min-h-full">
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 180px))`,
+                  maxWidth: `${location.columns * 190}px`
+                }}
+              >
+                {renderGrid()}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="inline-block min-w-full">
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 1fr))`
+                }}
+              >
+                {renderGrid()}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
