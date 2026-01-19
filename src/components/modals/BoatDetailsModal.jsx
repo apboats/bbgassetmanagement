@@ -753,6 +753,38 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             <div className="flex-1 border-t border-indigo-200" />
                           </div>
 
+                          {/* Workshop locations in this site */}
+                          {siteLocations.filter(l => l.type === 'shop').map(loc => {
+                            const totalSlots = loc.layout === 'u-shaped'
+                              ? (loc.rows * 2) + loc.columns
+                              : loc.rows * loc.columns;
+                            const occupiedSlots = Object.keys(loc.boats || {}).length;
+                            const availableSlots = totalSlots - occupiedSlots;
+
+                            return (
+                              <button
+                                key={loc.id}
+                                onClick={() => setSelectedMoveLocation(loc)}
+                                disabled={availableSlots === 0 && boat.location !== loc.name}
+                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                  boat.location === loc.name
+                                    ? 'border-orange-500 bg-orange-50'
+                                    : availableSlots === 0
+                                    ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                                    : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                                  <p className="font-semibold text-slate-900">{loc.name}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  workshop • {availableSlots} slots available
+                                </p>
+                              </button>
+                            );
+                          })}
+
                           {/* Pool locations in this site */}
                           {siteLocations.filter(l => l.type === 'pool').map(loc => (
                             <button
@@ -779,8 +811,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             </button>
                           ))}
 
-                          {/* Grid locations in this site */}
-                          {siteLocations.filter(l => l.type !== 'pool').map(loc => {
+                          {/* Rack and parking locations in this site */}
+                          {siteLocations.filter(l => l.type === 'rack-building' || l.type === 'parking-lot').map(loc => {
                             const totalSlots = loc.layout === 'u-shaped'
                               ? (loc.rows * 2) + loc.columns
                               : loc.rows * loc.columns;
@@ -819,6 +851,38 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                   ) : (
                     // No sites - show flat list (legacy behavior)
                     <>
+                      {/* Workshop locations */}
+                      {locations.filter(l => l.type === 'shop').map(loc => {
+                        const totalSlots = loc.layout === 'u-shaped'
+                          ? (loc.rows * 2) + loc.columns
+                          : loc.rows * loc.columns;
+                        const occupiedSlots = Object.keys(loc.boats || {}).length;
+                        const availableSlots = totalSlots - occupiedSlots;
+
+                        return (
+                          <button
+                            key={loc.id}
+                            onClick={() => setSelectedMoveLocation(loc)}
+                            disabled={availableSlots === 0 && boat.location !== loc.name}
+                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                              boat.location === loc.name
+                                ? 'border-orange-500 bg-orange-50'
+                                : availableSlots === 0
+                                ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                                : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-orange-500" />
+                              <p className="font-semibold text-slate-900">{loc.name}</p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              workshop • {availableSlots} slots available
+                            </p>
+                          </button>
+                        );
+                      })}
+
                       {/* Pool locations */}
                       {locations.filter(l => l.type === 'pool').map(loc => (
                         <button
@@ -845,8 +909,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                         </button>
                       ))}
 
-                      {/* Grid locations */}
-                      {locations.filter(l => l.type !== 'pool').map(loc => {
+                      {/* Rack and parking locations */}
+                      {locations.filter(l => l.type === 'rack-building' || l.type === 'parking-lot').map(loc => {
                         const totalSlots = loc.layout === 'u-shaped'
                           ? (loc.rows * 2) + loc.columns
                           : loc.rows * loc.columns;
@@ -868,8 +932,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                           >
                             <div className="flex items-center gap-2">
                               <div className={`w-3 h-3 rounded-full ${
-                                loc.type === 'rack-building' ? 'bg-blue-500' :
-                                loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                                loc.type === 'rack-building' ? 'bg-blue-500' : 'bg-purple-500'
                               }`} />
                               <p className="font-semibold text-slate-900">{loc.name}</p>
                             </div>

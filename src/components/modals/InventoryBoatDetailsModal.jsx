@@ -303,8 +303,9 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                       const siteLocations = locations.filter(l => l.site_id === site.id);
                       if (siteLocations.length === 0) return null;
 
+                      const workshopLocations = siteLocations.filter(l => l.type === 'shop');
                       const poolLocations = siteLocations.filter(l => l.type === 'pool');
-                      const gridLocations = siteLocations.filter(l => l.type !== 'pool');
+                      const rackAndParkingLocations = siteLocations.filter(l => l.type === 'rack-building' || l.type === 'parking-lot');
 
                       return (
                         <div key={site.id} className="mb-4">
@@ -315,6 +316,23 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                           </div>
 
                           <div className="space-y-2 pl-2">
+                            {/* Workshop locations in this site */}
+                            {workshopLocations.map(loc => (
+                              <button
+                                key={loc.id}
+                                onClick={() => setSelectedMoveLocation(loc)}
+                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                                  <p className="font-semibold text-slate-900">{loc.name}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  Workshop • {Object.keys(loc.boats || {}).length} boats
+                                </p>
+                              </button>
+                            ))}
+
                             {/* Pool locations in this site */}
                             {poolLocations.map(loc => (
                               <button
@@ -330,19 +348,19 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                               </button>
                             ))}
 
-                            {/* Grid locations in this site */}
-                            {gridLocations.map(loc => (
+                            {/* Rack and parking locations in this site */}
+                            {rackAndParkingLocations.map(loc => (
                               <button
                                 key={loc.id}
                                 onClick={() => setSelectedMoveLocation(loc)}
-                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                                className={`w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors`}
                               >
                                 <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                  <div className={`w-3 h-3 rounded-full ${loc.type === 'rack-building' ? 'bg-blue-500' : 'bg-purple-500'}`} />
                                   <p className="font-semibold text-slate-900">{loc.name}</p>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-1">
-                                  {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                                  {loc.type.replace('-', ' ')} • {Object.keys(loc.boats || {}).length} boats
                                 </p>
                               </button>
                             ))}
@@ -353,6 +371,23 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                   ) : (
                     // Legacy flat list when no sites exist
                     <>
+                      {/* Workshop locations */}
+                      {locations.filter(l => l.type === 'shop').map(loc => (
+                        <button
+                          key={loc.id}
+                          onClick={() => setSelectedMoveLocation(loc)}
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-orange-500" />
+                            <p className="font-semibold text-slate-900">{loc.name}</p>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Workshop • {Object.keys(loc.boats || {}).length} boats
+                          </p>
+                        </button>
+                      ))}
+
                       {/* Pool locations */}
                       {locations.filter(l => l.type === 'pool').map(loc => (
                         <button
@@ -368,19 +403,19 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                         </button>
                       ))}
 
-                      {/* Grid locations */}
-                      {locations.filter(l => l.type !== 'pool').map(loc => (
+                      {/* Rack and parking locations */}
+                      {locations.filter(l => l.type === 'rack-building' || l.type === 'parking-lot').map(loc => (
                         <button
                           key={loc.id}
                           onClick={() => setSelectedMoveLocation(loc)}
                           className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
                         >
                           <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-blue-500" />
+                            <div className={`w-3 h-3 rounded-full ${loc.type === 'rack-building' ? 'bg-blue-500' : 'bg-purple-500'}`} />
                             <p className="font-semibold text-slate-900">{loc.name}</p>
                           </div>
                           <p className="text-xs text-slate-500 mt-1">
-                            {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                            {loc.type.replace('-', ' ')} • {Object.keys(loc.boats || {}).length} boats
                           </p>
                         </button>
                       ))}
