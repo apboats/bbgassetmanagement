@@ -500,6 +500,262 @@ export const boatsService = {
 }
 
 // ============================================================================
+// BOAT LIFECYCLE SERVICE
+// ============================================================================
+// Centralized service for boat status transitions, import, and archive operations
+// Use this instead of directly calling create/update to prevent duplicates
+// ============================================================================
+
+export const boatLifecycleService = {
+  // Valid boat statuses
+  STATUSES: {
+    NEEDS_APPROVAL: 'needs-approval',
+    NEEDS_PARTS: 'needs-parts',
+    PARTS_KIT_PULLED: 'parts-kit-pulled',
+    ON_DECK: 'on-deck',
+    ALL_WORK_COMPLETE: 'all-work-complete',
+    ARCHIVED: 'archived',
+    ACTIVE: 'active', // For inventory boats
+  },
+
+  /**
+   * Find existing boat by matching criteria (dockmasterId or hullId)
+   * Checks ALL statuses (not just archived) and BOTH tables (boats + inventory_boats)
+   *
+   * @param {Object} criteria - { dockmasterId, hullId }
+   * @returns {Object|null} - { boat, source: 'boats'|'inventory_boats' } or null
+   */
+  async findExistingBoat(criteria) {
+    const { dockmasterId, hullId } = criteria;
+
+    // Priority 1: Check by Dockmaster ID in boats table (most reliable)
+    if (dockmasterId) {
+      const { data: boatsByDockmaster, error: e1 } = await supabase
+        .from('boats')
+        .select('*')
+        .eq('dockmaster_id', dockmasterId);
+
+      if (!e1 && boatsByDockmaster && boatsByDockmaster.length > 0) {
+        return { boat: boatsByDockmaster[0], source: 'boats' };
+      }
+    }
+
+    // Priority 2: Check by Hull ID in boats table (permanent identifier)
+    if (hullId) {
+      const { data: boatsByHull, error: e2 } = await supabase
+        .from('boats')
+        .select('*')
+        .eq('hull_id', hullId);
+
+      if (!e2 && boatsByHull && boatsByHull.length > 0) {
+        return { boat: boatsByHull[0], source: 'boats' };
+      }
+    }
+
+    // Priority 3: Check inventory_boats table by Dockmaster ID
+    if (dockmasterId) {
+      const { data: inventoryBoats, error: e3 } = await supabase
+        .from('inventory_boats')
+        .select('*')
+        .eq('dockmaster_id', dockmasterId);
+
+      if (!e3 && inventoryBoats && inventoryBoats.length > 0) {
+        return { boat: inventoryBoats[0], source: 'inventory_boats' };
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Import or update a boat from Dockmaster
+   * - If boat exists (any status, any table): updates it and unarchives if needed
+   * - If boat doesn't exist: creates new with status 'needs-approval'
+   * - Prevents duplicates by comprehensive matching
+   *
+   * @param {Object} boatData - Boat data to import
+   * @param {Object} options - { preserveLocation: boolean, targetStatus: string }
+   * @returns {Object} - Created or updated boat
+   */
+  async importOrUpdateBoat(boatData, options = {}) {
+    const {
+      preserveLocation = false,
+      targetStatus = this.STATUSES.NEEDS_APPROVAL
+    } = options;
+
+    // Clean and prepare boat data
+    const cleanData = {
+      name: boatData.name || 'Unknown Boat',
+      model: boatData.model || '',
+      make: boatData.make || '',
+      hull_id: boatData.hullId || boatData.hull_id || null,
+      dockmaster_id: boatData.dockmasterId || boatData.dockmaster_id || null,
+      owner: boatData.owner || '',
+      customer_id: boatData.customerId || boatData.customer_id || null,
+      year: boatData.year || null,
+      length: boatData.length || null,
+      work_order_number: boatData.workOrderNumber || boatData.work_order_number || null,
+    };
+
+    // Search for existing boat
+    const existing = await this.findExistingBoat({
+      dockmasterId: cleanData.dockmaster_id,
+      hullId: cleanData.hull_id
+    });
+
+    if (existing) {
+      // FOUND: Update existing boat
+      const { boat: existingBoat, source } = existing;
+
+      // If found in inventory_boats, we need to move it to boats table
+      if (source === 'inventory_boats') {
+        // Create in boats table (this is a "promotion" from inventory)
+        const newBoatData = {
+          ...cleanData,
+          qr_code: `QR-${Date.now()}`,
+          nfc_tag: null,
+          status: targetStatus,
+          location: null,
+          slot: null,
+          archived_date: null,
+        };
+
+        const { data: newBoat, error } = await supabase
+          .from('boats')
+          .insert([newBoatData])
+          .select();
+
+        if (error) throw error;
+
+        // Optionally delete from inventory_boats to prevent confusion
+        // (Commented out to preserve inventory history)
+        // await supabase.from('inventory_boats').delete().eq('id', existingBoat.id);
+
+        return newBoat[0];
+      }
+
+      // Found in boats table - update it
+      const wasArchived = existingBoat.status === this.STATUSES.ARCHIVED;
+
+      const updates = {
+        ...cleanData,
+        // If boat was archived, unarchive it
+        status: wasArchived ? targetStatus : existingBoat.status,
+        archived_date: wasArchived ? null : existingBoat.archived_date,
+        // Preserve or clear location based on options
+        location: preserveLocation ? existingBoat.location : null,
+        slot: preserveLocation ? existingBoat.slot : null,
+      };
+
+      return await boatsService.update(existingBoat.id, updates);
+    } else {
+      // NOT FOUND: Create new boat
+      const newBoatData = {
+        ...cleanData,
+        qr_code: boatData.qrCode || `QR-${Date.now()}`,
+        nfc_tag: boatData.nfcTag || null,
+        status: targetStatus,
+        location: null,
+        slot: null,
+        archived_date: null,
+      };
+
+      return await boatsService.create(newBoatData);
+    }
+  },
+
+  /**
+   * Unarchive a boat (typically when placing it back on the board)
+   * Sets status to 'needs-approval' and clears archivedDate
+   *
+   * @param {string} boatId - Boat ID to unarchive
+   * @param {Object} options - { targetStatus: string, location: string, slot: string }
+   * @returns {Object} - Updated boat
+   */
+  async unarchiveBoat(boatId, options = {}) {
+    const {
+      targetStatus = this.STATUSES.NEEDS_APPROVAL,
+      location = null,
+      slot = null
+    } = options;
+
+    const boat = await boatsService.getById(boatId);
+
+    if (!boat) {
+      throw new Error(`Boat ${boatId} not found`);
+    }
+
+    if (boat.status !== this.STATUSES.ARCHIVED) {
+      // Not archived - just update location if provided
+      if (location !== null) {
+        return await boatsService.update(boatId, { location, slot });
+      }
+      return boat;
+    }
+
+    // Unarchive the boat
+    const updates = {
+      status: targetStatus,
+      archived_date: null,
+      location,
+      slot,
+    };
+
+    return await boatsService.update(boatId, updates);
+  },
+
+  /**
+   * Archive/release a boat
+   * - Sets status to 'archived'
+   * - Sets archivedDate to now
+   * - Clears location and slot
+   * - NOTE: Caller must handle removing from location.boats object
+   *
+   * @param {string} boatId - Boat ID to archive
+   * @returns {Object} - Updated boat
+   */
+  async archiveBoat(boatId) {
+    const updates = {
+      status: this.STATUSES.ARCHIVED,
+      archived_date: new Date().toISOString(),
+      location: null,
+      slot: null,
+    };
+
+    return await boatsService.update(boatId, updates);
+  },
+
+  /**
+   * Update boat status with validation
+   * Prevents invalid status transitions (e.g., archived boats can't change work phases)
+   *
+   * @param {string} boatId - Boat ID
+   * @param {string} newStatus - Target status
+   * @returns {Object} - Updated boat
+   */
+  async updateBoatStatus(boatId, newStatus) {
+    const boat = await boatsService.getById(boatId);
+
+    if (!boat) {
+      throw new Error(`Boat ${boatId} not found`);
+    }
+
+    // Don't allow status changes on archived boats (must unarchive first)
+    if (boat.status === this.STATUSES.ARCHIVED && newStatus !== this.STATUSES.ARCHIVED) {
+      throw new Error('Cannot change status of archived boat. Unarchive it first.');
+    }
+
+    // Validate status is valid
+    const validStatuses = Object.values(this.STATUSES);
+    if (!validStatuses.includes(newStatus)) {
+      throw new Error(`Invalid status: ${newStatus}`);
+    }
+
+    return await boatsService.update(boatId, { status: newStatus });
+  },
+};
+
+// ============================================================================
 // INVENTORY BOATS OPERATIONS (Dockmaster API Boats)
 // ============================================================================
 
@@ -1638,6 +1894,7 @@ export const boatMovementsService = {
 export default {
   auth: authService,
   boats: boatsService,
+  boatLifecycle: boatLifecycleService,
   inventoryBoats: inventoryBoatsService,
   locations: locationsService,
   sites: sitesService,
