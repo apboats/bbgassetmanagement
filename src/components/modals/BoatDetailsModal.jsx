@@ -424,12 +424,16 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                       const date = new Date(move.movedAt);
                       const timeAgo = getTimeAgo(date);
 
+                      const movedByName = move.movedByUser?.name || null;
+
                       return (
                         <div key={move.id || idx} className="text-xs text-blue-800 flex items-start gap-1">
                           <span className="text-blue-400 flex-shrink-0">{idx === 0 ? '→' : '·'}</span>
                           <span className="truncate">
                             {from} → {to}
-                            <span className="text-blue-500 ml-1">({timeAgo})</span>
+                            <span className="text-blue-500 ml-1">
+                              ({timeAgo}{movedByName ? ` by ${movedByName}` : ''})
+                            </span>
                           </span>
                         </div>
                       );
@@ -440,36 +444,6 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                 )}
               </div>
 
-              {/* NFC Tag Management */}
-              <div className="p-3 bg-purple-50 border-2 border-purple-200 rounded-lg col-span-1 sm:col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-xs text-purple-700 font-medium">NFC Tag</p>
-                  </div>
-                  {boat.nfcTag && !isArchived && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Release this NFC tag? It can be reassigned to another boat.')) {
-                          onUpdateBoat({ ...boat, nfcTag: null });
-                        }
-                      }}
-                      className="text-xs text-purple-600 hover:text-purple-800 font-medium underline"
-                    >
-                      Release Tag
-                    </button>
-                  )}
-                </div>
-                {boat.nfcTag ? (
-                  <p className="text-sm font-bold text-purple-900 font-mono">{boat.nfcTag}</p>
-                ) : (
-                  <p className="text-xs text-purple-600">
-                    No NFC tag assigned • Tag will auto-assign on first scan
-                  </p>
-                )}
-              </div>
             </div>
           </div>
 

@@ -244,12 +244,16 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                   const date = new Date(move.movedAt);
                   const timeAgo = getTimeAgo(date);
 
+                  const movedByName = move.movedByUser?.name || null;
+
                   return (
                     <div key={move.id || idx} className="text-xs text-blue-800 flex items-start gap-1">
                       <span className="text-blue-400 flex-shrink-0">{idx === 0 ? '→' : '·'}</span>
                       <span className="truncate">
                         {from} → {to}
-                        <span className="text-blue-500 ml-1">({timeAgo})</span>
+                        <span className="text-blue-500 ml-1">
+                          ({timeAgo}{movedByName ? ` by ${movedByName}` : ''})
+                        </span>
                       </span>
                     </div>
                   );
