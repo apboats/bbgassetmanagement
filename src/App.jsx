@@ -626,6 +626,7 @@ export default function BoatsByGeorgeAssetManager({
             onAddSite={onAddSite}
             onUpdateSite={onUpdateSite}
             onDeleteSite={onDeleteSite}
+            onReorderSites={onReorderSites}
             currentUser={currentUser}
           />
         )}
@@ -2462,7 +2463,7 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
   );
 }
 
-function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, currentUser }) {
+function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites, currentUser }) {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
