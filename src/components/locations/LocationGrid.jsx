@@ -5,8 +5,8 @@
 // Used in LocationsView and MyViewEditor
 // ============================================================================
 
-import React from 'react';
-import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign, LayoutGrid, List } from 'lucide-react';
 
 // ============================================================================
 // MAXIMIZED LOCATION MODAL
@@ -26,6 +26,9 @@ export function MaximizedLocationModal({
   onDrop,
   onClose
 }) {
+  // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
+  const [viewMode, setViewMode] = useState('layout');
+
   // Combine boats and inventory boats
   const allBoats = [...(boats || []), ...(inventoryBoats || [])];
 
@@ -163,7 +166,7 @@ export function MaximizedLocationModal({
     );
   };
 
-  // Render the grid
+  // Render the grid (Layout View)
   const renderGrid = () => {
     const slots = [];
     for (let row = 0; row < location.rows; row++) {
@@ -182,6 +185,46 @@ export function MaximizedLocationModal({
     return slots;
   };
 
+  // Render Concise View for U-shaped layouts (three horizontal strips)
+  const renderConciseView = () => {
+    // Collect slots for each section
+    const leftArmSlots = [];
+    const bottomSlots = [];
+    const rightArmSlots = [];
+
+    // Left arm: column 0, rows 0 to rows-2 (not including bottom row)
+    for (let row = 0; row < location.rows - 1; row++) {
+      leftArmSlots.push({ row, col: 0 });
+    }
+
+    // Bottom row: all columns in the last row
+    for (let col = 0; col < location.columns; col++) {
+      bottomSlots.push({ row: location.rows - 1, col });
+    }
+
+    // Right arm: last column, rows 0 to rows-2 (not including bottom row)
+    for (let row = 0; row < location.rows - 1; row++) {
+      rightArmSlots.push({ row, col: location.columns - 1 });
+    }
+
+    const renderSection = (title, slots) => (
+      <div className="mb-6">
+        <h4 className="text-sm font-semibold text-slate-600 mb-2 px-1">{title}</h4>
+        <div className="flex flex-wrap gap-5">
+          {slots.map(({ row, col }) => renderSlot(row, col, true))}
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="p-2">
+        {renderSection(`Left Arm (${leftArmSlots.length} slots)`, leftArmSlots)}
+        {renderSection(`Bottom (${bottomSlots.length} slots)`, bottomSlots)}
+        {renderSection(`Right Arm (${rightArmSlots.length} slots)`, rightArmSlots)}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col">
@@ -194,44 +237,80 @@ export function MaximizedLocationModal({
               {isUShape && ' (U-shaped)'} • {occupiedSlots}/{totalSlots} slots ({occupancyRate}%)
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 bg-white hover:bg-slate-100 rounded-lg transition-colors shadow"
-          >
-            <X className="w-6 h-6 text-slate-600" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* View mode toggle - only for U-shaped layouts */}
+            {isUShape && (
+              <div className="flex bg-white rounded-lg shadow p-1 gap-1">
+                <button
+                  onClick={() => setViewMode('layout')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'layout'
+                      ? 'bg-blue-500 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Layout
+                </button>
+                <button
+                  onClick={() => setViewMode('concise')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'concise'
+                      ? 'bg-blue-500 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                  Concise
+                </button>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 bg-white hover:bg-slate-100 rounded-lg transition-colors shadow"
+            >
+              <X className="w-6 h-6 text-slate-600" />
+            </button>
+          </div>
         </div>
 
         {/* Grid Content - extra padding and gap for mobile touch scrolling */}
         <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50">
-          {/*
-            For narrow grids (1-2 columns): center the content since it won't need horizontal scroll
-            For wider grids: use inline-block to allow horizontal scrolling from the left edge
-            Gap increased to gap-5 (20px) for easier touch scrolling on mobile
-          */}
-          {location.columns <= 2 ? (
-            <div className="flex items-center justify-center min-h-full p-2">
-              <div
-                className="grid gap-5"
-                style={{
-                  gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 180px))`,
-                  maxWidth: `${location.columns * 200}px`
-                }}
-              >
-                {renderGrid()}
-              </div>
-            </div>
+          {/* Concise view for U-shaped layouts */}
+          {isUShape && viewMode === 'concise' ? (
+            renderConciseView()
           ) : (
-            <div className="inline-block min-w-full p-2">
-              <div
-                className="grid gap-5"
-                style={{
-                  gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 1fr))`
-                }}
-              >
-                {renderGrid()}
-              </div>
-            </div>
+            <>
+              {/*
+                For narrow grids (1-2 columns): center the content since it won't need horizontal scroll
+                For wider grids: use inline-block to allow horizontal scrolling from the left edge
+                Gap increased to gap-5 (20px) for easier touch scrolling on mobile
+              */}
+              {location.columns <= 2 ? (
+                <div className="flex items-center justify-center min-h-full p-2">
+                  <div
+                    className="grid gap-5"
+                    style={{
+                      gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 180px))`,
+                      maxWidth: `${location.columns * 200}px`
+                    }}
+                  >
+                    {renderGrid()}
+                  </div>
+                </div>
+              ) : (
+                <div className="inline-block min-w-full p-2">
+                  <div
+                    className="grid gap-5"
+                    style={{
+                      gridTemplateColumns: `repeat(${location.columns}, minmax(140px, 1fr))`
+                    }}
+                  >
+                    {renderGrid()}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
