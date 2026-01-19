@@ -1003,6 +1003,124 @@ export const locationsService = {
 }
 
 // ============================================================================
+// SITES OPERATIONS (grouping locations by physical place)
+// ============================================================================
+
+export const sitesService = {
+  // Get all sites ordered by sort_order
+  async getAll() {
+    const { data, error } = await supabase
+      .from('sites')
+      .select('*')
+      .order('sort_order', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Get single site
+  async getById(id) {
+    const { data, error } = await supabase
+      .from('sites')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  // Create site
+  async create(siteData) {
+    // Get max sort_order to put new site at the end
+    const { data: existing } = await supabase
+      .from('sites')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+
+    const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0
+
+    const { data, error } = await supabase
+      .from('sites')
+      .insert([{ ...siteData, sort_order: nextOrder }])
+      .select()
+
+    if (error) throw error
+    return data && data.length > 0 ? data[0] : null
+  },
+
+  // Update site
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('sites')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+    return data && data.length > 0 ? data[0] : null
+  },
+
+  // Delete site (only if no locations are assigned)
+  async delete(id) {
+    // Check if any locations use this site
+    const { data: locations } = await supabase
+      .from('locations')
+      .select('id')
+      .eq('site_id', id)
+      .limit(1)
+
+    if (locations && locations.length > 0) {
+      throw new Error('Cannot delete site with assigned locations. Please move or delete locations first.')
+    }
+
+    const { error } = await supabase
+      .from('sites')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
+  // Reorder sites (update sort_order for all)
+  async reorder(siteIds) {
+    const promises = siteIds.map((id, index) =>
+      supabase
+        .from('sites')
+        .update({ sort_order: index, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    )
+
+    const results = await Promise.all(promises)
+    const errors = results.filter(r => r.error)
+    if (errors.length > 0) throw errors[0].error
+    return true
+  },
+
+  // Ensure a default site exists (called on app load)
+  async ensureDefaultSite() {
+    const sites = await this.getAll()
+    if (sites.length === 0) {
+      return this.create({ name: 'Main Site' })
+    }
+    return sites[0]
+  },
+
+  // Get locations for a site
+  async getLocationsForSite(siteId) {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('site_id', siteId)
+      .order('name', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+}
+
+// ============================================================================
 // USER PREFERENCES OPERATIONS
 // ============================================================================
 
@@ -1463,6 +1581,7 @@ export default {
   boats: boatsService,
   inventoryBoats: inventoryBoatsService,
   locations: locationsService,
+  sites: sitesService,
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
