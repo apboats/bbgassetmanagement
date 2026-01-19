@@ -1573,6 +1573,65 @@ export const boatShowsService = {
 }
 
 // ============================================================================
+// BOAT MOVEMENTS OPERATIONS (location history tracking)
+// ============================================================================
+
+export const boatMovementsService = {
+  // Log a boat movement
+  async logMovement({ boatId, boatType, fromLocation, fromSlot, toLocation, toSlot, movedBy, notes }) {
+    const { data, error } = await supabase
+      .from('boat_movements')
+      .insert([{
+        boat_id: boatId,
+        boat_type: boatType || 'customer',
+        from_location: fromLocation,
+        from_slot: fromSlot,
+        to_location: toLocation,
+        to_slot: toSlot,
+        moved_by: movedBy,
+        notes: notes || null,
+      }])
+      .select()
+
+    if (error) throw error
+    return data && data.length > 0 ? data[0] : null
+  },
+
+  // Get movement history for a boat (most recent first)
+  async getForBoat(boatId, limit = 10) {
+    const { data, error } = await supabase
+      .from('boat_movements')
+      .select(`
+        *,
+        moved_by_user:users!boat_movements_moved_by_fkey(id, name, email)
+      `)
+      .eq('boat_id', boatId)
+      .order('moved_at', { ascending: false })
+      .limit(limit)
+
+    if (error) throw error
+    return (data || []).map(m => ({
+      id: m.id,
+      boatId: m.boat_id,
+      boatType: m.boat_type,
+      fromLocation: m.from_location,
+      fromSlot: m.from_slot,
+      toLocation: m.to_location,
+      toSlot: m.to_slot,
+      movedBy: m.moved_by,
+      movedByUser: m.moved_by_user,
+      movedAt: m.moved_at,
+      notes: m.notes,
+    }))
+  },
+
+  // Get last N movements for a boat (for quick "previous locations")
+  async getLastMovements(boatId, count = 2) {
+    return this.getForBoat(boatId, count)
+  },
+}
+
+// ============================================================================
 // EXPORT ALL SERVICES
 // ============================================================================
 
@@ -1586,6 +1645,7 @@ export default {
   dockmaster: dockmasterService,
   users: usersService,
   boatShows: boatShowsService,
+  boatMovements: boatMovementsService,
   subscriptions,
   getAllBoatsCombined,
   toCamelCase,
