@@ -105,7 +105,29 @@ export default function BoatsByGeorgeAssetManager({
 }) {
   // UI State (keep these)
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Bypass auth for development
-  const [currentView, setCurrentView] = useState('dashboard');
+
+  // Hash-based routing for URL persistence
+  const validViews = ['dashboard', 'myview', 'locations', 'boats', 'inventory', 'shows', 'scan', 'settings'];
+  const getViewFromHash = () => {
+    const hash = window.location.hash.replace('#/', '').replace('#', '');
+    return validViews.includes(hash) ? hash : 'dashboard';
+  };
+  const [currentView, setCurrentViewState] = useState(getViewFromHash);
+
+  // Sync view state with URL hash
+  const setCurrentView = (view) => {
+    window.location.hash = `#/${view}`;
+    setCurrentViewState(view);
+  };
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentViewState(getViewFromHash());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
