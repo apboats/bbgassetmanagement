@@ -25,7 +25,7 @@ function StatusButton({ status, label, active, onClick }) {
   );
 }
 
-export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], onMoveBoat, currentUser }) {
+export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, currentUser }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
@@ -714,7 +714,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             <div className="p-4 overflow-y-auto flex-1">
               {!selectedMoveLocation ? (
                 // Step 1: Select location
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {/* Remove from location option - shown prominently at top */}
                   {boat.location && (
                     <>
@@ -737,66 +737,208 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                     </>
                   )}
 
-                  {/* Pool locations */}
-                  {locations.filter(l => l.type === 'pool').map(loc => (
-                    <button
-                      key={loc.id}
-                      onClick={async () => {
-                        if (onMoveBoat) {
-                          await onMoveBoat(boat, loc, 'pool');
-                          setShowLocationPicker(false);
-                        }
-                      }}
-                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
-                        boat.location === loc.name
-                          ? 'border-teal-500 bg-teal-50'
-                          : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-teal-500" />
-                        <p className="font-semibold text-slate-900">{loc.name}</p>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Pool • {(loc.pool_boats || loc.poolBoats || []).length} boats
-                      </p>
-                    </button>
-                  ))}
+                  {/* Group locations by site */}
+                  {sites.length > 0 ? (
+                    // Sites exist - group by site
+                    sites.map(site => {
+                      const siteLocations = locations.filter(l => l.site_id === site.id);
+                      if (siteLocations.length === 0) return null;
 
-                  {/* Grid locations */}
-                  {locations.filter(l => l.type !== 'pool').map(loc => {
-                    const totalSlots = loc.layout === 'u-shaped'
-                      ? (loc.rows * 2) + loc.columns
-                      : loc.rows * loc.columns;
-                    const occupiedSlots = Object.keys(loc.boats || {}).length;
-                    const availableSlots = totalSlots - occupiedSlots;
+                      return (
+                        <div key={site.id} className="space-y-2">
+                          {/* Site header */}
+                          <div className="flex items-center gap-2 px-1">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                            <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">{site.name}</span>
+                            <div className="flex-1 border-t border-indigo-200" />
+                          </div>
+
+                          {/* Pool locations in this site */}
+                          {siteLocations.filter(l => l.type === 'pool').map(loc => (
+                            <button
+                              key={loc.id}
+                              onClick={async () => {
+                                if (onMoveBoat) {
+                                  await onMoveBoat(boat, loc, 'pool');
+                                  setShowLocationPicker(false);
+                                }
+                              }}
+                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                boat.location === loc.name
+                                  ? 'border-teal-500 bg-teal-50'
+                                  : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                <p className="font-semibold text-slate-900">{loc.name}</p>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Pool • {(loc.pool_boats || loc.poolBoats || []).length} boats
+                              </p>
+                            </button>
+                          ))}
+
+                          {/* Grid locations in this site */}
+                          {siteLocations.filter(l => l.type !== 'pool').map(loc => {
+                            const totalSlots = loc.layout === 'u-shaped'
+                              ? (loc.rows * 2) + loc.columns
+                              : loc.rows * loc.columns;
+                            const occupiedSlots = Object.keys(loc.boats || {}).length;
+                            const availableSlots = totalSlots - occupiedSlots;
+
+                            return (
+                              <button
+                                key={loc.id}
+                                onClick={() => setSelectedMoveLocation(loc)}
+                                disabled={availableSlots === 0 && boat.location !== loc.name}
+                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                  boat.location === loc.name
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : availableSlots === 0
+                                    ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                                    : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-3 h-3 rounded-full ${
+                                    loc.type === 'rack-building' ? 'bg-blue-500' :
+                                    loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                                  }`} />
+                                  <p className="font-semibold text-slate-900">{loc.name}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {loc.type.replace('-', ' ')} • {availableSlots} slots available
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    // No sites - show flat list (legacy behavior)
+                    <>
+                      {/* Pool locations */}
+                      {locations.filter(l => l.type === 'pool').map(loc => (
+                        <button
+                          key={loc.id}
+                          onClick={async () => {
+                            if (onMoveBoat) {
+                              await onMoveBoat(boat, loc, 'pool');
+                              setShowLocationPicker(false);
+                            }
+                          }}
+                          className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                            boat.location === loc.name
+                              ? 'border-teal-500 bg-teal-50'
+                              : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-teal-500" />
+                            <p className="font-semibold text-slate-900">{loc.name}</p>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Pool • {(loc.pool_boats || loc.poolBoats || []).length} boats
+                          </p>
+                        </button>
+                      ))}
+
+                      {/* Grid locations */}
+                      {locations.filter(l => l.type !== 'pool').map(loc => {
+                        const totalSlots = loc.layout === 'u-shaped'
+                          ? (loc.rows * 2) + loc.columns
+                          : loc.rows * loc.columns;
+                        const occupiedSlots = Object.keys(loc.boats || {}).length;
+                        const availableSlots = totalSlots - occupiedSlots;
+
+                        return (
+                          <button
+                            key={loc.id}
+                            onClick={() => setSelectedMoveLocation(loc)}
+                            disabled={availableSlots === 0 && boat.location !== loc.name}
+                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                              boat.location === loc.name
+                                ? 'border-blue-500 bg-blue-50'
+                                : availableSlots === 0
+                                ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${
+                                loc.type === 'rack-building' ? 'bg-blue-500' :
+                                loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                              }`} />
+                              <p className="font-semibold text-slate-900">{loc.name}</p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {loc.type.replace('-', ' ')} • {availableSlots} slots available
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Unassigned locations (no site_id) - only show if sites exist */}
+                  {sites.length > 0 && (() => {
+                    const unassignedLocs = locations.filter(l => !l.site_id);
+                    if (unassignedLocs.length === 0) return null;
 
                     return (
-                      <button
-                        key={loc.id}
-                        onClick={() => setSelectedMoveLocation(loc)}
-                        disabled={availableSlots === 0 && boat.location !== loc.name}
-                        className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
-                          boat.location === loc.name
-                            ? 'border-blue-500 bg-blue-50'
-                            : availableSlots === 0
-                            ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                            : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${
-                            loc.type === 'rack-building' ? 'bg-blue-500' :
-                            loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
-                          }`} />
-                          <p className="font-semibold text-slate-900">{loc.name}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 px-1">
+                          <div className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Unassigned</span>
+                          <div className="flex-1 border-t border-slate-200" />
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {loc.type.replace('-', ' ')} • {availableSlots} slots available
-                        </p>
-                      </button>
+                        {unassignedLocs.map(loc => {
+                          const isPool = loc.type === 'pool';
+                          const totalSlots = loc.layout === 'u-shaped'
+                            ? (loc.rows * 2) + loc.columns
+                            : loc.rows * loc.columns;
+                          const occupiedSlots = Object.keys(loc.boats || {}).length;
+                          const availableSlots = totalSlots - occupiedSlots;
+
+                          return (
+                            <button
+                              key={loc.id}
+                              onClick={async () => {
+                                if (isPool && onMoveBoat) {
+                                  await onMoveBoat(boat, loc, 'pool');
+                                  setShowLocationPicker(false);
+                                } else {
+                                  setSelectedMoveLocation(loc);
+                                }
+                              }}
+                              disabled={!isPool && availableSlots === 0 && boat.location !== loc.name}
+                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                boat.location === loc.name
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : (!isPool && availableSlots === 0)
+                                  ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                                  : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  isPool ? 'bg-teal-500' :
+                                  loc.type === 'rack-building' ? 'bg-blue-500' :
+                                  loc.type === 'parking-lot' ? 'bg-purple-500' : 'bg-orange-500'
+                                }`} />
+                                <p className="font-semibold text-slate-900">{loc.name}</p>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {isPool ? `Pool • ${(loc.pool_boats || loc.poolBoats || []).length} boats` : `${loc.type.replace('-', ' ')} • ${availableSlots} slots available`}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     );
-                  })}
+                  })()}
                 </div>
               ) : (
                 // Step 2: Select slot for grid location

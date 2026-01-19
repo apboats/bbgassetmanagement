@@ -10,7 +10,7 @@ import { X, Wrench, ChevronRight } from 'lucide-react';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
 
-export function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, onClose }) {
+export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onClose }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
@@ -296,37 +296,96 @@ export function InventoryBoatDetailsModal({ boat, locations = [], onMoveBoat, on
                     </>
                   )}
 
-                  {/* Pool locations */}
-                  {locations.filter(l => l.type === 'pool').map(loc => (
-                    <button
-                      key={loc.id}
-                      onClick={() => handleMove(loc, 'pool')}
-                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-teal-500" />
-                        <p className="font-semibold text-slate-900">{loc.name}</p>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">Pool location</p>
-                    </button>
-                  ))}
+                  {/* Group locations by site */}
+                  {sites.length > 0 ? (
+                    // Render locations grouped by site
+                    sites.map(site => {
+                      const siteLocations = locations.filter(l => l.site_id === site.id);
+                      if (siteLocations.length === 0) return null;
 
-                  {/* Grid locations */}
-                  {locations.filter(l => l.type !== 'pool').map(loc => (
-                    <button
-                      key={loc.id}
-                      onClick={() => setSelectedMoveLocation(loc)}
-                      className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        <p className="font-semibold text-slate-900">{loc.name}</p>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
-                      </p>
-                    </button>
-                  ))}
+                      const poolLocations = siteLocations.filter(l => l.type === 'pool');
+                      const gridLocations = siteLocations.filter(l => l.type !== 'pool');
+
+                      return (
+                        <div key={site.id} className="mb-4">
+                          {/* Site Header */}
+                          <div className="flex items-center gap-2 mb-2 pb-1 border-b border-indigo-200">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                            <p className="text-sm font-semibold text-indigo-700">{site.name}</p>
+                          </div>
+
+                          <div className="space-y-2 pl-2">
+                            {/* Pool locations in this site */}
+                            {poolLocations.map(loc => (
+                              <button
+                                key={loc.id}
+                                onClick={() => handleMove(loc, 'pool')}
+                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                  <p className="font-semibold text-slate-900">{loc.name}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">Pool location</p>
+                              </button>
+                            ))}
+
+                            {/* Grid locations in this site */}
+                            {gridLocations.map(loc => (
+                              <button
+                                key={loc.id}
+                                onClick={() => setSelectedMoveLocation(loc)}
+                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                  <p className="font-semibold text-slate-900">{loc.name}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    // Legacy flat list when no sites exist
+                    <>
+                      {/* Pool locations */}
+                      {locations.filter(l => l.type === 'pool').map(loc => (
+                        <button
+                          key={loc.id}
+                          onClick={() => handleMove(loc, 'pool')}
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-teal-500" />
+                            <p className="font-semibold text-slate-900">{loc.name}</p>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">Pool location</p>
+                        </button>
+                      ))}
+
+                      {/* Grid locations */}
+                      {locations.filter(l => l.type !== 'pool').map(loc => (
+                        <button
+                          key={loc.id}
+                          onClick={() => setSelectedMoveLocation(loc)}
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500" />
+                            <p className="font-semibold text-slate-900">{loc.name}</p>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {loc.rows} × {loc.columns} grid • {Object.keys(loc.boats || {}).length} boats
+                          </p>
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
               ) : (
                 // Step 2: Select slot in grid
