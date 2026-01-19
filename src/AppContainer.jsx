@@ -124,12 +124,13 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
+        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
         hullId: boat.hull_id,
       }))
-      
+
       setBoats(transformedData)
     } catch (error) {
       console.error('Error loading boats:', error)
@@ -151,6 +152,7 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
+        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         hullId: boat.hull_id,
@@ -302,6 +304,7 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
+        invoicedComplete,
         archivedDate,
         dockmasterId,
         customerId,
@@ -314,11 +317,12 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
+        invoiced_complete,
         archived_date,
         dockmaster_id,
         customer_id,
         hull_id,
-        ...cleanUpdates 
+        ...cleanUpdates
       } = updates
       
       // Build updateData with only fields that exist in updates
@@ -334,6 +338,7 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
+      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
@@ -397,6 +402,7 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
+        invoicedComplete,
         archivedDate,
         dockmasterId,
         hullId,
@@ -410,6 +416,7 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
+        invoiced_complete,
         archived_date,
         dockmaster_id,
         hull_id,
@@ -418,7 +425,7 @@ function AppContainer() {
         // Don't update location/slot here - use handleMoveBoat for that
         location,
         slot,
-        ...cleanUpdates 
+        ...cleanUpdates
       } = updates
       
       // Build updateData with only fields that exist in updates
@@ -432,7 +439,8 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
-      
+      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
+
       // Only update if there are fields to update
       if (Object.keys(updateData).length > 0) {
         console.log('Inventory boat update - sending to DB:', updateData);
