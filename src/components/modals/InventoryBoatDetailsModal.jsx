@@ -5,10 +5,26 @@
 // with location assignment capability
 // ============================================================================
 
-import React, { useState } from 'react';
-import { X, Wrench, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Wrench, ChevronRight, History } from 'lucide-react';
+import supabaseService from '../../services/supabaseService';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
+
+// Helper to format time ago
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 
 export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onClose }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -20,6 +36,21 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
   const [workOrdersError, setWorkOrdersError] = useState('');
   const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
+
+  // Movement history state
+  const [movementHistory, setMovementHistory] = useState([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+
+  // Load movement history when modal opens
+  useEffect(() => {
+    if (boat?.id) {
+      setLoadingMovements(true);
+      supabaseService.boatMovements.getForBoat(boat.id, 5)
+        .then(movements => setMovementHistory(movements))
+        .catch(err => console.error('Error loading movement history:', err))
+        .finally(() => setLoadingMovements(false));
+    }
+  }, [boat?.id]);
 
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);
@@ -187,6 +218,46 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Movement History */}
+          <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <History className="w-4 h-4 text-blue-600" />
+              <p className="text-sm text-blue-700 font-medium">Recent Moves</p>
+            </div>
+            {loadingMovements ? (
+              <p className="text-xs text-blue-600">Loading...</p>
+            ) : movementHistory.length > 0 ? (
+              <div className="space-y-1.5">
+                {movementHistory.slice(0, 3).map((move, idx) => {
+                  const formatSlot = (slot) => {
+                    if (!slot || slot === 'pool') return slot || '';
+                    const parts = slot.split('-');
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                      return `${parseInt(parts[0]) + 1}-${parseInt(parts[1]) + 1}`;
+                    }
+                    return slot;
+                  };
+                  const from = move.fromLocation ? `${move.fromLocation}${move.fromSlot ? ` (${formatSlot(move.fromSlot)})` : ''}` : 'Unassigned';
+                  const to = move.toLocation ? `${move.toLocation}${move.toSlot ? ` (${formatSlot(move.toSlot)})` : ''}` : 'Unassigned';
+                  const date = new Date(move.movedAt);
+                  const timeAgo = getTimeAgo(date);
+
+                  return (
+                    <div key={move.id || idx} className="text-xs text-blue-800 flex items-start gap-1">
+                      <span className="text-blue-400 flex-shrink-0">{idx === 0 ? '→' : '·'}</span>
+                      <span className="truncate">
+                        {from} → {to}
+                        <span className="text-blue-500 ml-1">({timeAgo})</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-blue-600">No movement history yet</p>
+            )}
           </div>
 
           {/* Work Orders Button */}

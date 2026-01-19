@@ -5,9 +5,25 @@
 // Includes work phases, status updates, location management, and work orders
 // ============================================================================
 
-import React, { useState } from 'react';
-import { Package, X, Trash2, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
+import supabaseService from '../../services/supabaseService';
+
+// Helper to format time ago
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 
 // Status Button Component
 function StatusButton({ status, label, active, onClick }) {
@@ -37,6 +53,19 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [movementHistory, setMovementHistory] = useState([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+
+  // Load movement history when modal opens
+  useEffect(() => {
+    if (boat?.id) {
+      setLoadingMovements(true);
+      supabaseService.boatMovements.getForBoat(boat.id, 5)
+        .then(movements => setMovementHistory(movements))
+        .catch(err => console.error('Error loading movement history:', err))
+        .finally(() => setLoadingMovements(false));
+    }
+  }, [boat?.id]);
 
   const statusLabels = {
     'needs-approval': 'Needs Approval',
@@ -369,6 +398,46 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                     return boat.slot;
                   })() : 'N/A'}
                 </p>
+              </div>
+
+              {/* Movement History */}
+              <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg col-span-1 sm:col-span-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <History className="w-4 h-4 text-blue-600" />
+                  <p className="text-xs text-blue-700 font-medium">Recent Moves</p>
+                </div>
+                {loadingMovements ? (
+                  <p className="text-xs text-blue-600">Loading...</p>
+                ) : movementHistory.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {movementHistory.slice(0, 3).map((move, idx) => {
+                      const formatSlot = (slot) => {
+                        if (!slot || slot === 'pool') return slot || '';
+                        const parts = slot.split('-');
+                        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                          return `${parseInt(parts[0]) + 1}-${parseInt(parts[1]) + 1}`;
+                        }
+                        return slot;
+                      };
+                      const from = move.fromLocation ? `${move.fromLocation}${move.fromSlot ? ` (${formatSlot(move.fromSlot)})` : ''}` : 'Unassigned';
+                      const to = move.toLocation ? `${move.toLocation}${move.toSlot ? ` (${formatSlot(move.toSlot)})` : ''}` : 'Unassigned';
+                      const date = new Date(move.movedAt);
+                      const timeAgo = getTimeAgo(date);
+
+                      return (
+                        <div key={move.id || idx} className="text-xs text-blue-800 flex items-start gap-1">
+                          <span className="text-blue-400 flex-shrink-0">{idx === 0 ? '→' : '·'}</span>
+                          <span className="truncate">
+                            {from} → {to}
+                            <span className="text-blue-500 ml-1">({timeAgo})</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-blue-600">No movement history yet</p>
+                )}
               </div>
 
               {/* NFC Tag Management */}
