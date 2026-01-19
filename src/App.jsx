@@ -3,6 +3,7 @@ import { Camera, Search, Plus, Trash2, Edit2, Save, X, LogOut, Users, User, Map,
 import Tesseract from 'tesseract.js';
 import { supabase } from './supabaseClient';
 import { useAuth } from './AuthProvider';
+import supabaseService, { boatLifecycleService } from './services/supabaseService';
 import { boatsService, inventoryBoatsService } from './services/supabaseService';
 import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation, BoatStatusIcons, InventoryBadge, findBoatLocationData } from './components/BoatComponents';
 import { PoolLocation } from './components/locations/PoolLocation';
@@ -1182,64 +1183,36 @@ function BoatsView({ boats, locations, onUpdateBoats, dockmasterConfig, onMoveBo
     setShowBoatTypeSelector(true);
   };
 
-  const handleAddBoat = (newBoat) => {
-    // Check if an archived boat with the same Dockmaster ID exists
-    // This is more reliable than name+owner since owners can change
-    let existingArchivedBoat = null;
-    
-    if (newBoat.dockmasterId) {
-      // Primary match: Dockmaster ID (most reliable)
-      existingArchivedBoat = boats.find(b => 
-        b.status === 'archived' && 
-        b.dockmasterId && 
-        b.dockmasterId === newBoat.dockmasterId
-      );
-    }
-    
-    if (!existingArchivedBoat && newBoat.hullId) {
-      // Fallback match: Hull ID (HIN is permanent to the boat)
-      existingArchivedBoat = boats.find(b => 
-        b.status === 'archived' && 
-        b.hullId && 
-        b.hullId === newBoat.hullId
-      );
-    }
+  const handleAddBoat = async (newBoat) => {
+    try {
+      // Use centralized service to import/update boat
+      // This handles duplicate detection across ALL statuses and both tables
+      const importedBoat = await boatLifecycleService.importOrUpdateBoat({
+        name: newBoat.name,
+        model: newBoat.model,
+        make: newBoat.make,
+        hullId: newBoat.hullId,
+        dockmasterId: newBoat.dockmasterId,
+        owner: newBoat.owner,
+        customerId: newBoat.customerId,
+        year: newBoat.year,
+        length: newBoat.length,
+        workOrderNumber: newBoat.workOrderNumber,
+        qrCode: newBoat.qrCode,
+        nfcTag: newBoat.nfcTag,
+      }, {
+        targetStatus: 'needs-approval',
+        preserveLocation: false
+      });
 
-    if (existingArchivedBoat) {
-      // Unarchive the existing boat and update it with new data
-      const unarchivedBoat = {
-        ...existingArchivedBoat,
-        ...newBoat,
-        // Keep the existing ID, QR code, and NFC tag
-        id: existingArchivedBoat.id,
-        qrCode: existingArchivedBoat.qrCode,
-        nfcTag: existingArchivedBoat.nfcTag,
-        // Set status to needs-approval
-        status: 'needs-approval',
-        // Clear archived date
-        archivedDate: null,
-        // Clear location if it had one
-        location: null,
-        slot: null
-      };
-      
-      onUpdateBoats(boats.map(b => b.id === existingArchivedBoat.id ? unarchivedBoat : b));
+      // Reload boats from database to get fresh data
+      const updatedBoats = await supabaseService.boatsService.getAll();
+      onUpdateBoats(updatedBoats);
       setShowAddBoat(false);
-      
-      // Show a message to the user
-      alert(`Boat "${newBoat.name}" has been restored from the archive with updated information.`);
-    } else {
-      // No archived boat found, create a new one
-      const boat = {
-        // Don't include id - let the database auto-generate it
-        qrCode: `QR-${Date.now()}`,
-        nfcTag: null, // NFC tag will be assigned on first scan
-        ...newBoat,
-        location: null,
-        slot: null
-      };
-      onUpdateBoats([...boats, boat]);
-      setShowAddBoat(false);
+
+    } catch (error) {
+      console.error('Error adding/importing boat:', error);
+      alert(`Failed to add boat: ${error.message}`);
     }
   };
 
@@ -4835,10 +4808,16 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       }
 
       if (foundBoat) {
-        // Found boat - show location picker
+        // Found boat - show location picker (with archived warning)
         setSelectedBoat(foundBoat);
         setShowLocationPicker(true);
-        setOcrResult(`✓ Found: ${foundBoat.name}`);
+
+        // Show different message if boat is archived
+        if (foundBoat.status === 'archived') {
+          setOcrResult(`✓ Found: ${foundBoat.name} (ARCHIVED)`);
+        } else {
+          setOcrResult(`✓ Found: ${foundBoat.name}`);
+        }
       } else {
         // Not found - show manual search
         alert(`No boat found with Hull ID: ${hullId}\nUse manual search below.`);
@@ -4862,13 +4841,19 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       return;
     }
 
-    // Search across all boats
-    const results = boats.filter(boat =>
-      boat.name?.toLowerCase().includes(query) ||
-      boat.owner?.toLowerCase().includes(query) ||
-      boat.hullId?.toLowerCase().includes(query) ||
-      boat.model?.toLowerCase().includes(query)
-    );
+    // Search across all boats, but exclude archived boats
+    const results = boats.filter(boat => {
+      // Check if boat matches search query
+      const matchesQuery = boat.name?.toLowerCase().includes(query) ||
+        boat.owner?.toLowerCase().includes(query) ||
+        boat.hullId?.toLowerCase().includes(query) ||
+        boat.model?.toLowerCase().includes(query);
+
+      // Exclude archived boats from search results
+      const isNotArchived = boat.status !== 'archived';
+
+      return matchesQuery && isNotArchived;
+    });
 
     setSearchResults(results);
   };
@@ -4885,6 +4870,19 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
     if (!selectedBoat || !selectedLocation) {
       alert('Please select a location');
       return;
+    }
+
+    // Check if boat is archived and prompt for unarchive
+    const isArchived = selectedBoat.status === 'archived';
+    if (isArchived) {
+      const confirmed = window.confirm(
+        `"${selectedBoat.name}" is currently archived.\n\n` +
+        `Moving it to a location will unarchive it and set status to "Needs Approval".\n\n` +
+        `Do you want to continue?`
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     const location = locations.find(l => l.name === selectedLocation);
@@ -4948,15 +4946,28 @@ function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
       }
     };
 
-    // Update boat with new location
-    const updatedBoat = {
-      ...selectedBoat,
-      location: location.name,
-      slot: finalSlot
-    };
+    // Use centralized service to unarchive if needed
+    let updatedBoat;
+    if (isArchived) {
+      // Boat is archived - use service to unarchive and place
+      updatedBoat = await boatLifecycleService.unarchiveBoat(selectedBoat.id, {
+        targetStatus: 'needs-approval',
+        location: location.name,
+        slot: finalSlot
+      });
+    } else {
+      // Boat is not archived - just update location
+      updatedBoat = await boatsService.update(selectedBoat.id, {
+        location: location.name,
+        slot: finalSlot
+      });
+    }
 
     await onUpdateLocations(locations.map(l => l.id === location.id ? updatedLocation : l));
-    onUpdateBoats(boats.map(b => b.id === selectedBoat.id ? updatedBoat : b));
+
+    // Reload all boats to get fresh data from database
+    const refreshedBoats = await boatsService.getAll();
+    onUpdateBoats(refreshedBoats);
 
     // Show success and reset
     alert(`✓ ${selectedBoat.name} moved to ${location.name} (${finalSlot})`);
