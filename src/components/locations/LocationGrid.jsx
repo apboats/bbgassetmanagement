@@ -385,7 +385,8 @@ export function LocationGrid({
   onMaximize,
   onEdit,
   onDelete,
-  onRemove
+  onRemove,
+  currentUser
 }) {
   // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
   const [viewMode, setViewMode] = useState('layout');
@@ -703,7 +704,7 @@ export function LocationGrid({
                 <Maximize2 className="w-4 h-4 text-slate-600" />
               </button>
             )}
-            {onEdit && (
+            {onEdit && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
               <button
                 onClick={onEdit}
                 className="p-1.5 hover:bg-white rounded-lg transition-colors"
@@ -712,7 +713,7 @@ export function LocationGrid({
                 <Edit2 className="w-4 h-4 text-slate-600" />
               </button>
             )}
-            {(onDelete || onRemove) && (
+            {(onDelete || onRemove) && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
               <button
                 onClick={onDelete || onRemove}
                 className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"

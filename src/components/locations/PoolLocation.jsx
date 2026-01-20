@@ -21,7 +21,8 @@ export function PoolLocation({
   onDragStart,
   onDragEnd,
   onDragOver,
-  onDrop
+  onDrop,
+  currentUser
 }) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -64,7 +65,7 @@ export function PoolLocation({
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-bold text-white text-lg">{location.name}</h4>
           <div className="flex items-center gap-2">
-            {onEdit && (
+            {onEdit && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
               <button
                 onClick={onEdit}
                 className="p-1.5 hover:bg-white/20 rounded transition-colors"
@@ -73,7 +74,7 @@ export function PoolLocation({
                 <Pencil className="w-4 h-4 text-white" />
               </button>
             )}
-            {(onDelete || onRemove) && (
+            {(onDelete || onRemove) && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
               <button
                 onClick={onDelete || onRemove}
                 className="p-1.5 hover:bg-white/20 rounded transition-colors"
