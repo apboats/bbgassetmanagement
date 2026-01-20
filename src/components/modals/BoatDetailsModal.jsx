@@ -274,8 +274,8 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
       const updatedBoat = {
         ...boat,
         notes: notesText.trim(),
-        notes_updated_by: currentUser?.name || currentUser?.username || 'Unknown',
-        notes_updated_at: new Date().toISOString()
+        notesUpdatedBy: currentUser?.name || currentUser?.username || 'Unknown',
+        notesUpdatedAt: new Date().toISOString()
       };
       await onUpdateBoat(updatedBoat);
     } catch (error) {
@@ -465,9 +465,9 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
           <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-base md:text-lg font-bold text-slate-900">Notes</h4>
-              {boat.notes_updated_by && boat.notes_updated_at && (
+              {boat.notesUpdatedBy && boat.notesUpdatedAt && (
                 <p className="text-xs text-slate-500">
-                  Last updated by {boat.notes_updated_by} on {new Date(boat.notes_updated_at).toLocaleDateString()}
+                  Last updated by {boat.notesUpdatedBy || 'Unknown'} on {boat.notesUpdatedAt ? new Date(boat.notesUpdatedAt).toLocaleDateString() : ''}
                 </p>
               )}
             </div>
