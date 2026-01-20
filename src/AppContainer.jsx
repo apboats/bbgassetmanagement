@@ -275,6 +275,8 @@ function AppContainer() {
         warrantyComplete,
         invoicedComplete,
         archivedDate,
+        completedAt,
+        completedBy,
         dockmasterId,
         customerId,
         hullId,
@@ -288,6 +290,8 @@ function AppContainer() {
         warranty_complete,
         invoiced_complete,
         archived_date,
+        completed_at,
+        completed_by,
         dockmaster_id,
         customer_id,
         hull_id,
@@ -309,6 +313,8 @@ function AppContainer() {
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
+      if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
+      if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
@@ -358,7 +364,7 @@ function AppContainer() {
   const handleUpdateInventoryBoat = async (boatId, updates) => {
     try {
       // Filter out fields that don't belong in database
-      const { 
+      const {
         isInventory,
         // UI-only fields
         currentLocation,
@@ -373,6 +379,8 @@ function AppContainer() {
         warrantyComplete,
         invoicedComplete,
         archivedDate,
+        completedAt,
+        completedBy,
         dockmasterId,
         hullId,
         salesStatus,
@@ -387,6 +395,8 @@ function AppContainer() {
         warranty_complete,
         invoiced_complete,
         archived_date,
+        completed_at,
+        completed_by,
         dockmaster_id,
         hull_id,
         sales_status,
@@ -394,7 +404,7 @@ function AppContainer() {
         // Don't update location/slot here - use handleMoveBoat for that
         location,
         slot,
-        ...cleanUpdates 
+        ...cleanUpdates
       } = updates
       
       // Build updateData with only fields that exist in updates
@@ -409,6 +419,8 @@ function AppContainer() {
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
       if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
+      if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
+      if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
 
       // Only update if there are fields to update
       if (Object.keys(updateData).length > 0) {
