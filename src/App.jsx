@@ -2802,6 +2802,10 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
     }
   };
 
+  const handleBoatClick = (boat) => {
+    setViewingBoat(boat);
+  };
+
   // Create a new boat from the assignment modal and return it for immediate assignment
   const handleCreateBoatFromAssignModal = async (newBoatData) => {
     const newBoat = {
