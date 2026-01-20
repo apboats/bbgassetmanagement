@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
+import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
 
 // Helper to format time ago
@@ -41,10 +42,11 @@ function StatusButton({ status, label, active, onClick }) {
   );
 }
 
-export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, currentUser }) {
+export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, currentUser, boats = [], inventoryBoats = [] }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
+  const [slotViewMode, setSlotViewMode] = useState('layout');
   const [showWorkOrders, setShowWorkOrders] = useState(false);
   const [workOrders, setWorkOrders] = useState([]);
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(false);
@@ -1112,66 +1114,49 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
               ) : (
                 // Step 2: Select slot for grid location
                 <div>
-                  <button
-                    onClick={() => setSelectedMoveLocation(null)}
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Back to locations
-                  </button>
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={() => setSelectedMoveLocation(null)}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Back to locations
+                    </button>
+
+                    {/* View mode toggle for U-shaped locations */}
+                    {selectedMoveLocation.layout === 'u-shaped' && (
+                      <button
+                        onClick={() => setSlotViewMode(slotViewMode === 'layout' ? 'concise' : 'layout')}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {slotViewMode === 'layout' ? 'Concise View' : 'Layout View'}
+                      </button>
+                    )}
+                  </div>
+
                   <p className="text-sm text-slate-600 mb-3">
                     Select a slot in <strong>{selectedMoveLocation.name}</strong>:
                   </p>
-                  <div
-                    className="grid gap-1.5 max-h-[300px] overflow-y-auto"
-                    style={{
-                      gridTemplateColumns: `repeat(${Math.min(selectedMoveLocation.columns, 6)}, minmax(50px, 1fr))`
-                    }}
-                  >
-                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
-                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
-                        const slotId = `${row}-${col}`;
-                        const isOccupied = selectedMoveLocation.boats?.[slotId];
-                        const isCurrentBoat = isOccupied === boat.id;
-                        const displaySlot = `${row + 1}-${col + 1}`;
 
-                        // For U-shaped layouts, render empty div for interior slots
-                        if (selectedMoveLocation.layout === 'u-shaped') {
-                          const isLeftEdge = col === 0;
-                          const isRightEdge = col === selectedMoveLocation.columns - 1;
-                          const isBottomRow = row === selectedMoveLocation.rows - 1;
-                          if (!isLeftEdge && !isRightEdge && !isBottomRow) {
-                            // Render empty placeholder to maintain grid structure
-                            return <div key={slotId} className="aspect-square" />;
-                          }
+                  <div className="max-h-[400px] overflow-y-auto">
+                    <SlotGridDisplay
+                      location={selectedMoveLocation}
+                      boats={boats}
+                      inventoryBoats={inventoryBoats}
+                      mode="select"
+                      currentBoatId={boat.id}
+                      onSlotClick={async (slotId) => {
+                        if (onMoveBoat) {
+                          await onMoveBoat(boat, selectedMoveLocation, slotId);
+                          setShowLocationPicker(false);
+                          setSelectedMoveLocation(null);
+                          await loadMovementHistory();
                         }
-
-                        return (
-                          <button
-                            key={slotId}
-                            onClick={async () => {
-                              if (!isOccupied && onMoveBoat) {
-                                await onMoveBoat(boat, selectedMoveLocation, slotId);
-                                setShowLocationPicker(false);
-                                setSelectedMoveLocation(null);
-                                // Refresh movement history after move completes
-                                await loadMovementHistory();
-                              }
-                            }}
-                            disabled={isOccupied && !isCurrentBoat}
-                            className={`p-2 text-xs font-medium rounded transition-colors ${
-                              isCurrentBoat
-                                ? 'bg-blue-500 text-white'
-                                : isOccupied
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-100 hover:bg-blue-100 text-slate-700'
-                            }`}
-                          >
-                            {displaySlot}
-                          </button>
-                        );
-                      })
-                    )}
+                      }}
+                      viewMode={slotViewMode}
+                      showBoatNames={true}
+                      interactive={true}
+                    />
                   </div>
                 </div>
               )}

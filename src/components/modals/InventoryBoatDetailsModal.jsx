@@ -10,6 +10,7 @@ import { X, Wrench, ChevronRight, History } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
+import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -26,8 +27,9 @@ function getTimeAgo(date) {
   return date.toLocaleDateString();
 }
 
-export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], onMoveBoat, onUpdateBoat, onClose }) {
+export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [slotViewMode, setSlotViewMode] = useState('layout');
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
 
   // Work order state
@@ -566,53 +568,44 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], on
               ) : (
                 // Step 2: Select slot in grid
                 <div>
-                  <button
-                    onClick={() => setSelectedMoveLocation(null)}
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back to locations
-                  </button>
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={() => setSelectedMoveLocation(null)}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to locations
+                    </button>
 
-                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${selectedMoveLocation.columns}, 1fr)` }}>
-                    {Array.from({ length: selectedMoveLocation.rows }).map((_, row) =>
-                      Array.from({ length: selectedMoveLocation.columns }).map((_, col) => {
-                        const slotId = `${row}-${col}`;
-                        const occupyingBoatId = selectedMoveLocation.boats?.[slotId];
-                        const isOccupied = occupyingBoatId && occupyingBoatId !== boat.id;
-                        const isCurrent = occupyingBoatId === boat.id;
-
-                        // For U-shaped layouts, render empty div for interior slots
-                        if (selectedMoveLocation.layout === 'u-shaped') {
-                          const isLeftEdge = col === 0;
-                          const isRightEdge = col === selectedMoveLocation.columns - 1;
-                          const isBottomRow = row === selectedMoveLocation.rows - 1;
-                          if (!isLeftEdge && !isRightEdge && !isBottomRow) {
-                            // Render empty placeholder to maintain grid structure
-                            return <div key={slotId} className="aspect-square" />;
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={slotId}
-                            onClick={() => !isOccupied && handleMove(selectedMoveLocation, slotId)}
-                            disabled={isOccupied}
-                            className={`aspect-square rounded flex items-center justify-center text-xs font-medium transition-colors ${
-                              isCurrent
-                                ? 'bg-blue-500 text-white'
-                                : isOccupied
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700'
-                            }`}
-                          >
-                            {row + 1}-{col + 1}
-                          </button>
-                        );
-                      })
+                    {/* View mode toggle for U-shaped locations */}
+                    {selectedMoveLocation.layout === 'u-shaped' && (
+                      <button
+                        onClick={() => setSlotViewMode(slotViewMode === 'layout' ? 'concise' : 'layout')}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {slotViewMode === 'layout' ? 'Concise View' : 'Layout View'}
+                      </button>
                     )}
+                  </div>
+
+                  <p className="text-sm text-slate-600 mb-3">
+                    Select a slot in <strong>{selectedMoveLocation.name}</strong>:
+                  </p>
+
+                  <div className="max-h-[400px] overflow-y-auto">
+                    <SlotGridDisplay
+                      location={selectedMoveLocation}
+                      boats={boats}
+                      inventoryBoats={inventoryBoats}
+                      mode="select"
+                      currentBoatId={boat.id}
+                      onSlotClick={(slotId) => handleMove(selectedMoveLocation, slotId)}
+                      viewMode={slotViewMode}
+                      showBoatNames={true}
+                      interactive={true}
+                    />
                   </div>
                 </div>
               )}
