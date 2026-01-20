@@ -7,7 +7,7 @@ import supabaseService, { boatLifecycleService } from './services/supabaseServic
 import { boatsService, inventoryBoatsService } from './services/supabaseService';
 import { BoatCard, BoatCardContent, BoatListItem, LocationBadge, useBoatLocation, BoatStatusIcons, InventoryBadge, findBoatLocationData } from './components/BoatComponents';
 import { PoolLocation } from './components/locations/PoolLocation';
-import { LocationGrid } from './components/locations/LocationGrid';
+import { LocationGrid, MaximizedLocationModal } from './components/locations/LocationGrid';
 import { LocationSection } from './components/locations/LocationSection';
 import { SiteManagementModal } from './components/modals/SiteManagementModal';
 import { BoatDetailsModal } from './components/modals/BoatDetailsModal';
