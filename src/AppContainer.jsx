@@ -126,6 +126,8 @@ function AppContainer() {
         warrantyComplete: boat.warranty_complete ?? false,
         invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
+        notesUpdatedBy: boat.notes_updated_by,
+        notesUpdatedAt: boat.notes_updated_at,
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
         hullId: boat.hull_id,
@@ -154,6 +156,8 @@ function AppContainer() {
         warrantyComplete: boat.warranty_complete ?? false,
         invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
+        notesUpdatedBy: boat.notes_updated_by,
+        notesUpdatedAt: boat.notes_updated_at,
         dockmasterId: boat.dockmaster_id,
         hullId: boat.hull_id,
         salesStatus: boat.sales_status,
@@ -277,6 +281,8 @@ function AppContainer() {
         archivedDate,
         completedAt,
         completedBy,
+        notesUpdatedBy,
+        notesUpdatedAt,
         dockmasterId,
         customerId,
         hullId,
@@ -292,6 +298,8 @@ function AppContainer() {
         archived_date,
         completed_at,
         completed_by,
+        notes_updated_by,
+        notes_updated_at,
         dockmaster_id,
         customer_id,
         hull_id,
@@ -315,6 +323,8 @@ function AppContainer() {
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
       if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
       if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
+      if ('notesUpdatedBy' in updates) updateData.notes_updated_by = updates.notesUpdatedBy;
+      if ('notesUpdatedAt' in updates) updateData.notes_updated_at = updates.notesUpdatedAt;
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
@@ -381,6 +391,8 @@ function AppContainer() {
         archivedDate,
         completedAt,
         completedBy,
+        notesUpdatedBy,
+        notesUpdatedAt,
         dockmasterId,
         hullId,
         salesStatus,
@@ -397,6 +409,8 @@ function AppContainer() {
         archived_date,
         completed_at,
         completed_by,
+        notes_updated_by,
+        notes_updated_at,
         dockmaster_id,
         hull_id,
         sales_status,
@@ -421,6 +435,8 @@ function AppContainer() {
       if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
       if ('completedAt' in updates) updateData.completed_at = updates.completedAt;
       if ('completedBy' in updates) updateData.completed_by = updates.completedBy;
+      if ('notesUpdatedBy' in updates) updateData.notes_updated_by = updates.notesUpdatedBy;
+      if ('notesUpdatedAt' in updates) updateData.notes_updated_at = updates.notesUpdatedAt;
 
       // Only update if there are fields to update
       if (Object.keys(updateData).length > 0) {
