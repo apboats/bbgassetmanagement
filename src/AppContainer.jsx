@@ -124,6 +124,7 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
+        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
@@ -151,6 +152,7 @@ function AppContainer() {
         cleanComplete: boat.clean_complete ?? false,
         fiberglassComplete: boat.fiberglass_complete ?? false,
         warrantyComplete: boat.warranty_complete ?? false,
+        invoicedComplete: boat.invoiced_complete ?? false,
         archivedDate: boat.archived_date,
         dockmasterId: boat.dockmaster_id,
         hullId: boat.hull_id,
@@ -303,11 +305,12 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
+      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
       if ('archivedDate' in updates) updateData.archived_date = updates.archivedDate;
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
-      
+
       await boatsService.update(boatId, updateData)
       await loadBoats()
     } catch (error) {
@@ -401,7 +404,8 @@ function AppContainer() {
       if ('cleanComplete' in updates) updateData.clean_complete = updates.cleanComplete;
       if ('fiberglassComplete' in updates) updateData.fiberglass_complete = updates.fiberglassComplete;
       if ('warrantyComplete' in updates) updateData.warranty_complete = updates.warrantyComplete;
-      
+      if ('invoicedComplete' in updates) updateData.invoiced_complete = updates.invoicedComplete;
+
       // Only update if there are fields to update
       if (Object.keys(updateData).length > 0) {
         console.log('Inventory boat update - sending to DB:', updateData);
