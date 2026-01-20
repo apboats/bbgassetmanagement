@@ -1201,7 +1201,9 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
     
     const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          boat.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase());
+                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (boat.hullId && boat.hullId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (boat.dockmasterId && boat.dockmasterId.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || boat.status === filterStatus;
     
     let matchesWorkPhase = true;
