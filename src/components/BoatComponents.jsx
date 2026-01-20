@@ -130,10 +130,22 @@ export function BoatStatusIcons({ boat, size = 'w-3 h-3', className = '' }) {
 
   return (
     <div className={`flex gap-1 ${className}`}>
-      <Wrench className={`${size} ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`} />
-      <Sparkles className={`${size} ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`} />
-      <Layers className={`${size} ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`} />
-      <Shield className={`${size} ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`} />
+      <Wrench
+        className={`${size} ${boat.mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`}
+        strokeWidth={boat.mechanicalsComplete ? 2.5 : 1.5}
+      />
+      <Sparkles
+        className={`${size} ${boat.cleanComplete ? 'text-green-500' : 'text-slate-300'}`}
+        strokeWidth={boat.cleanComplete ? 2.5 : 1.5}
+      />
+      <Layers
+        className={`${size} ${boat.fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`}
+        strokeWidth={boat.fiberglassComplete ? 2.5 : 1.5}
+      />
+      <Shield
+        className={`${size} ${boat.warrantyComplete ? 'text-green-500' : 'text-slate-300'}`}
+        strokeWidth={boat.warrantyComplete ? 2.5 : 1.5}
+      />
     </div>
   );
 }
