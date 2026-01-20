@@ -2609,6 +2609,10 @@ function DockmasterImportModal({ dockmasterConfig, onImport, onCancel }) {
 }
 
 function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites, currentUser }) {
+  // Split boats into regular and inventory
+  const regularBoats = boats.filter(b => !b.isInventory);
+  const inventoryBoats = boats.filter(b => b.isInventory);
+
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [showBoatAssignModal, setShowBoatAssignModal] = useState(false);
@@ -3374,7 +3378,7 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
       {maximizedLocation && (
         <MaximizedLocationModal
           location={maximizedLocation}
-          boats={boats}
+          boats={regularBoats}
           inventoryBoats={inventoryBoats}
           onSlotClick={handleSlotClick}
           onBoatClick={handleBoatClick}
