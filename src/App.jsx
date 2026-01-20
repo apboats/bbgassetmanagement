@@ -3375,7 +3375,9 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
         <MaximizedLocationModal
           location={maximizedLocation}
           boats={boats}
+          inventoryBoats={inventoryBoats}
           onSlotClick={handleSlotClick}
+          onBoatClick={handleBoatClick}
           onDragStart={handleDragStart}
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
