@@ -5007,7 +5007,8 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
               Showing {myViewLocations.length} location{myViewLocations.length !== 1 ? 's' : ''}
             </p>
           </div>
-          
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {myViewLocations.map(location => {
             // Handle pool-type locations
             if (location.type === 'pool') {
@@ -5068,6 +5069,7 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
               />
             );
           })}
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-md p-12 border border-slate-200 text-center">
