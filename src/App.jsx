@@ -2664,6 +2664,16 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
     });
   }, [sites]);
 
+  // Keep maximizedLocation synchronized with locations prop
+  useEffect(() => {
+    if (maximizedLocation) {
+      const updatedLocation = locations.find(loc => loc.id === maximizedLocation.id);
+      if (updatedLocation) {
+        setMaximizedLocation(updatedLocation);
+      }
+    }
+  }, [locations, maximizedLocation?.id]);
+
   // Toggle site expansion
   const toggleSiteExpansion = (siteId) => {
     setExpandedSites(prev => {
