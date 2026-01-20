@@ -5229,10 +5229,22 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
   const handleUpdateBoatFromModal = async (updatedBoat) => {
     // Update the modal state immediately for responsiveness
     setViewingBoat(updatedBoat);
-    
-    // Call direct update function to save to database
+
+    // Extract only changed fields to send to database
     if (onUpdateSingleBoat) {
-      await onUpdateSingleBoat(updatedBoat.id, updatedBoat);
+      const oldBoat = inventoryBoats.find(b => b.id === updatedBoat.id);
+      if (oldBoat) {
+        // Send only the changed fields
+        const changes = {};
+        for (const key in updatedBoat) {
+          if (JSON.stringify(updatedBoat[key]) !== JSON.stringify(oldBoat[key])) {
+            changes[key] = updatedBoat[key];
+          }
+        }
+        if (Object.keys(changes).length > 0) {
+          await onUpdateSingleBoat(updatedBoat.id, changes);
+        }
+      }
     }
   };
 
