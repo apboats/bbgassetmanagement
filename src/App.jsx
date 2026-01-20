@@ -1076,6 +1076,8 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={[]}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
@@ -1086,6 +1088,8 @@ function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={inventoryBoats}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -1924,6 +1928,8 @@ function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConf
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={[]}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -3394,6 +3400,8 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={inventoryBoats}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
@@ -3404,6 +3412,8 @@ function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpda
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={inventoryBoats}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
@@ -5153,6 +5163,8 @@ function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUs
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={[]}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={(updatedBoat) => {
             const updatedBoats = boats.map(b => b.id === updatedBoat.id ? updatedBoat : b);
@@ -5663,6 +5675,8 @@ function InventoryView({ inventoryBoats, locations, sites = [], lastSync, onSync
           boat={viewingBoat}
           locations={locations}
           sites={sites}
+          boats={boats}
+          inventoryBoats={inventoryBoats}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
