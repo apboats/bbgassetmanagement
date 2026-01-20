@@ -455,7 +455,7 @@ function AppContainer() {
       // Call the Dockmaster inventory edge function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-      
+
       console.log(`Calling Dockmaster inventory sync (${fullSync ? 'full' : 'incremental'})...`)
       const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-inventory`, {
         method: 'POST',
@@ -494,16 +494,46 @@ function AppContainer() {
 
         await inventoryBoatsService.sync(boatsToSync, fullSync)
       }
-      
+
       // Update the last sync time
       await dockmasterService.updateLastSync()
       await loadInventoryBoats()
       await loadDockmasterConfig()
-      
+
       console.log('Inventory sync completed successfully')
       return { success: true, count: result.boats?.length || 0 }
     } catch (error) {
       console.error('Error syncing inventory:', error)
+      throw error
+    }
+  }
+
+  const handleSyncInternalWorkOrders = async (fullSync = false) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+      console.log(`Calling internal work orders sync (${fullSync ? 'full' : 'incremental'})...`)
+      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-internal-workorders-sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ fullSync })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Internal work orders sync error:', errorData)
+        throw new Error(errorData.error || 'Failed to sync internal work orders')
+      }
+
+      const result = await response.json()
+      console.log('Internal work orders sync completed:', result)
+      return result
+    } catch (error) {
+      console.error('Error syncing internal work orders:', error)
       throw error
     }
   }
@@ -760,7 +790,7 @@ function AppContainer() {
       // User
       currentUser={user}
       onSignOut={signOut}
-      
+
       // Boats
       boats={boats}
       onAddBoat={handleAddBoat}
@@ -768,11 +798,12 @@ function AppContainer() {
       onDeleteBoat={handleDeleteBoat}
       onAssignNfcTag={handleAssignNfcTag}
       onReleaseNfcTag={handleReleaseNfcTag}
-      
+
       // Inventory Boats
       inventoryBoats={inventoryBoats}
       onUpdateInventoryBoat={handleUpdateInventoryBoat}
       onSyncInventory={handleSyncInventory}
+      onSyncInternalWorkOrders={handleSyncInternalWorkOrders}
       lastInventorySync={lastInventorySync}
       
       // Locations
