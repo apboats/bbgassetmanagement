@@ -273,6 +273,7 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
+        invoicedComplete,
         archivedDate,
         dockmasterId,
         customerId,
@@ -285,11 +286,12 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
+        invoiced_complete,
         archived_date,
         dockmaster_id,
         customer_id,
         hull_id,
-        ...cleanUpdates 
+        ...cleanUpdates
       } = updates
       
       // Build updateData with only fields that exist in updates
@@ -369,6 +371,7 @@ function AppContainer() {
         cleanComplete,
         fiberglassComplete,
         warrantyComplete,
+        invoicedComplete,
         archivedDate,
         dockmasterId,
         hullId,
@@ -382,6 +385,7 @@ function AppContainer() {
         clean_complete,
         fiberglass_complete,
         warranty_complete,
+        invoiced_complete,
         archived_date,
         dockmaster_id,
         hull_id,
