@@ -20,9 +20,9 @@ export function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCre
   const handleCreateBoat = async (newBoat) => {
     if (onCreateBoat) {
       const createdBoat = await onCreateBoat(newBoat);
-      if (createdBoat && createdBoat.id) {
-        // Auto-assign the newly created boat to the slot
-        onAssign(createdBoat.id);
+      if (createdBoat) {
+        // Auto-assign using the boat object directly (not ID lookup)
+        onAssign(createdBoat);
       }
     }
     setShowCreateBoat(false);
@@ -31,9 +31,9 @@ export function BoatAssignmentModal({ boats, allBoats, onAssign, onCancel, onCre
   const handleImportBoat = async (importedBoat) => {
     if (onImportBoat) {
       const createdBoat = await onImportBoat(importedBoat);
-      if (createdBoat && createdBoat.id) {
-        // Auto-assign the newly imported boat to the slot
-        onAssign(createdBoat.id);
+      if (createdBoat) {
+        // Auto-assign using the boat object directly (not ID lookup)
+        onAssign(createdBoat);
       }
     }
     setShowImportBoat(false);
