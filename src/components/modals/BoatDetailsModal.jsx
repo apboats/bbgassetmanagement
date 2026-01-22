@@ -205,15 +205,20 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
 
       // Auto-populate ALL work order numbers (comma-separated)
       if (data.workOrders && data.workOrders.length > 0) {
+        console.log('[BoatDetailsModal] Work orders received:', data.workOrders);
         const allWorkOrderNumbers = data.workOrders
           .map(wo => wo.workOrderNumber)
           .filter(Boolean)
           .join(', ');
 
+        console.log('[BoatDetailsModal] Auto-populating work order numbers:', allWorkOrderNumbers);
         if (allWorkOrderNumbers) {
           const updatedBoat = { ...boat, workOrderNumber: allWorkOrderNumbers };
+          console.log('[BoatDetailsModal] Calling onUpdateBoat with:', updatedBoat);
           onUpdateBoat(updatedBoat);
         }
+      } else {
+        console.log('[BoatDetailsModal] No work orders to auto-populate');
       }
     } catch (error) {
       console.error('Error fetching work orders:', error);
