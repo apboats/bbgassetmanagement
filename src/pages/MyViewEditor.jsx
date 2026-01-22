@@ -261,14 +261,15 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
     return newBoat;
   };
 
-  const handleAssignBoat = async (boatId) => {
+  const handleAssignBoat = async (boatOrId) => {
     if (!selectedLocation || isProcessing) return;
 
     setIsProcessing(true);
 
-    const boat = boats.find(b => b.id === boatId);
+    // Handle both boat object and boat ID
+    const boat = typeof boatOrId === 'object' ? boatOrId : boats.find(b => b.id === boatOrId);
     if (!boat) {
-      console.error('[Assign] Boat not found:', boatId);
+      console.error('[Assign] Boat not found:', boatOrId);
       setIsProcessing(false);
       return;
     }
@@ -296,7 +297,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
     }
 
     // Use the unified hook to assign the boat
-    await assignBoat(boatId, selectedLocation.id, slotId, boat.isInventory);
+    await assignBoat(boat.id, selectedLocation.id, slotId, boat.isInventory);
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {

@@ -238,8 +238,8 @@ export function DashboardView({ boats, locations, sites = [], onNavigate, onUpda
           boat={viewingBoat}
           locations={locations}
           sites={sites}
-          boats={boats}
-          inventoryBoats={[]}
+          boats={boats.filter(b => !b.isInventory)}
+          inventoryBoats={boats.filter(b => b.isInventory)}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
