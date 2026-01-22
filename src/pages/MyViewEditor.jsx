@@ -225,6 +225,10 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
     }
   };
 
+  const handleBoatClick = (boat) => {
+    setViewingBoat(boat);
+  };
+
   // Create a new boat from the assignment modal and return it for immediate assignment
   const handleCreateBoatFromAssignModal = async (newBoatData) => {
     const newBoat = {
@@ -712,26 +716,13 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
           location={maximizedLocation}
           boats={boats.filter(b => !b.isInventory)}
           inventoryBoats={boats.filter(b => b.isInventory)}
-          onClose={() => setMaximizedLocation(null)}
-          onSlotClick={(loc, row, col) => {
-            const slotId = `${row}-${col}`;
-            setSelectedLocation(maximizedLocation);
-            setSelectedSlot({ row, col, slotId });
-            setShowBoatAssignModal(true);
-            setMaximizedLocation(null);
-          }}
-          onBoatClick={(boat) => {
-            setViewingBoat({
-              ...boat,
-              currentLocation: maximizedLocation,
-              currentSlot: boat.slot
-            });
-            setMaximizedLocation(null);
-          }}
-          draggingBoat={draggingBoat}
-          onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, maximizedLocation, slotId)}
+          onSlotClick={handleSlotClick}
+          onBoatClick={handleBoatClick}
+          onDragStart={handleBoatDragStart}
+          onDrop={handleBoatDrop}
           onDragEnd={handleBoatDragEnd}
-          onDrop={(e, loc, row, col) => handleBoatDrop(e, maximizedLocation, row, col)}
+          draggingBoat={draggingBoat}
+          onClose={() => setMaximizedLocation(null)}
         />
       )}
     </div>
