@@ -202,6 +202,19 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
       setWorkOrdersLastSynced(data.lastSynced);
       setWorkOrdersFromCache(data.fromCache || false);
       setShowWorkOrders(true);
+
+      // Auto-populate ALL work order numbers (comma-separated)
+      if (data.workOrders && data.workOrders.length > 0) {
+        const allWorkOrderNumbers = data.workOrders
+          .map(wo => wo.workOrderNumber)
+          .filter(Boolean)
+          .join(', ');
+
+        if (allWorkOrderNumbers) {
+          const updatedBoat = { ...boat, workOrderNumber: allWorkOrderNumbers };
+          onUpdateBoat(updatedBoat);
+        }
+      }
     } catch (error) {
       console.error('Error fetching work orders:', error);
       setWorkOrdersError(error.message);
