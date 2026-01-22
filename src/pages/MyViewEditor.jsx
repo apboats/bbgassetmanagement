@@ -9,6 +9,7 @@ import { BoatAssignmentModal } from '../components/modals/BoatAssignmentModal';
 import { PoolLocation } from '../components/locations/PoolLocation';
 import { LocationGrid, MaximizedLocationModal } from '../components/locations/LocationGrid';
 import { LocationSection } from '../components/locations/LocationSection';
+import { boatLifecycleService } from '../services/supabaseService';
 
 export function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
@@ -244,21 +245,35 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
 
   // Import a boat from Dockmaster and return it for immediate assignment
   const handleImportBoatFromAssignModal = async (importedBoatData) => {
-    const newBoat = {
-      ...importedBoatData,
-      id: `boat-${Date.now()}`,
-      qrCode: importedBoatData.qrCode || `BBG-${Date.now().toString(36).toUpperCase()}`,
-      status: importedBoatData.status || 'needs-approval',
-      mechanicalsComplete: false,
-      cleanComplete: false,
-      fiberglassComplete: false,
-      warrantyComplete: false
-    };
-    
-    const updatedBoats = [...boats, newBoat];
-    await onUpdateBoats(updatedBoats);
-    
-    return newBoat;
+    try {
+      // Prepare boat data for database insertion
+      const boatDataForDb = {
+        ...importedBoatData,
+        qr_code: importedBoatData.qrCode || `BBG-${Date.now().toString(36).toUpperCase()}`,
+        status: importedBoatData.status || 'needs-approval',
+        mechanicals_complete: false,
+        clean_complete: false,
+        fiberglass_complete: false,
+        warranty_complete: false
+      };
+
+      // Save to database using lifecycle service (this returns the boat with real UUID)
+      const savedBoat = await boatLifecycleService.importOrUpdateBoat(boatDataForDb, {
+        targetStatus: 'needs-approval',
+        preserveLocation: false
+      });
+
+      console.log('[MyViewEditor] Boat saved to database:', savedBoat.id);
+
+      // Reload boats to get the updated list (this updates local state)
+      const updatedBoats = [...boats.filter(b => b.id !== savedBoat.id), savedBoat];
+      await onUpdateBoats(updatedBoats);
+
+      return savedBoat;
+    } catch (error) {
+      console.error('[MyViewEditor] Error importing boat:', error);
+      throw error;
+    }
   };
 
   const handleAssignBoat = async (boatOrId) => {
