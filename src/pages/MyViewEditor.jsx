@@ -296,8 +296,8 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
       slotId = selectedSlot.slotId;
     }
 
-    // Use the unified hook to assign the boat
-    await assignBoat(boat.id, selectedLocation.id, slotId, boat.isInventory);
+    // Use the unified hook to assign the boat (pass boat object to avoid race condition)
+    await assignBoat(boat, selectedLocation.id, slotId, boat.isInventory);
   };
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
