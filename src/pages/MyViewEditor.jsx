@@ -630,7 +630,10 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
                 onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, location, slotId)}
                 onDragEnd={handleBoatDragEnd}
                 onDrop={(e, loc, row, col) => handleBoatDrop(e, location, row, col)}
-                onMaximize={setMaximizedLocation}
+                onMaximize={(loc) => {
+                  const liveLocation = locations.find(l => l.id === loc.id);
+                  setMaximizedLocation(liveLocation || loc);
+                }}
               />
             );
           })}
