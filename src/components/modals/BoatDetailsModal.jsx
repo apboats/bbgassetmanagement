@@ -207,7 +207,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
       if (data.workOrders && data.workOrders.length > 0) {
         console.log('[BoatDetailsModal] Work orders received:', data.workOrders);
         const allWorkOrderNumbers = data.workOrders
-          .map(wo => wo.workOrderNumber)
+          .map(wo => wo.id)
           .filter(Boolean)
           .join(', ');
 
