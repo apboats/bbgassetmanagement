@@ -721,6 +721,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
           }}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
 
