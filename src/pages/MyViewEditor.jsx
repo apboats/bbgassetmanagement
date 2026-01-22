@@ -207,6 +207,16 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
     setHasChanges(true);
   };
 
+  // Keep maximizedLocation in sync with locations updates (for real-time boat movements)
+  useEffect(() => {
+    if (maximizedLocation) {
+      const updatedLocation = locations.find(l => l.id === maximizedLocation.id);
+      if (updatedLocation && JSON.stringify(updatedLocation.boats) !== JSON.stringify(maximizedLocation.boats)) {
+        setMaximizedLocation(updatedLocation);
+      }
+    }
+  }, [locations, maximizedLocation]);
+
   const handleSlotClick = (location, row, col) => {
     const slotId = `${row}-${col}`;
     const boatId = location.boats ? location.boats[slotId] : null;
