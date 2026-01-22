@@ -630,9 +630,10 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
                 onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, location, slotId)}
                 onDragEnd={handleBoatDragEnd}
                 onDrop={(e, loc, row, col) => handleBoatDrop(e, location, row, col)}
-                onMaximize={(loc) => {
-                  const liveLocation = locations.find(l => l.id === loc.id);
-                  setMaximizedLocation(liveLocation || loc);
+                onMaximize={() => {
+                  // Look up the live location from the locations prop to ensure we have all current data
+                  const liveLocation = locations.find(l => l.id === location.id);
+                  setMaximizedLocation(liveLocation || location);
                 }}
               />
             );
