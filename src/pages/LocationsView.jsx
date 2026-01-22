@@ -308,8 +308,16 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
       slotId = selectedSlot.slotId;
     }
 
+    // Save current scroll position to prevent unwanted scrolling during real-time updates
+    const scrollPosition = window.scrollY;
+
     // Use the unified hook to assign the boat (pass boat object to avoid race condition)
     await assignBoat(boat, selectedLocation.id, slotId, boat.isInventory);
+
+    // Restore scroll position after a brief delay (to allow real-time updates to complete)
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 100);
   };
 
   const handleUpdateBoatFromModal = (updatedBoat) => {
