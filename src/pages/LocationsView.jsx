@@ -828,6 +828,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
 
