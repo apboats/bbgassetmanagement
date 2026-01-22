@@ -15,7 +15,10 @@ export function useAssignBoat({ onMoveBoat, onSuccess, onError }) {
   const [error, setError] = useState(null);
 
   const assignBoat = useCallback(
-    async (boatId, locationId, slotId = null, isInventory = false) => {
+    async (boatOrId, locationId, slotId = null, isInventory = false) => {
+      // Handle both boat object and boat ID to avoid race conditions
+      const boatId = typeof boatOrId === 'object' ? boatOrId.id : boatOrId;
+
       if (!boatId) {
         const err = new Error('Invalid boat ID');
         setError(err);
@@ -42,15 +45,15 @@ export function useAssignBoat({ onMoveBoat, onSuccess, onError }) {
 
       try {
         console.log('[useAssignBoat] Assigning boat:', {
-          boatId,
+          boatOrId: typeof boatOrId === 'object' ? boatOrId.id : boatOrId,
           locationId,
           slotId,
           isInventory
         });
 
         // Delegate to AppContainer's handleMoveBoat
-        // This will handle removing from old location if needed
-        await onMoveBoat(boatId, locationId, slotId, isInventory);
+        // Pass the boat object (or ID) to avoid race conditions with newly created boats
+        await onMoveBoat(boatOrId, locationId, slotId, isInventory);
 
         console.log('[useAssignBoat] Boat assigned successfully');
 
