@@ -29,6 +29,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [viewingBoat, setViewingBoat] = useState(null);
+  const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
 
   // Use unified remove boat hook
@@ -625,7 +626,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
                 onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, location, slotId)}
                 onDragEnd={handleBoatDragEnd}
                 onDrop={(e, loc, row, col) => handleBoatDrop(e, location, row, col)}
-                onMaximize={null}
+                onMaximize={setMaximizedLocation}
               />
             );
           })}
@@ -702,6 +703,35 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
           }}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
+        />
+      )}
+
+      {/* Maximized Location Modal */}
+      {maximizedLocation && (
+        <MaximizedLocationModal
+          location={maximizedLocation}
+          boats={boats.filter(b => !b.isInventory)}
+          inventoryBoats={boats.filter(b => b.isInventory)}
+          onClose={() => setMaximizedLocation(null)}
+          onSlotClick={(loc, row, col) => {
+            const slotId = `${row}-${col}`;
+            setSelectedLocation(maximizedLocation);
+            setSelectedSlot({ row, col, slotId });
+            setShowBoatAssignModal(true);
+            setMaximizedLocation(null);
+          }}
+          onBoatClick={(boat) => {
+            setViewingBoat({
+              ...boat,
+              currentLocation: maximizedLocation,
+              currentSlot: boat.slot
+            });
+            setMaximizedLocation(null);
+          }}
+          draggingBoat={draggingBoat}
+          onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, maximizedLocation, slotId)}
+          onDragEnd={handleBoatDragEnd}
+          onDrop={(e, loc, row, col) => handleBoatDrop(e, maximizedLocation, row, col)}
         />
       )}
     </div>
