@@ -134,6 +134,25 @@ function AppContainer() {
         customerId: boat.customer_id,
         hullId: boat.hull_id,
         storageBoat: boat.storage_boat ?? false,
+        // Seasonal work phases (storage boats only)
+        fallStatus: boat.fall_status || 'needs-approval',
+        winterStatus: boat.winter_status || 'needs-approval',
+        springStatus: boat.spring_status || 'needs-approval',
+        fallMechanicalsComplete: boat.fall_mechanicals_complete ?? false,
+        fallCleanComplete: boat.fall_clean_complete ?? false,
+        fallFiberglassComplete: boat.fall_fiberglass_complete ?? false,
+        fallWarrantyComplete: boat.fall_warranty_complete ?? false,
+        fallInvoicedComplete: boat.fall_invoiced_complete ?? false,
+        winterMechanicalsComplete: boat.winter_mechanicals_complete ?? false,
+        winterCleanComplete: boat.winter_clean_complete ?? false,
+        winterFiberglassComplete: boat.winter_fiberglass_complete ?? false,
+        winterWarrantyComplete: boat.winter_warranty_complete ?? false,
+        winterInvoicedComplete: boat.winter_invoiced_complete ?? false,
+        springMechanicalsComplete: boat.spring_mechanicals_complete ?? false,
+        springCleanComplete: boat.spring_clean_complete ?? false,
+        springFiberglassComplete: boat.spring_fiberglass_complete ?? false,
+        springWarrantyComplete: boat.spring_warranty_complete ?? false,
+        springInvoicedComplete: boat.spring_invoiced_complete ?? false,
       }))
       
       setBoats(transformedData)
@@ -334,6 +353,25 @@ function AppContainer() {
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
       if ('storageBoat' in updates) updateData.storage_boat = updates.storageBoat;
+      // Seasonal work phases
+      if ('fallStatus' in updates) updateData.fall_status = updates.fallStatus;
+      if ('winterStatus' in updates) updateData.winter_status = updates.winterStatus;
+      if ('springStatus' in updates) updateData.spring_status = updates.springStatus;
+      if ('fallMechanicalsComplete' in updates) updateData.fall_mechanicals_complete = updates.fallMechanicalsComplete;
+      if ('fallCleanComplete' in updates) updateData.fall_clean_complete = updates.fallCleanComplete;
+      if ('fallFiberglassComplete' in updates) updateData.fall_fiberglass_complete = updates.fallFiberglassComplete;
+      if ('fallWarrantyComplete' in updates) updateData.fall_warranty_complete = updates.fallWarrantyComplete;
+      if ('fallInvoicedComplete' in updates) updateData.fall_invoiced_complete = updates.fallInvoicedComplete;
+      if ('winterMechanicalsComplete' in updates) updateData.winter_mechanicals_complete = updates.winterMechanicalsComplete;
+      if ('winterCleanComplete' in updates) updateData.winter_clean_complete = updates.winterCleanComplete;
+      if ('winterFiberglassComplete' in updates) updateData.winter_fiberglass_complete = updates.winterFiberglassComplete;
+      if ('winterWarrantyComplete' in updates) updateData.winter_warranty_complete = updates.winterWarrantyComplete;
+      if ('winterInvoicedComplete' in updates) updateData.winter_invoiced_complete = updates.winterInvoicedComplete;
+      if ('springMechanicalsComplete' in updates) updateData.spring_mechanicals_complete = updates.springMechanicalsComplete;
+      if ('springCleanComplete' in updates) updateData.spring_clean_complete = updates.springCleanComplete;
+      if ('springFiberglassComplete' in updates) updateData.spring_fiberglass_complete = updates.springFiberglassComplete;
+      if ('springWarrantyComplete' in updates) updateData.spring_warranty_complete = updates.springWarrantyComplete;
+      if ('springInvoicedComplete' in updates) updateData.spring_invoiced_complete = updates.springInvoicedComplete;
 
       await boatsService.update(boatId, updateData)
       await loadBoats()
