@@ -83,14 +83,6 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
   else if (filterWorkPhase === 'needs-warranty') workPhaseFilter = 'warranty';
   else if (filterWorkPhase === 'all-complete' || filterWorkPhase === 'all') workPhaseFilter = 'all';
 
-  // DEBUG: Log filtering inputs
-  console.log('[BoatsView] Filtering:', {
-    totalBoats: nonArchivedFiltered.length,
-    filterStatus,
-    workPhaseFilter,
-    sampleBoat: nonArchivedFiltered[0],
-  });
-
   // Apply centralized filters
   const filteredBoats = applyAllFilters(nonArchivedFiltered, {
     searchQuery,
@@ -99,12 +91,6 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
     locations: filterLocations.length > 0 ? filterLocations : null,
     sites: filterSites.length > 0 ? filterSites : null
   }, locations);
-
-  // DEBUG: Log filtering results
-  console.log('[BoatsView] Filtered result:', {
-    filteredCount: filteredBoats.length,
-    sampleFiltered: filteredBoats[0],
-  });
 
   const handleAddBoat = async (newBoat) => {
     try {
@@ -164,13 +150,7 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
                 <Plus className="w-5 h-5" />Add Boat
               </button>
               <button
-                onClick={() => {
-                  if (!dockmasterConfig?.apiKey || !dockmasterConfig?.dealerId) {
-                    alert('Dockmaster API credentials not configured. Please configure in Settings.');
-                    return;
-                  }
-                  setShowBoatTypeSelector(true);
-                }}
+                onClick={() => setShowBoatTypeSelector(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
               >
                 <Package className="w-5 h-5" />Import
