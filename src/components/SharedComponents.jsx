@@ -71,12 +71,26 @@ export function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
   return (
     <div className="boat-card bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
       {boat.storageBoat ? (
-        // Storage boat - 3 horizontal colored sections (no labels)
-        <div className="flex h-12">
-          <div className={`status-${boat.fallStatus} flex-1 border-r border-white/20`}></div>
-          <div className={`status-${boat.winterStatus} flex-1 border-r border-white/20`}></div>
-          <div className={`status-${boat.springStatus} flex-1`}></div>
-        </div>
+        // Storage boat - 3 horizontal colored sections with dynamic widths based on active season
+        (() => {
+          const activeSeason = getActiveSeason(boat);
+          const allComplete = boat.fallStatus === 'all-work-complete' &&
+                             boat.winterStatus === 'all-work-complete' &&
+                             boat.springStatus === 'all-work-complete';
+
+          // Determine width classes based on active season
+          const fallWidth = allComplete ? 'flex-[1]' : (activeSeason === 'fall' ? 'flex-[2]' : 'flex-[1]');
+          const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
+          const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
+
+          return (
+            <div className="flex h-12">
+              <div className={`status-${boat.fallStatus} ${fallWidth} border-r border-white/20`}></div>
+              <div className={`status-${boat.winterStatus} ${winterWidth} border-r border-white/20`}></div>
+              <div className={`status-${boat.springStatus} ${springWidth}`}></div>
+            </div>
+          );
+        })()
       ) : (
         // Regular boat - single colored bar with status label and QR code
         <div className={`status-${boat.status} p-3`}>
