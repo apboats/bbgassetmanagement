@@ -52,18 +52,24 @@ function AppContainer() {
       const boatsChannel = supabaseService.subscriptions.subscribeToBoats(() => {
         console.log('Real-time update: boats changed')
         loadBoats()
+        // Also reload locations since boat moves update location.boats object
+        loadLocations()
       })
 
       // Subscribe to locations changes
       const locationsChannel = supabaseService.subscriptions.subscribeToLocations(() => {
         console.log('Real-time update: locations changed')
         loadLocations()
+        // Also reload boats since location changes may affect boat.location/slot
+        loadBoats()
       })
 
       // Subscribe to inventory boats changes
       const inventoryChannel = supabaseService.subscriptions.subscribeToInventoryBoats(() => {
         console.log('Real-time update: inventory boats changed')
         loadInventoryBoats()
+        // Also reload locations since inventory boat moves update location.boats object
+        loadLocations()
       })
 
       console.log('Real-time subscriptions active')
