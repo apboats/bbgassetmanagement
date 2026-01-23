@@ -153,6 +153,13 @@ function AppContainer() {
         springFiberglassComplete: boat.spring_fiberglass_complete ?? false,
         springWarrantyComplete: boat.spring_warranty_complete ?? false,
         springInvoicedComplete: boat.spring_invoiced_complete ?? false,
+        // Seasonal completion tracking
+        fallCompletedBy: boat.fall_completed_by || null,
+        fallCompletedAt: boat.fall_completed_at || null,
+        winterCompletedBy: boat.winter_completed_by || null,
+        winterCompletedAt: boat.winter_completed_at || null,
+        springCompletedBy: boat.spring_completed_by || null,
+        springCompletedAt: boat.spring_completed_at || null,
       }))
       
       setBoats(transformedData)
@@ -310,6 +317,32 @@ function AppContainer() {
         dockmasterId,
         customerId,
         hullId,
+        storageBoat,
+        // Seasonal fields (camelCase - will be mapped to snake_case)
+        fallStatus,
+        winterStatus,
+        springStatus,
+        fallMechanicalsComplete,
+        fallCleanComplete,
+        fallFiberglassComplete,
+        fallWarrantyComplete,
+        fallInvoicedComplete,
+        winterMechanicalsComplete,
+        winterCleanComplete,
+        winterFiberglassComplete,
+        winterWarrantyComplete,
+        winterInvoicedComplete,
+        springMechanicalsComplete,
+        springCleanComplete,
+        springFiberglassComplete,
+        springWarrantyComplete,
+        springInvoicedComplete,
+        fallCompletedBy,
+        fallCompletedAt,
+        winterCompletedBy,
+        winterCompletedAt,
+        springCompletedBy,
+        springCompletedAt,
         // Also remove snake_case versions (we'll add them back correctly)
         qr_code,
         nfc_tag,
@@ -327,6 +360,31 @@ function AppContainer() {
         dockmaster_id,
         customer_id,
         hull_id,
+        storage_boat,
+        fall_status,
+        winter_status,
+        spring_status,
+        fall_mechanicals_complete,
+        fall_clean_complete,
+        fall_fiberglass_complete,
+        fall_warranty_complete,
+        fall_invoiced_complete,
+        winter_mechanicals_complete,
+        winter_clean_complete,
+        winter_fiberglass_complete,
+        winter_warranty_complete,
+        winter_invoiced_complete,
+        spring_mechanicals_complete,
+        spring_clean_complete,
+        spring_fiberglass_complete,
+        spring_warranty_complete,
+        spring_invoiced_complete,
+        fall_completed_by,
+        fall_completed_at,
+        winter_completed_by,
+        winter_completed_at,
+        spring_completed_by,
+        spring_completed_at,
         ...cleanUpdates
       } = updates
       
@@ -372,6 +430,13 @@ function AppContainer() {
       if ('springFiberglassComplete' in updates) updateData.spring_fiberglass_complete = updates.springFiberglassComplete;
       if ('springWarrantyComplete' in updates) updateData.spring_warranty_complete = updates.springWarrantyComplete;
       if ('springInvoicedComplete' in updates) updateData.spring_invoiced_complete = updates.springInvoicedComplete;
+      // Seasonal completion tracking
+      if ('fallCompletedBy' in updates) updateData.fall_completed_by = updates.fallCompletedBy;
+      if ('fallCompletedAt' in updates) updateData.fall_completed_at = updates.fallCompletedAt;
+      if ('winterCompletedBy' in updates) updateData.winter_completed_by = updates.winterCompletedBy;
+      if ('winterCompletedAt' in updates) updateData.winter_completed_at = updates.winterCompletedAt;
+      if ('springCompletedBy' in updates) updateData.spring_completed_by = updates.springCompletedBy;
+      if ('springCompletedAt' in updates) updateData.spring_completed_at = updates.springCompletedAt;
 
       await boatsService.update(boatId, updateData)
       await loadBoats()
