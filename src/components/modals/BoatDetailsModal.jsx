@@ -60,7 +60,9 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [notesText, setNotesText] = useState(boat.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
-  const [activeSeason, setActiveSeason] = useState('fall');
+  const [activeSeason, setActiveSeason] = useState(
+    boat.storageBoat ? getActiveSeason(boat) : 'fall'
+  );
 
   // Handler for seasonal work phases
   const handleSeasonWorkPhaseToggle = (season, phase) => {
