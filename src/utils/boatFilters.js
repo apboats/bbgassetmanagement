@@ -18,10 +18,26 @@ import { getActiveSeason, getDisplayStatus } from './seasonHelpers';
 export function filterByStatus(boats, filterStatus) {
   if (filterStatus === 'all') return boats;
 
-  return boats.filter(boat => {
+  const result = boats.filter(boat => {
     const displayStatus = getDisplayStatus(boat);
-    return displayStatus === filterStatus;
+    const matches = displayStatus === filterStatus;
+
+    // DEBUG: Log first few boats
+    if (boats.indexOf(boat) < 3) {
+      console.log('[filterByStatus]', {
+        owner: boat.owner,
+        storageBoat: boat.storageBoat,
+        displayStatus,
+        filterStatus,
+        matches,
+      });
+    }
+
+    return matches;
   });
+
+  console.log(`[filterByStatus] Filtered ${boats.length} → ${result.length} boats with status="${filterStatus}"`);
+  return result;
 }
 
 /**
