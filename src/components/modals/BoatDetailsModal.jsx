@@ -10,7 +10,7 @@ import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
-import { SEASONS, SEASON_LABELS, getSeasonStatus } from '../../utils/seasonHelpers';
+import { SEASONS, SEASON_LABELS } from '../../utils/seasonHelpers';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -62,14 +62,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [savingNotes, setSavingNotes] = useState(false);
   const [activeSeason, setActiveSeason] = useState('fall');
 
-  // Handlers for seasonal work phases
-  const handleSeasonStatusChange = (season, newStatus) => {
-    if (isArchived) return;
-    const statusKey = `${season}Status`;
-    const updatedBoat = { ...boat, [statusKey]: newStatus };
-    onUpdateBoat(updatedBoat);
-  };
-
+  // Handler for seasonal work phases
   const handleSeasonWorkPhaseToggle = (season, phase) => {
     if (isArchived) return;
     const phaseKey = `${season}${phase.charAt(0).toUpperCase() + phase.slice(1)}Complete`;
@@ -126,7 +119,14 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
     'FP': 'Floor Planned'
   };
 
-  const allWorkPhasesComplete = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete && boat.invoicedComplete;
+  // For storage boats, check season-specific work phases; for regular boats, check regular phases
+  const allWorkPhasesComplete = boat.storageBoat
+    ? (boat[`${activeSeason}MechanicalsComplete`] &&
+       boat[`${activeSeason}CleanComplete`] &&
+       boat[`${activeSeason}FiberglassComplete`] &&
+       boat[`${activeSeason}WarrantyComplete`] &&
+       boat[`${activeSeason}InvoicedComplete`])
+    : (boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete && boat.invoicedComplete);
   const isArchived = boat.status === 'archived';
   const isInventory = boat.isInventory === true; // Check if this is an inventory boat
 
@@ -146,41 +146,83 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const handleStatusUpdate = (newStatus) => {
     if (isArchived) return; // Can't modify archived boats
 
-    // Validate: can't set to complete without all phases done
-    if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
-      alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty, Invoiced) must be completed first.');
-      return;
-    }
+    // For storage boats, update the active season's status
+    if (boat.storageBoat) {
+      // Validate: can't set to complete without all phases done for this season
+      if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
+        alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty, Invoiced) must be completed first.');
+        return;
+      }
 
-    // Check for unbilled opcodes (labor finished but not closed) when marking complete
-    if (newStatus === 'all-work-complete' && workOrders.length > 0) {
-      const hasUnbilledOpcodes = workOrders.some(wo =>
-        wo.operations && wo.operations.some(op =>
-          op.status !== 'C' && op.flagLaborFinished
-        )
-      );
+      // Check for unbilled opcodes (labor finished but not closed) when marking complete
+      if (newStatus === 'all-work-complete' && workOrders.length > 0) {
+        const hasUnbilledOpcodes = workOrders.some(wo =>
+          wo.operations && wo.operations.some(op =>
+            op.status !== 'C' && op.flagLaborFinished
+          )
+        );
 
-      if (hasUnbilledOpcodes) {
-        const shouldOverride = confirm('All work should be invoiced before the boat is marked as complete. Would you like to override?');
-        if (!shouldOverride) {
-          return;
+        if (hasUnbilledOpcodes) {
+          const shouldOverride = confirm('All work should be invoiced before the boat is marked as complete. Would you like to override?');
+          if (!shouldOverride) {
+            return;
+          }
         }
       }
+
+      // Update season-specific status
+      const statusKey = `${activeSeason}Status`;
+      const updatedBoat = { ...boat, [statusKey]: newStatus };
+
+      // Record who marked the season as complete and when
+      if (newStatus === 'all-work-complete' && currentUser) {
+        updatedBoat[`${activeSeason}CompletedBy`] = currentUser.name || currentUser.username;
+        updatedBoat[`${activeSeason}CompletedAt`] = new Date().toISOString();
+      } else if (newStatus !== 'all-work-complete') {
+        // Clear completedBy if status is changed away from complete
+        updatedBoat[`${activeSeason}CompletedBy`] = null;
+        updatedBoat[`${activeSeason}CompletedAt`] = null;
+      }
+
+      onUpdateBoat(updatedBoat);
+    } else {
+      // Regular boats - use existing logic
+      // Validate: can't set to complete without all phases done
+      if (newStatus === 'all-work-complete' && !allWorkPhasesComplete) {
+        alert('Cannot mark as complete! All work phases (Mechanicals, Clean, Fiberglass, Warranty, Invoiced) must be completed first.');
+        return;
+      }
+
+      // Check for unbilled opcodes (labor finished but not closed) when marking complete
+      if (newStatus === 'all-work-complete' && workOrders.length > 0) {
+        const hasUnbilledOpcodes = workOrders.some(wo =>
+          wo.operations && wo.operations.some(op =>
+            op.status !== 'C' && op.flagLaborFinished
+          )
+        );
+
+        if (hasUnbilledOpcodes) {
+          const shouldOverride = confirm('All work should be invoiced before the boat is marked as complete. Would you like to override?');
+          if (!shouldOverride) {
+            return;
+          }
+        }
+      }
+
+      const updatedBoat = { ...boat, status: newStatus };
+
+      // Record who marked the boat as complete and when
+      if (newStatus === 'all-work-complete' && currentUser) {
+        updatedBoat.completedBy = currentUser.name || currentUser.username;
+        updatedBoat.completedAt = new Date().toISOString();
+      } else if (newStatus !== 'all-work-complete') {
+        // Clear completedBy if status is changed away from complete
+        updatedBoat.completedBy = null;
+        updatedBoat.completedAt = null;
+      }
+
+      onUpdateBoat(updatedBoat);
     }
-
-    const updatedBoat = { ...boat, status: newStatus };
-
-    // Record who marked the boat as complete and when
-    if (newStatus === 'all-work-complete' && currentUser) {
-      updatedBoat.completedBy = currentUser.name || currentUser.username;
-      updatedBoat.completedAt = new Date().toISOString();
-    } else if (newStatus !== 'all-work-complete') {
-      // Clear completedBy if status is changed away from complete
-      updatedBoat.completedBy = null;
-      updatedBoat.completedAt = null;
-    }
-
-    onUpdateBoat(updatedBoat);
   };
 
   const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
@@ -592,25 +634,6 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                 ))}
               </div>
 
-              {/* Status Dropdown for Active Season */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {SEASON_LABELS[activeSeason]} Status
-                </label>
-                <select
-                  value={getSeasonStatus(boat, activeSeason)}
-                  onChange={(e) => handleSeasonStatusChange(activeSeason, e.target.value)}
-                  disabled={isArchived}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                >
-                  <option value="needs-approval">Needs Approval</option>
-                  <option value="needs-parts">Needs Parts</option>
-                  <option value="parts-kit-pulled">Parts Kit Pulled</option>
-                  <option value="on-deck">On Deck</option>
-                  <option value="all-work-complete">All Work Complete</option>
-                </select>
-              </div>
-
               {/* Work Phase Toggles for Active Season */}
               <div className="space-y-2">
                 {['mechanicals', 'clean', 'fiberglass', 'warranty', 'invoiced'].map(phase => {
@@ -788,37 +811,39 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
           )}
 
           <div>
-            <h4 className="text-lg font-bold text-slate-900 mb-4">Update Status</h4>
+            <h4 className="text-lg font-bold text-slate-900 mb-4">
+              Update Status {boat.storageBoat && `(${SEASON_LABELS[activeSeason]})`}
+            </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <StatusButton
                 status="needs-approval"
                 label="Needs Approval"
-                active={boat.status === 'needs-approval'}
+                active={boat.storageBoat ? boat[`${activeSeason}Status`] === 'needs-approval' : boat.status === 'needs-approval'}
                 onClick={() => handleStatusUpdate('needs-approval')}
               />
               <StatusButton
                 status="needs-parts"
                 label="Needs Parts"
-                active={boat.status === 'needs-parts'}
+                active={boat.storageBoat ? boat[`${activeSeason}Status`] === 'needs-parts' : boat.status === 'needs-parts'}
                 onClick={() => handleStatusUpdate('needs-parts')}
               />
               <StatusButton
                 status="parts-kit-pulled"
                 label="Parts Pulled"
-                active={boat.status === 'parts-kit-pulled'}
+                active={boat.storageBoat ? boat[`${activeSeason}Status`] === 'parts-kit-pulled' : boat.status === 'parts-kit-pulled'}
                 onClick={() => handleStatusUpdate('parts-kit-pulled')}
               />
               <StatusButton
                 status="on-deck"
                 label="On Deck"
-                active={boat.status === 'on-deck'}
+                active={boat.storageBoat ? boat[`${activeSeason}Status`] === 'on-deck' : boat.status === 'on-deck'}
                 onClick={() => handleStatusUpdate('on-deck')}
               />
               <button
                 onClick={() => handleStatusUpdate('all-work-complete')}
                 disabled={!allWorkPhasesComplete}
                 className={`p-4 rounded-lg border-2 transition-all ${
-                  boat.status === 'all-work-complete'
+                  (boat.storageBoat ? boat[`${activeSeason}Status`] === 'all-work-complete' : boat.status === 'all-work-complete')
                     ? 'status-all-work-complete border-transparent text-white font-semibold shadow-md'
                     : allWorkPhasesComplete
                       ? 'border-slate-300 bg-white hover:border-slate-400 text-slate-700'
@@ -827,10 +852,18 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                 title={!allWorkPhasesComplete ? 'Complete all work phases first' : ''}
               >
                 <span>Complete</span>
-                {boat.status === 'all-work-complete' && boat.completedBy && (
-                  <span className="block text-xs mt-1 opacity-90">
-                    by {boat.completedBy}
-                  </span>
+                {boat.storageBoat ? (
+                  boat[`${activeSeason}Status`] === 'all-work-complete' && boat[`${activeSeason}CompletedBy`] && (
+                    <span className="block text-xs mt-1 opacity-90">
+                      by {boat[`${activeSeason}CompletedBy`]}
+                    </span>
+                  )
+                ) : (
+                  boat.status === 'all-work-complete' && boat.completedBy && (
+                    <span className="block text-xs mt-1 opacity-90">
+                      by {boat.completedBy}
+                    </span>
+                  )
                 )}
               </button>
             </div>
@@ -839,10 +872,18 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                 ⚠️ All work phases must be completed before marking as complete
               </p>
             )}
-            {boat.status === 'all-work-complete' && boat.completedBy && boat.completedAt && (
-              <p className="text-sm text-green-600 mt-2">
-                Marked complete by {boat.completedBy} on {new Date(boat.completedAt).toLocaleDateString()}
-              </p>
+            {boat.storageBoat ? (
+              boat[`${activeSeason}Status`] === 'all-work-complete' && boat[`${activeSeason}CompletedBy`] && boat[`${activeSeason}CompletedAt`] && (
+                <p className="text-sm text-green-600 mt-2">
+                  Marked complete by {boat[`${activeSeason}CompletedBy`]} on {new Date(boat[`${activeSeason}CompletedAt`]).toLocaleDateString()}
+                </p>
+              )
+            ) : (
+              boat.status === 'all-work-complete' && boat.completedBy && boat.completedAt && (
+                <p className="text-sm text-green-600 mt-2">
+                  Marked complete by {boat.completedBy} on {new Date(boat.completedAt).toLocaleDateString()}
+                </p>
+              )
             )}
           </div>
 
