@@ -522,6 +522,30 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             )}
           </div>
 
+          {/* Storage Boat Toggle */}
+          <div>
+            <div className="flex items-center justify-between">
+              <h4 className="text-base md:text-lg font-bold text-slate-900">Storage Boat</h4>
+              <button
+                onClick={() => {
+                  if (isArchived) return;
+                  const updatedBoat = { ...boat, storageBoat: !boat.storageBoat };
+                  onUpdateBoat(updatedBoat);
+                }}
+                disabled={isArchived}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  boat.storageBoat ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    boat.storageBoat ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           <div>
             <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
             <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
