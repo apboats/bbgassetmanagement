@@ -8,6 +8,8 @@ import { boatLifecycleService } from '../services/supabaseService';
 import { boatsService } from '../services/supabaseService';
 import { findBoatLocationData, useBoatLocation } from '../components/BoatComponents';
 import { CustomerBoatCard } from '../components/SharedComponents';
+import { applyAllFilters } from '../utils/boatFilters';
+import { getActiveSeason } from '../utils/seasonHelpers';
 
 // Removed local component definitions - now imported from separate files
 // - CustomerBoatCard: imported from ../components/SharedComponents
@@ -65,33 +67,30 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
     // Don't auto-clear location filters - let user manage them separately
   };
 
-  const filteredBoats = boats.filter(boat => {
+  // Apply archived filter first
+  const nonArchivedFiltered = boats.filter(boat => {
     const isArchived = boat.status === 'archived';
     if (showArchived && !isArchived) return false;
     if (!showArchived && isArchived) return false;
-    
-    const matchesSearch = boat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         boat.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (boat.hullId && boat.hullId.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                         (boat.dockmasterId && boat.dockmasterId.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = filterStatus === 'all' || boat.status === filterStatus;
-    
-    let matchesWorkPhase = true;
-    if (filterWorkPhase === 'needs-mechanicals') matchesWorkPhase = !boat.mechanicalsComplete;
-    else if (filterWorkPhase === 'needs-clean') matchesWorkPhase = !boat.cleanComplete;
-    else if (filterWorkPhase === 'needs-fiberglass') matchesWorkPhase = !boat.fiberglassComplete;
-    else if (filterWorkPhase === 'needs-warranty') matchesWorkPhase = !boat.warrantyComplete;
-    else if (filterWorkPhase === 'all-complete') matchesWorkPhase = boat.mechanicalsComplete && boat.cleanComplete && boat.fiberglassComplete && boat.warrantyComplete;
-    
-    let matchesLocation = true;
-    if (filterLocations.length > 0) {
-      if (filterLocations.includes('unassigned')) matchesLocation = !boat.location || filterLocations.includes(boat.location);
-      else matchesLocation = boat.location && filterLocations.includes(boat.location);
-    }
-    
-    return matchesSearch && matchesStatus && matchesWorkPhase && matchesLocation;
+    return true;
   });
+
+  // Convert filterWorkPhase to match centralized filter format
+  let workPhaseFilter = filterWorkPhase;
+  if (filterWorkPhase === 'needs-mechanicals') workPhaseFilter = 'mechanicals';
+  else if (filterWorkPhase === 'needs-clean') workPhaseFilter = 'clean';
+  else if (filterWorkPhase === 'needs-fiberglass') workPhaseFilter = 'fiberglass';
+  else if (filterWorkPhase === 'needs-warranty') workPhaseFilter = 'warranty';
+  else if (filterWorkPhase === 'all-complete' || filterWorkPhase === 'all') workPhaseFilter = 'all';
+
+  // Apply centralized filters
+  const filteredBoats = applyAllFilters(nonArchivedFiltered, {
+    searchQuery,
+    status: filterStatus,
+    workPhase: workPhaseFilter,
+    locations: filterLocations.length > 0 ? filterLocations : null,
+    sites: filterSites.length > 0 ? filterSites : null
+  }, locations);
 
   const handleAddBoat = async (newBoat) => {
     try {
@@ -191,7 +190,14 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
                   </div>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {boats.filter(b => b.status !== 'archived' && !b.mechanicalsComplete).length}
+                  {boats.filter(b => {
+                    if (b.status === 'archived') return false;
+                    if (b.storageBoat) {
+                      const activeSeason = getActiveSeason(b);
+                      return !b[`${activeSeason}MechanicalsComplete`];
+                    }
+                    return !b.mechanicalsComplete;
+                  }).length}
                 </p>
               </button>
 
@@ -212,7 +218,14 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
                   </div>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {boats.filter(b => b.status !== 'archived' && !b.cleanComplete).length}
+                  {boats.filter(b => {
+                    if (b.status === 'archived') return false;
+                    if (b.storageBoat) {
+                      const activeSeason = getActiveSeason(b);
+                      return !b[`${activeSeason}CleanComplete`];
+                    }
+                    return !b.cleanComplete;
+                  }).length}
                 </p>
               </button>
 
@@ -233,7 +246,14 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
                   </div>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {boats.filter(b => b.status !== 'archived' && !b.fiberglassComplete).length}
+                  {boats.filter(b => {
+                    if (b.status === 'archived') return false;
+                    if (b.storageBoat) {
+                      const activeSeason = getActiveSeason(b);
+                      return !b[`${activeSeason}FiberglassComplete`];
+                    }
+                    return !b.fiberglassComplete;
+                  }).length}
                 </p>
               </button>
 
@@ -252,7 +272,14 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
                   </div>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {boats.filter(b => b.status !== 'archived' && !b.warrantyComplete).length}
+                  {boats.filter(b => {
+                    if (b.status === 'archived') return false;
+                    if (b.storageBoat) {
+                      const activeSeason = getActiveSeason(b);
+                      return !b[`${activeSeason}WarrantyComplete`];
+                    }
+                    return !b.warrantyComplete;
+                  }).length}
                 </p>
               </button>
             </div>
