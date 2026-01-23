@@ -10,7 +10,7 @@ import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
-import { SEASONS, SEASON_LABELS } from '../../utils/seasonHelpers';
+import { SEASONS, SEASON_LABELS, getActiveSeason } from '../../utils/seasonHelpers';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -404,11 +404,16 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
     }
   };
 
+  // Get the appropriate status for header color
+  const headerStatus = boat.storageBoat
+    ? boat[`${getActiveSeason(boat)}Status`]
+    : boat.status;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 md:p-4 z-[60]">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col animate-slide-in">
         {/* Fixed Header */}
-        <div className={`status-${boat.status} p-4 md:p-6 rounded-t-xl flex-shrink-0`}>
+        <div className={`status-${headerStatus} p-4 md:p-6 rounded-t-xl flex-shrink-0`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
