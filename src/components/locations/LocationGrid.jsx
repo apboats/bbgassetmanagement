@@ -99,6 +99,42 @@ export function MaximizedLocationModal({
       );
     }
 
+    // Storage boat - split into 3 vertical sections
+    if (boat.storageBoat) {
+      return (
+        <div className="w-full h-full flex absolute inset-0 rounded-xl overflow-hidden">
+          {/* Fall Section (Left 33%) */}
+          <div className={`w-1/3 h-full status-${boat.fallStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
+            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
+              Fall
+            </span>
+          </div>
+
+          {/* Winter Section (Middle 33%) */}
+          <div className={`w-1/3 h-full status-${boat.winterStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
+            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
+              Winter
+            </span>
+          </div>
+
+          {/* Spring Section (Right 33%) */}
+          <div className={`w-1/3 h-full status-${boat.springStatus} flex items-center justify-center pointer-events-none`}>
+            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
+              Spring
+            </span>
+          </div>
+
+          {/* Boat Info Overlay (visible on hover) */}
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+            <div className="text-white text-center px-2">
+              <p className="font-bold text-sm">{boat.owner}</p>
+              <p className="text-xs opacity-75">{boat.name}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <>
         <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
@@ -153,12 +189,14 @@ export function MaximizedLocationModal({
             onSlotClick(location, row, col);
           }
         }}
-        className={`aspect-square border-2 rounded-xl p-3 flex flex-col items-center justify-center text-center transition-all min-w-[140px] min-h-[140px] ${
+        className={`aspect-square border-2 rounded-xl flex flex-col items-center justify-center text-center transition-all min-w-[140px] min-h-[140px] group ${
           boat
-            ? `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105`
+            ? boat.storageBoat
+              ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+              : `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-3`
             : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+              ? 'border-blue-400 bg-blue-50 cursor-pointer p-3'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-3'
         }`}
       >
         {renderSlotContent(boat, row, col)}
@@ -196,12 +234,14 @@ export function MaximizedLocationModal({
             onSlotClick(location, row, col);
           }
         }}
-        className={`border-2 rounded-xl p-2 flex flex-col items-center justify-center text-center transition-all overflow-hidden ${
+        className={`border-2 rounded-xl flex flex-col items-center justify-center text-center transition-all overflow-hidden group ${
           boat
-            ? `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105`
+            ? boat.storageBoat
+              ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+              : `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-2`
             : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+              ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
         }`}
         style={{ width: '140px', height: '140px', flexShrink: 0 }}
       >
@@ -464,6 +504,42 @@ export function LocationGrid({
       );
     }
 
+    // Storage boat - split into 3 vertical sections
+    if (boat.storageBoat) {
+      return (
+        <div className="w-full h-full flex absolute inset-0 rounded-lg overflow-hidden">
+          {/* Fall Section (Left 33%) */}
+          <div className={`w-1/3 h-full status-${boat.fallStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
+            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
+              Fall
+            </span>
+          </div>
+
+          {/* Winter Section (Middle 33%) */}
+          <div className={`w-1/3 h-full status-${boat.winterStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
+            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
+              Winter
+            </span>
+          </div>
+
+          {/* Spring Section (Right 33%) */}
+          <div className={`w-1/3 h-full status-${boat.springStatus} flex items-center justify-center pointer-events-none`}>
+            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
+              Spring
+            </span>
+          </div>
+
+          {/* Boat Info Overlay (visible on hover) */}
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+            <div className="text-white text-center px-2">
+              <p className="font-bold text-[clamp(0.6rem,1.2vw,0.75rem)]">{boat.owner}</p>
+              <p className="text-[clamp(0.5rem,1vw,0.625rem)] opacity-75">{boat.name}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Regular boat display
     return (
       <>
@@ -534,12 +610,14 @@ export function LocationGrid({
                 onSlotClick(location, row, col);
               }
             }}
-            className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
+            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all group ${
               boat
-                ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105`
+                ? boat.storageBoat
+                  ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                  : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
                 : isDragging
-                  ? 'border-blue-400 bg-blue-50 cursor-pointer'
-                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                  ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
             }`}
           >
             {renderSlotContent(boat, row, col)}
@@ -584,12 +662,14 @@ export function LocationGrid({
                 onSlotClick(location, row, col);
               }
             }}
-            className={`location-slot aspect-square border-2 rounded-lg p-2 flex flex-col items-center justify-center text-center transition-all ${
+            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all group ${
               boat
-                ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105`
+                ? boat.storageBoat
+                  ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                  : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
                 : isDragging
-                  ? 'border-blue-400 bg-blue-50 cursor-pointer'
-                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                  ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
             }`}
           >
             {renderSlotContent(boat, row, col)}
@@ -629,12 +709,14 @@ export function LocationGrid({
             onSlotClick(location, row, col);
           }
         }}
-        className={`location-slot border-2 rounded-lg p-1.5 flex flex-col items-center justify-center text-center transition-all overflow-hidden ${
+        className={`location-slot border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all overflow-hidden group ${
           boat
-            ? `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105`
+            ? boat.storageBoat
+              ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+              : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-1.5`
             : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+              ? 'border-blue-400 bg-blue-50 cursor-pointer p-1.5'
+              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1.5'
         }`}
         style={{ width: '100px', height: '100px', flexShrink: 0 }}
       >
