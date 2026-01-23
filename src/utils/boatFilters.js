@@ -95,7 +95,8 @@ export function filterBySite(boats, filterSites, locations) {
   return boats.filter(boat => {
     if (!boat.location) return false;
     const location = locations.find(l => l.name === boat.location);
-    return location && filterSites.includes(location.siteId);
+    // Note: location uses snake_case site_id from database
+    return location && filterSites.includes(location.site_id);
   });
 }
 
