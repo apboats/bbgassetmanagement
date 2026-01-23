@@ -133,6 +133,7 @@ function AppContainer() {
         dockmasterId: boat.dockmaster_id,
         customerId: boat.customer_id,
         hullId: boat.hull_id,
+        storageBoat: boat.storage_boat ?? false,
       }))
       
       setBoats(transformedData)
@@ -332,6 +333,7 @@ function AppContainer() {
       if ('dockmasterId' in updates) updateData.dockmaster_id = updates.dockmasterId;
       if ('customerId' in updates) updateData.customer_id = updates.customerId;
       if ('hullId' in updates) updateData.hull_id = updates.hullId;
+      if ('storageBoat' in updates) updateData.storage_boat = updates.storageBoat;
 
       await boatsService.update(boatId, updateData)
       await loadBoats()
