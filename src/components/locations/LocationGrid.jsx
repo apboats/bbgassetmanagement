@@ -112,13 +112,18 @@ export function MaximizedLocationModal({
       const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
       const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
 
+      // Add opacity to inactive seasons
+      const fallOpacity = (activeSeason !== 'fall' && !allComplete) ? 'opacity-70' : '';
+      const winterOpacity = (activeSeason !== 'winter' && !allComplete) ? 'opacity-70' : '';
+      const springOpacity = (activeSeason !== 'spring' && !allComplete) ? 'opacity-70' : '';
+
       return (
         <>
           {/* Background: 3 colored vertical stripes with dynamic widths */}
           <div className="absolute inset-0 flex rounded-xl overflow-hidden pointer-events-none">
-            <div className={`${fallWidth} h-full status-${boat.fallStatus} border-r border-white/20`}></div>
-            <div className={`${winterWidth} h-full status-${boat.winterStatus} border-r border-white/20`}></div>
-            <div className={`${springWidth} h-full status-${boat.springStatus}`}></div>
+            <div className={`${fallWidth} h-full status-${boat.fallStatus} ${fallOpacity} border-r border-white/20`}></div>
+            <div className={`${winterWidth} h-full status-${boat.winterStatus} ${winterOpacity} border-r border-white/20`}></div>
+            <div className={`${springWidth} h-full status-${boat.springStatus} ${springOpacity}`}></div>
           </div>
 
           {/* Foreground: Regular boat card content */}
@@ -521,13 +526,18 @@ export function LocationGrid({
       const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
       const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
 
+      // Add opacity to inactive seasons
+      const fallOpacity = (activeSeason !== 'fall' && !allComplete) ? 'opacity-70' : '';
+      const winterOpacity = (activeSeason !== 'winter' && !allComplete) ? 'opacity-70' : '';
+      const springOpacity = (activeSeason !== 'spring' && !allComplete) ? 'opacity-70' : '';
+
       return (
         <>
           {/* Background: 3 colored vertical stripes with dynamic widths */}
           <div className="absolute inset-0 flex rounded-lg overflow-hidden pointer-events-none">
-            <div className={`${fallWidth} h-full status-${boat.fallStatus} border-r border-white/20`}></div>
-            <div className={`${winterWidth} h-full status-${boat.winterStatus} border-r border-white/20`}></div>
-            <div className={`${springWidth} h-full status-${boat.springStatus}`}></div>
+            <div className={`${fallWidth} h-full status-${boat.fallStatus} ${fallOpacity} border-r border-white/20`}></div>
+            <div className={`${winterWidth} h-full status-${boat.winterStatus} ${winterOpacity} border-r border-white/20`}></div>
+            <div className={`${springWidth} h-full status-${boat.springStatus} ${springOpacity}`}></div>
           </div>
 
           {/* Foreground: Regular boat card content (responsive sizing) */}
