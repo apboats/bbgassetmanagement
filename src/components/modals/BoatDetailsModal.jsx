@@ -10,6 +10,7 @@ import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
+import { SEASONS, SEASON_LABELS, getSeasonStatus } from '../../utils/seasonHelpers';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -59,6 +60,29 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [notesText, setNotesText] = useState(boat.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [activeSeason, setActiveSeason] = useState('fall');
+
+  // Handlers for seasonal work phases
+  const handleSeasonStatusChange = (season, newStatus) => {
+    if (isArchived) return;
+    const statusKey = `${season}Status`;
+    const updatedBoat = { ...boat, [statusKey]: newStatus };
+    onUpdateBoat(updatedBoat);
+  };
+
+  const handleSeasonWorkPhaseToggle = (season, phase) => {
+    if (isArchived) return;
+    const phaseKey = `${season}${phase.charAt(0).toUpperCase() + phase.slice(1)}Complete`;
+    const updatedBoat = { ...boat, [phaseKey]: !boat[phaseKey] };
+
+    // Auto-clear "all-work-complete" if unchecking a phase
+    const statusKey = `${season}Status`;
+    if (!updatedBoat[phaseKey] && boat[statusKey] === 'all-work-complete') {
+      updatedBoat[statusKey] = 'on-deck';
+    }
+
+    onUpdateBoat(updatedBoat);
+  };
 
   // Extract movement history loading to reusable function
   const loadMovementHistory = useCallback(async () => {
@@ -546,136 +570,222 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             </div>
           </div>
 
-          <div>
-            <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
-            <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleWorkPhaseToggle('mechanicalsComplete')}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
-                    boat.mechanicalsComplete ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {boat.mechanicalsComplete ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <X className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 truncate">Mechanicals</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                  boat.mechanicalsComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {boat.mechanicalsComplete ? '✓' : '○'}
-                </span>
-              </button>
+{boat.storageBoat ? (
+            // SEASONAL WORK PHASES - Tabbed interface for storage boats
+            <div>
+              <h4 className="text-base md:text-lg font-bold text-slate-900 mb-3">Seasonal Work Phases</h4>
 
-              <button
-                onClick={() => handleWorkPhaseToggle('cleanComplete')}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
-                    boat.cleanComplete ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {boat.cleanComplete ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <X className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 truncate">Clean</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                  boat.cleanComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {boat.cleanComplete ? '✓' : '○'}
-                </span>
-              </button>
+              {/* Season Tabs */}
+              <div className="flex gap-2 mb-4">
+                {SEASONS.map(season => (
+                  <button
+                    key={season}
+                    onClick={() => setActiveSeason(season)}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      activeSeason === season
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {SEASON_LABELS[season]}
+                  </button>
+                ))}
+              </div>
 
-              <button
-                onClick={() => handleWorkPhaseToggle('fiberglassComplete')}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
-                    boat.fiberglassComplete ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {boat.fiberglassComplete ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <X className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 truncate">Fiberglass</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                  boat.fiberglassComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {boat.fiberglassComplete ? '✓' : '○'}
-                </span>
-              </button>
+              {/* Status Dropdown for Active Season */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {SEASON_LABELS[activeSeason]} Status
+                </label>
+                <select
+                  value={getSeasonStatus(boat, activeSeason)}
+                  onChange={(e) => handleSeasonStatusChange(activeSeason, e.target.value)}
+                  disabled={isArchived}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                >
+                  <option value="needs-approval">Needs Approval</option>
+                  <option value="needs-parts">Needs Parts</option>
+                  <option value="parts-kit-pulled">Parts Kit Pulled</option>
+                  <option value="on-deck">On Deck</option>
+                  <option value="all-work-complete">All Work Complete</option>
+                </select>
+              </div>
 
-              <button
-                onClick={() => handleWorkPhaseToggle('warrantyComplete')}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
-                    boat.warrantyComplete ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {boat.warrantyComplete ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <X className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 truncate">Warranty</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                  boat.warrantyComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {boat.warrantyComplete ? '✓' : '○'}
-                </span>
-              </button>
+              {/* Work Phase Toggles for Active Season */}
+              <div className="space-y-2">
+                {['mechanicals', 'clean', 'fiberglass', 'warranty', 'invoiced'].map(phase => {
+                  const phaseKey = `${activeSeason}${phase.charAt(0).toUpperCase() + phase.slice(1)}Complete`;
+                  const isComplete = boat[phaseKey];
 
-              <button
-                onClick={() => handleWorkPhaseToggle('invoicedComplete')}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
-                    boat.invoicedComplete ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {boat.invoicedComplete ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <X className="w-5 h-5 text-slate-400" />
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 truncate">Invoiced</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                  boat.invoicedComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {boat.invoicedComplete ? '✓' : '○'}
-                </span>
-              </button>
+                  return (
+                    <button
+                      key={phase}
+                      onClick={() => handleSeasonWorkPhaseToggle(activeSeason, phase)}
+                      className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                          isComplete ? 'bg-green-100' : 'bg-slate-200'
+                        }`}>
+                          {isComplete ? (
+                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <X className="w-5 h-5 text-slate-400" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-slate-900 truncate capitalize">
+                          {phase === 'mechanicals' ? 'Mechanicals' :
+                           phase === 'clean' ? 'Clean' :
+                           phase === 'fiberglass' ? 'Fiberglass' :
+                           phase === 'warranty' ? 'Warranty' :
+                           'Invoiced'}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                        isComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {isComplete ? '✓' : '○'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            // REGULAR WORK PHASES - Original single-phase interface for non-storage boats
+            <div>
+              <h4 className="text-base md:text-lg font-bold text-slate-900 mb-1">Work Phases</h4>
+              <p className="text-xs text-slate-500 mb-3">Check phases that are complete or not needed. All phases must be verified and billed before marking status as complete.</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleWorkPhaseToggle('mechanicalsComplete')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                      boat.mechanicalsComplete ? 'bg-green-100' : 'bg-slate-200'
+                    }`}>
+                      {boat.mechanicalsComplete ? (
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <X className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-900 truncate">Mechanicals</span>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    boat.mechanicalsComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {boat.mechanicalsComplete ? '✓' : '○'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleWorkPhaseToggle('cleanComplete')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                      boat.cleanComplete ? 'bg-green-100' : 'bg-slate-200'
+                    }`}>
+                      {boat.cleanComplete ? (
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <X className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-900 truncate">Clean</span>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    boat.cleanComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {boat.cleanComplete ? '✓' : '○'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleWorkPhaseToggle('fiberglassComplete')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                      boat.fiberglassComplete ? 'bg-green-100' : 'bg-slate-200'
+                    }`}>
+                      {boat.fiberglassComplete ? (
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <X className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-900 truncate">Fiberglass</span>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    boat.fiberglassComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {boat.fiberglassComplete ? '✓' : '○'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleWorkPhaseToggle('warrantyComplete')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                      boat.warrantyComplete ? 'bg-green-100' : 'bg-slate-200'
+                    }`}>
+                      {boat.warrantyComplete ? (
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <X className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-900 truncate">Warranty</span>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    boat.warrantyComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {boat.warrantyComplete ? '✓' : '○'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleWorkPhaseToggle('invoicedComplete')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${
+                      boat.invoicedComplete ? 'bg-green-100' : 'bg-slate-200'
+                    }`}>
+                      {boat.invoicedComplete ? (
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <X className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-900 truncate">Invoiced</span>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                    boat.invoicedComplete ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {boat.invoicedComplete ? '✓' : '○'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div>
             <h4 className="text-lg font-bold text-slate-900 mb-4">Update Status</h4>
