@@ -83,11 +83,16 @@ export function CustomerBoatCard({ boat, onEdit, onDelete, compact }) {
           const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
           const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
 
+          // Add opacity to inactive seasons
+          const fallOpacity = (activeSeason !== 'fall' && !allComplete) ? 'opacity-70' : '';
+          const winterOpacity = (activeSeason !== 'winter' && !allComplete) ? 'opacity-70' : '';
+          const springOpacity = (activeSeason !== 'spring' && !allComplete) ? 'opacity-70' : '';
+
           return (
             <div className="flex h-12">
-              <div className={`status-${boat.fallStatus} ${fallWidth} border-r border-white/20`}></div>
-              <div className={`status-${boat.winterStatus} ${winterWidth} border-r border-white/20`}></div>
-              <div className={`status-${boat.springStatus} ${springWidth}`}></div>
+              <div className={`status-${boat.fallStatus} ${fallWidth} ${fallOpacity} border-r border-white/20`}></div>
+              <div className={`status-${boat.winterStatus} ${winterWidth} ${winterOpacity} border-r border-white/20`}></div>
+              <div className={`status-${boat.springStatus} ${springWidth} ${springOpacity}`}></div>
             </div>
           );
         })()
