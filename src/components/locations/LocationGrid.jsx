@@ -100,17 +100,25 @@ export function MaximizedLocationModal({
       );
     }
 
-    // Storage boat - 3 vertical background stripes with regular overlay
+    // Storage boat - 3 vertical background stripes with dynamic widths based on active season
     if (boat.storageBoat) {
       const activeSeason = getActiveSeason(boat);
+      const allComplete = boat.fallStatus === 'all-work-complete' &&
+                         boat.winterStatus === 'all-work-complete' &&
+                         boat.springStatus === 'all-work-complete';
+
+      // Determine width classes based on active season
+      const fallWidth = allComplete ? 'flex-[1]' : (activeSeason === 'fall' ? 'flex-[2]' : 'flex-[1]');
+      const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
+      const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
 
       return (
         <>
-          {/* Background: 3 colored vertical stripes */}
+          {/* Background: 3 colored vertical stripes with dynamic widths */}
           <div className="absolute inset-0 flex rounded-xl overflow-hidden pointer-events-none">
-            <div className={`w-1/3 h-full status-${boat.fallStatus} border-r border-white/20`}></div>
-            <div className={`w-1/3 h-full status-${boat.winterStatus} border-r border-white/20`}></div>
-            <div className={`w-1/3 h-full status-${boat.springStatus}`}></div>
+            <div className={`${fallWidth} h-full status-${boat.fallStatus} border-r border-white/20`}></div>
+            <div className={`${winterWidth} h-full status-${boat.winterStatus} border-r border-white/20`}></div>
+            <div className={`${springWidth} h-full status-${boat.springStatus}`}></div>
           </div>
 
           {/* Foreground: Regular boat card content */}
@@ -501,17 +509,25 @@ export function LocationGrid({
       );
     }
 
-    // Storage boat - 3 vertical background stripes with regular overlay
+    // Storage boat - 3 vertical background stripes with dynamic widths based on active season
     if (boat.storageBoat) {
       const activeSeason = getActiveSeason(boat);
+      const allComplete = boat.fallStatus === 'all-work-complete' &&
+                         boat.winterStatus === 'all-work-complete' &&
+                         boat.springStatus === 'all-work-complete';
+
+      // Determine width classes based on active season
+      const fallWidth = allComplete ? 'flex-[1]' : (activeSeason === 'fall' ? 'flex-[2]' : 'flex-[1]');
+      const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
+      const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
 
       return (
         <>
-          {/* Background: 3 colored vertical stripes */}
+          {/* Background: 3 colored vertical stripes with dynamic widths */}
           <div className="absolute inset-0 flex rounded-lg overflow-hidden pointer-events-none">
-            <div className={`w-1/3 h-full status-${boat.fallStatus} border-r border-white/20`}></div>
-            <div className={`w-1/3 h-full status-${boat.winterStatus} border-r border-white/20`}></div>
-            <div className={`w-1/3 h-full status-${boat.springStatus}`}></div>
+            <div className={`${fallWidth} h-full status-${boat.fallStatus} border-r border-white/20`}></div>
+            <div className={`${winterWidth} h-full status-${boat.winterStatus} border-r border-white/20`}></div>
+            <div className={`${springWidth} h-full status-${boat.springStatus}`}></div>
           </div>
 
           {/* Foreground: Regular boat card content (responsive sizing) */}
