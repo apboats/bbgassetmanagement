@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign, LayoutGrid, List } from 'lucide-react';
+import { getActiveSeason } from '../../utils/seasonHelpers';
 
 // ============================================================================
 // MAXIMIZED LOCATION MODAL
@@ -99,39 +100,35 @@ export function MaximizedLocationModal({
       );
     }
 
-    // Storage boat - split into 3 vertical sections
+    // Storage boat - 3 vertical background stripes with regular overlay
     if (boat.storageBoat) {
+      const activeSeason = getActiveSeason(boat);
+
       return (
-        <div className="w-full h-full flex absolute inset-0 rounded-xl overflow-hidden">
-          {/* Fall Section (Left 33%) */}
-          <div className={`w-1/3 h-full status-${boat.fallStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
-            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
-              Fall
-            </span>
+        <>
+          {/* Background: 3 colored vertical stripes */}
+          <div className="absolute inset-0 flex rounded-xl overflow-hidden pointer-events-none">
+            <div className={`w-1/3 h-full status-${boat.fallStatus} border-r border-white/20`}></div>
+            <div className={`w-1/3 h-full status-${boat.winterStatus} border-r border-white/20`}></div>
+            <div className={`w-1/3 h-full status-${boat.springStatus}`}></div>
           </div>
 
-          {/* Winter Section (Middle 33%) */}
-          <div className={`w-1/3 h-full status-${boat.winterStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
-            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
-              Winter
-            </span>
+          {/* Foreground: Regular boat card content */}
+          <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full px-1 relative z-10">{boat.owner}</p>
+          {boat.workOrderNumber && (
+            <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full relative z-10">
+              WO: {boat.workOrderNumber}
+            </p>
+          )}
+          <div className="flex gap-1.5 mt-1 pointer-events-none relative z-10">
+            <Wrench className={`w-5 h-5 ${boat[`${activeSeason}MechanicalsComplete`] ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+            <Sparkles className={`w-5 h-5 ${boat[`${activeSeason}CleanComplete`] ? 'text-white' : 'text-white/30'}`} title="Clean" />
+            <Layers className={`w-5 h-5 ${boat[`${activeSeason}FiberglassComplete`] ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+            <Shield className={`w-5 h-5 ${boat[`${activeSeason}WarrantyComplete`] ? 'text-white' : 'text-white/30'}`} title="Warranty" />
+            <DollarSign className={`w-5 h-5 ${boat[`${activeSeason}InvoicedComplete`] ? 'text-white' : 'text-white/30'}`} title="Invoiced" />
           </div>
-
-          {/* Spring Section (Right 33%) */}
-          <div className={`w-1/3 h-full status-${boat.springStatus} flex items-center justify-center pointer-events-none`}>
-            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
-              Spring
-            </span>
-          </div>
-
-          {/* Boat Info Overlay (visible on hover) */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-            <div className="text-white text-center px-2">
-              <p className="font-bold text-sm">{boat.owner}</p>
-              <p className="text-xs opacity-75">{boat.name}</p>
-            </div>
-          </div>
-        </div>
+          <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1 relative z-10">{boat.name}</p>
+        </>
       );
     }
 
@@ -504,39 +501,34 @@ export function LocationGrid({
       );
     }
 
-    // Storage boat - split into 3 vertical sections
+    // Storage boat - 3 vertical background stripes with regular overlay
     if (boat.storageBoat) {
+      const activeSeason = getActiveSeason(boat);
+
       return (
-        <div className="w-full h-full flex absolute inset-0 rounded-lg overflow-hidden">
-          {/* Fall Section (Left 33%) */}
-          <div className={`w-1/3 h-full status-${boat.fallStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
-            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
-              Fall
-            </span>
+        <>
+          {/* Background: 3 colored vertical stripes */}
+          <div className="absolute inset-0 flex rounded-lg overflow-hidden pointer-events-none">
+            <div className={`w-1/3 h-full status-${boat.fallStatus} border-r border-white/20`}></div>
+            <div className={`w-1/3 h-full status-${boat.winterStatus} border-r border-white/20`}></div>
+            <div className={`w-1/3 h-full status-${boat.springStatus}`}></div>
           </div>
 
-          {/* Winter Section (Middle 33%) */}
-          <div className={`w-1/3 h-full status-${boat.winterStatus} flex items-center justify-center border-r border-white/20 pointer-events-none`}>
-            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
-              Winter
-            </span>
+          {/* Foreground: Regular boat card content (responsive sizing) */}
+          <p className="text-white font-bold text-[clamp(0.75rem,1.8vw,1.125rem)] leading-tight pointer-events-none truncate w-full px-1 relative z-10">{boat.owner}</p>
+          {boat.workOrderNumber && (
+            <p className="text-white text-[clamp(0.6rem,1.2vw,0.875rem)] font-mono font-semibold pointer-events-none truncate w-full relative z-10">
+              WO: {boat.workOrderNumber}
+            </p>
+          )}
+          <div className="flex gap-1 mt-1 pointer-events-none relative z-10">
+            <Wrench className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat[`${activeSeason}MechanicalsComplete`] ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
+            <Sparkles className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat[`${activeSeason}CleanComplete`] ? 'text-white' : 'text-white/30'}`} title="Clean" />
+            <Layers className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat[`${activeSeason}FiberglassComplete`] ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
+            <Shield className={`w-[clamp(0.75rem,1.5vw,1.125rem)] h-[clamp(0.75rem,1.5vw,1.125rem)] ${boat[`${activeSeason}WarrantyComplete`] ? 'text-white' : 'text-white/30'}`} title="Warranty" />
           </div>
-
-          {/* Spring Section (Right 33%) */}
-          <div className={`w-1/3 h-full status-${boat.springStatus} flex items-center justify-center pointer-events-none`}>
-            <span className="text-white text-[clamp(0.5rem,1vw,0.65rem)] font-bold transform -rotate-90 whitespace-nowrap">
-              Spring
-            </span>
-          </div>
-
-          {/* Boat Info Overlay (visible on hover) */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-            <div className="text-white text-center px-2">
-              <p className="font-bold text-[clamp(0.6rem,1.2vw,0.75rem)]">{boat.owner}</p>
-              <p className="text-[clamp(0.5rem,1vw,0.625rem)] opacity-75">{boat.name}</p>
-            </div>
-          </div>
-        </div>
+          <p className="text-white text-[clamp(0.5rem,1vw,0.625rem)] opacity-75 pointer-events-none truncate w-full mt-0.5 relative z-10">{boat.name}</p>
+        </>
       );
     }
 
