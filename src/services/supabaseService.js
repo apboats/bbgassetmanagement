@@ -826,7 +826,7 @@ export const inventoryBoatsService = {
   },
 
   // Sync from Dockmaster API
-  async sync(apiBoats) {
+  async sync(apiBoats, fullSync = false) {
     // Get existing inventory boats
     const existing = await this.getAll()
     const existingMap = new Map(
@@ -880,18 +880,20 @@ export const inventoryBoatsService = {
 
     await Promise.all(operations)
 
-    // Delete boats that are no longer in Dockmaster (e.g., moved to SD status)
-    const toDelete = existing.filter(b => !existingIds.has(b.dockmaster_id))
-    if (toDelete.length > 0) {
-      console.log(`Deleting ${toDelete.length} boats no longer in Dockmaster`)
-      const deleteIds = toDelete.map(b => b.id)
-      const { error: deleteError } = await supabase
-        .from('inventory_boats')
-        .delete()
-        .in('id', deleteIds)
+    // Only delete boats on full sync (incremental sync only returns today's changes)
+    if (fullSync) {
+      const toDelete = existing.filter(b => !existingIds.has(b.dockmaster_id))
+      if (toDelete.length > 0) {
+        console.log(`Deleting ${toDelete.length} boats no longer in Dockmaster`)
+        const deleteIds = toDelete.map(b => b.id)
+        const { error: deleteError } = await supabase
+          .from('inventory_boats')
+          .delete()
+          .in('id', deleteIds)
 
-      if (deleteError) {
-        console.error('Error deleting stale inventory boats:', deleteError)
+        if (deleteError) {
+          console.error('Error deleting stale inventory boats:', deleteError)
+        }
       }
     }
 
