@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor } from 'lucide-react';
+import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText } from 'lucide-react';
 
 // Import pages
 import { LoginScreen } from './pages/LoginScreen';
@@ -11,6 +11,7 @@ import { MyViewEditor } from './pages/MyViewEditor';
 import { InventoryView } from './pages/InventoryView';
 import { SettingsView } from './pages/SettingsView';
 import { BoatShowPlanner } from './pages/BoatShowPlanner';
+import { ReportsView } from './pages/ReportsView';
 
 // Import shared components
 import { NavButton } from './components/SharedComponents';
@@ -291,6 +292,7 @@ export default function BoatsByGeorgeAssetManager({
               <NavButton icon={Package} label="Boats" active={currentView === 'boats'} onClick={() => setCurrentView('boats')} />
               <NavButton icon={Package} label="Inventory" active={currentView === 'inventory'} onClick={() => setCurrentView('inventory')} />
               <NavButton icon={Anchor} label="Shows" active={currentView === 'shows'} onClick={() => setCurrentView('shows')} />
+              <NavButton icon={FileText} label="Reports" active={currentView === 'reports'} onClick={() => setCurrentView('reports')} />
               <NavButton icon={Camera} label="Scan" active={currentView === 'scan'} onClick={() => setCurrentView('scan')} />
               <NavButton icon={Settings} label="Settings" active={currentView === 'settings'} onClick={() => setCurrentView('settings')} />
               <div className="flex items-center ml-2 pl-2 border-l border-slate-200">
@@ -322,6 +324,7 @@ export default function BoatsByGeorgeAssetManager({
                   { view: 'boats', icon: Package, label: 'Boats' },
                   { view: 'inventory', icon: Package, label: 'Inventory' },
                   { view: 'shows', icon: Anchor, label: 'Shows' },
+                  { view: 'reports', icon: FileText, label: 'Reports' },
                   { view: 'scan', icon: Camera, label: 'Scan' },
                   { view: 'settings', icon: Settings, label: 'Settings' },
                 ].map(({ view, icon: Icon, label }) => (
@@ -364,6 +367,9 @@ export default function BoatsByGeorgeAssetManager({
         )}
         {currentView === 'shows' && (
           <BoatShowPlanner inventoryBoats={inventoryBoats} />
+        )}
+        {currentView === 'reports' && (
+          <ReportsView currentUser={currentUser} />
         )}
         {currentView === 'settings' && (
           <SettingsView dockmasterConfig={dockmasterConfig} currentUser={currentUser} users={users}
