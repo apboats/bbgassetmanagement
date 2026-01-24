@@ -1,0 +1,280 @@
+import React, { useState, useEffect } from 'react';
+import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { SummaryCard } from '../components/SharedComponents';
+
+export function ReportsView({ currentUser }) {
+  const [unbilledData, setUnbilledData] = useState({ workOrders: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [daysBack, setDaysBack] = useState(7);
+  const [expandedWOs, setExpandedWOs] = useState(new Set());
+
+  useEffect(() => {
+    loadUnbilledWork();
+  }, [daysBack]);
+
+  const loadUnbilledWork = async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+      const cutoffISO = cutoffDate.toISOString();
+
+      // Query work orders with charges, status='O', and recent updates
+      const { data: workOrders, error: woError } = await supabase
+        .from('work_orders')
+        .select(`
+          *,
+          operations:work_order_operations(*),
+          boat:boats!boat_id(id, name, owner, dockmaster_id, work_order_number)
+        `)
+        .eq('status', 'O')
+        .gt('total_charges', 0)
+        .gte('last_synced', cutoffISO)
+        .order('last_synced', { ascending: false });
+
+      if (woError) throw woError;
+
+      setUnbilledData({ workOrders: workOrders || [] });
+    } catch (err) {
+      console.error('Error loading unbilled work:', err);
+      setError(err.message || 'Failed to load unbilled work');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleWorkOrder = (woId) => {
+    const newExpanded = new Set(expandedWOs);
+    if (newExpanded.has(woId)) {
+      newExpanded.delete(woId);
+    } else {
+      newExpanded.add(woId);
+    }
+    setExpandedWOs(newExpanded);
+  };
+
+  // Calculate totals
+  const totalWorkOrders = unbilledData.workOrders.length;
+  const totalOperations = unbilledData.workOrders.reduce((sum, wo) => sum + (wo.operations?.length || 0), 0);
+  const totalCharges = unbilledData.workOrders.reduce((sum, wo) => sum + (wo.total_charges || 0), 0);
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Reports</h1>
+        <p className="text-slate-600">View unbilled work orders and operations with recent updates</p>
+      </div>
+
+      {/* Filter Controls */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <Calendar className="w-4 h-4" />
+          Last Updated:
+          <select
+            value={daysBack}
+            onChange={(e) => setDaysBack(Number(e.target.value))}
+            className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={14}>Last 14 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={60}>Last 60 days</option>
+          </select>
+        </label>
+        <button
+          onClick={loadUnbilledWork}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <SummaryCard
+          title="Unbilled Work Orders"
+          value={totalWorkOrders}
+          subtitle="With active charges"
+          icon={FileText}
+          color="blue"
+        />
+        <SummaryCard
+          title="Total Operations"
+          value={totalOperations}
+          subtitle="Across all work orders"
+          icon={Package}
+          color="purple"
+        />
+        <SummaryCard
+          title="Total Charges"
+          value={`$${totalCharges.toFixed(2)}`}
+          subtitle="Unbilled amount"
+          icon={DollarSign}
+          color="green"
+        />
+      </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-red-900">Error loading unbilled work</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-3 text-slate-600">Loading unbilled work...</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && unbilledData.workOrders.length === 0 && (
+        <div className="text-center py-12">
+          <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">No unbilled work found</h3>
+          <p className="text-slate-600">
+            No open work orders with charges updated in the last {daysBack} days
+          </p>
+        </div>
+      )}
+
+      {/* Work Orders Table */}
+      {!isLoading && unbilledData.workOrders.length > 0 && (
+        <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-slate-100 border-b border-slate-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Work Order
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Boat / Owner
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Charges
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Last Synced
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Operations
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {unbilledData.workOrders.map((wo) => {
+                const isExpanded = expandedWOs.has(wo.id);
+                const boat = wo.boat || {};
+                const operations = wo.operations || [];
+
+                return (
+                  <React.Fragment key={wo.id}>
+                    {/* Work Order Row */}
+                    <tr
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                      onClick={() => toggleWorkOrder(wo.id)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          <span className="font-mono font-semibold text-slate-900">{wo.id}</span>
+                        </div>
+                        {wo.title && (
+                          <p className="text-xs text-slate-600 mt-1 ml-6">{wo.title}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-900">{boat.name || 'Unknown Boat'}</p>
+                        <p className="text-sm text-slate-600">{boat.owner || 'Unknown Owner'}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                          {wo.category || 'General'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-semibold text-slate-900">
+                          ${(wo.total_charges || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-slate-700">
+                          {wo.last_synced ? new Date(wo.last_synced).toLocaleDateString() : 'Unknown'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {wo.last_synced ? new Date(wo.last_synced).toLocaleTimeString() : ''}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
+                          {operations.length} ops
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Expanded Operations */}
+                    {isExpanded && operations.length > 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-2 bg-slate-50">
+                          <div className="pl-6">
+                            <p className="text-xs font-semibold text-slate-700 uppercase mb-2">Operations</p>
+                            <div className="space-y-1">
+                              {operations.map((op, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between p-2 bg-white rounded border border-slate-200"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-mono text-xs font-semibold text-slate-700">
+                                      {op.opcode}
+                                    </span>
+                                    <span className="text-sm text-slate-600">
+                                      {op.opcode_desc || 'No description'}
+                                    </span>
+                                    {op.flag_labor_finished && (
+                                      <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded uppercase">
+                                        Unbilled
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-slate-900">
+                                    ${(op.total_charges || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
