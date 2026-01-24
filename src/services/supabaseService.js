@@ -880,6 +880,21 @@ export const inventoryBoatsService = {
 
     await Promise.all(operations)
 
+    // Delete boats that are no longer in Dockmaster (e.g., moved to SD status)
+    const toDelete = existing.filter(b => !existingIds.has(b.dockmaster_id))
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} boats no longer in Dockmaster`)
+      const deleteIds = toDelete.map(b => b.id)
+      const { error: deleteError } = await supabase
+        .from('inventory_boats')
+        .delete()
+        .in('id', deleteIds)
+
+      if (deleteError) {
+        console.error('Error deleting stale inventory boats:', deleteError)
+      }
+    }
+
     // Return synced boats
     return this.getAll()
   },
