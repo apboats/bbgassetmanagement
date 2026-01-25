@@ -3,6 +3,47 @@ import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-rea
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
 
+// Helper: Get the most recent activity date for a work order
+const getActivityDate = (wo) => {
+  const woDate = wo.last_mod_date ? new Date(wo.last_mod_date) : null;
+
+  // Find most recent last_worked_at from operations
+  let latestOpDate = null;
+  for (const op of (wo.operations || [])) {
+    if (op.last_worked_at) {
+      const opDate = new Date(op.last_worked_at);
+      if (!latestOpDate || opDate > latestOpDate) {
+        latestOpDate = opDate;
+      }
+    }
+  }
+
+  // Return the more recent of the two
+  if (woDate && latestOpDate) {
+    return woDate > latestOpDate ? woDate : latestOpDate;
+  }
+  return woDate || latestOpDate; // Returns null if both are null
+};
+
+// Helper: Check if boat is in a shop location
+const isBoatInShop = (wo, locations, inventoryBoats) => {
+  let boatLocation = null;
+
+  if (wo.boat?.location) {
+    // Customer boat - use boat.location
+    boatLocation = wo.boat.location;
+  } else if (wo.rigging_id) {
+    // Internal work order - find inventory boat by rigging_id
+    const invBoat = inventoryBoats.find(b => b.dockmaster_id === wo.rigging_id);
+    boatLocation = invBoat?.location;
+  }
+
+  if (!boatLocation) return false;
+
+  const location = locations.find(l => l.name === boatLocation);
+  return location?.type === 'shop' || location?.type === 'workshop';
+};
+
 export function ReportsView({ currentUser }) {
   const [unbilledData, setUnbilledData] = useState({ workOrders: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -21,24 +62,54 @@ export function ReportsView({ currentUser }) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-      const cutoffISO = cutoffDate.toISOString();
 
-      // Query work orders with charges, status='O', and recent updates
+      // Fetch locations to check if boats are in shop
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('id, name, type');
+
+      // Fetch inventory boats for internal work order matching
+      const { data: inventoryBoats } = await supabase
+        .from('inventory_boats')
+        .select('id, dockmaster_id, location');
+
+      // Query work orders with charges and status='O'
       const { data: workOrders, error: woError } = await supabase
         .from('work_orders')
         .select(`
           *,
           operations:work_order_operations(*),
-          boat:boats!boat_id(id, name, owner, dockmaster_id, work_order_number)
+          boat:boats!boat_id(id, name, owner, dockmaster_id, work_order_number, location)
         `)
         .eq('status', 'O')
         .gt('total_charges', 0)
-        .gte('last_synced', cutoffISO)
-        .order('last_synced', { ascending: false });
+        .order('last_mod_date', { ascending: false, nullsFirst: false });
 
       if (woError) throw woError;
 
-      setUnbilledData({ workOrders: workOrders || [] });
+      // Filter work orders client-side based on activity date and shop location
+      const filteredWorkOrders = (workOrders || []).filter(wo => {
+        // 1. Must have an activity date (last_mod_date or last_worked_at on operations)
+        const activityDate = getActivityDate(wo);
+        if (!activityDate) return false;
+
+        // 2. Activity date must be within the selected range
+        if (activityDate < cutoffDate) return false;
+
+        // 3. Boat must not be in a shop location
+        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) return false;
+
+        return true;
+      });
+
+      // Sort by activity date (most recent first)
+      filteredWorkOrders.sort((a, b) => {
+        const dateA = getActivityDate(a);
+        const dateB = getActivityDate(b);
+        return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+      });
+
+      setUnbilledData({ workOrders: filteredWorkOrders });
     } catch (err) {
       console.error('Error loading unbilled work:', err);
       setError(err.message || 'Failed to load unbilled work');
@@ -168,7 +239,7 @@ export function ReportsView({ currentUser }) {
                   Charges
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Last Synced
+                  Last Activity
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Operations
@@ -219,12 +290,21 @@ export function ReportsView({ currentUser }) {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-sm text-slate-700">
-                          {wo.last_synced ? new Date(wo.last_synced).toLocaleDateString() : 'Unknown'}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {wo.last_synced ? new Date(wo.last_synced).toLocaleTimeString() : ''}
-                        </p>
+                        {(() => {
+                          const activityDate = getActivityDate(wo);
+                          return activityDate ? (
+                            <>
+                              <p className="text-sm text-slate-700">
+                                {activityDate.toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {activityDate.toLocaleTimeString()}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-slate-500">Unknown</p>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
