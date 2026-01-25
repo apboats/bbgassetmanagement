@@ -106,7 +106,7 @@ serve(async (req) => {
     }
 
     // ========== STEP 1: Get changed work orders ==========
-    const listChangedUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListNewOrChanged?LastUpdate=${formatDateForApi(lookbackTime)}&PageSize=100`
+    const listChangedUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListNewOrChanged?LastUpdate=${formatDateForApi(lookbackTime)}&Page=1&PageSize=100`
     console.log('Fetching changed work orders:', listChangedUrl)
 
     const changedResponse = await fetch(listChangedUrl, {
@@ -270,7 +270,7 @@ serve(async (req) => {
     }
 
     // ========== STEP 2: Get time entries to track last_worked_at ==========
-    const timeEntryUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListTimeEntry?StartDate=${formatDateForApi(lookbackTime)}&EndDate=${formatDateForApi(now)}&PageSize=100&Detail=true`
+    const timeEntryUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListTimeEntry?StartDate=${formatDateForApi(lookbackTime)}&EndDate=${formatDateForApi(now)}&Page=1&PageSize=100&Detail=true`
     console.log('Fetching time entries:', timeEntryUrl)
 
     const timeEntryResponse = await fetch(timeEntryUrl, {
