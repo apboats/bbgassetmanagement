@@ -268,7 +268,7 @@ serve(async (req) => {
       console.error('Failed to fetch changed work orders:', changedResponse.status)
     }
 
-    // ========== STEP 2: Get time entries for labor completion tracking ==========
+    // ========== STEP 2: Get time entries to track last_worked_at ==========
     const timeEntryUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListTimeEntry?StartDate=${formatDateForApi(lookbackTime)}&EndDate=${formatDateForApi(now)}&PageSize=100&Detail=true`
     console.log('Fetching time entries:', timeEntryUrl)
 
@@ -282,38 +282,34 @@ serve(async (req) => {
       const timeEntries = timeEntryData.content || []
       console.log('Time entries found:', timeEntries.length)
 
-      // Group time entries by work order and opcode
-      const timeEntryMap = new Map<string, any[]>()
+      // Group time entries by work order and opcode, track latest stopTime
+      const latestWorkTime = new Map<string, string>()
       for (const entry of timeEntries) {
         const key = `${entry.workOrderId}-${entry.opCode}`
-        if (!timeEntryMap.has(key)) {
-          timeEntryMap.set(key, [])
+        const stopTime = entry.stopTime
+        if (stopTime) {
+          const existing = latestWorkTime.get(key)
+          if (!existing || stopTime > existing) {
+            latestWorkTime.set(key, stopTime)
+          }
         }
-        timeEntryMap.get(key)!.push(entry)
       }
 
-      // Update operation statuses based on time entries
-      // A time entry with stopTime indicates labor was completed
-      for (const [key, entries] of timeEntryMap) {
+      // Update operations with last_worked_at timestamp
+      for (const [key, lastStopTime] of latestWorkTime) {
         const [workOrderId, opCode] = key.split('-')
 
-        // Check if any time entry has a stop time (indicates work completed)
-        const hasCompletedTime = entries.some((e: any) => e.stopTime)
+        // Update the operation's last_worked_at based on time entry stopTime
+        const { error: updateError } = await supabase
+          .from('work_order_operations')
+          .update({
+            last_worked_at: lastStopTime,
+          })
+          .eq('work_order_id', workOrderId)
+          .eq('opcode', opCode)
 
-        if (hasCompletedTime) {
-          // Update the operation's flag_labor_finished if work was clocked out
-          const { error: updateError } = await supabase
-            .from('work_order_operations')
-            .update({
-              flag_labor_finished: true,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('work_order_id', workOrderId)
-            .eq('opcode', opCode)
-
-          if (!updateError) {
-            timeEntriesProcessed++
-          }
+        if (!updateError) {
+          timeEntriesProcessed++
         }
       }
     } else {
