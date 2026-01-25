@@ -39,10 +39,11 @@ async function authenticateDockmaster(username: string, password: string) {
   return { authToken, systemId }
 }
 
-// Format date for Dockmaster API (URL encoded)
+// Format date for Dockmaster API
 function formatDateForApi(date: Date): string {
-  // Format: YYYY-MM-DDTHH:MM:SS
-  return encodeURIComponent(date.toISOString().split('.')[0])
+  // Format: YYYY-MM-DDTHH:MM:SS.sss URL-encoded (colons as %3A)
+  // Example: 2026-01-23T19%3A45%3A00.000
+  return encodeURIComponent(date.toISOString().replace('Z', ''))
 }
 
 serve(async (req) => {
