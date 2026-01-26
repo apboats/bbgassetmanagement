@@ -253,7 +253,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
         .eq('boat_id', boat.id)
         .eq('status', 'O')  // Only open work orders
         .is('rigging_id', null)  // Exclude internal work orders
-        .order('last_mod_date', { ascending: false });
+        .order('id', { ascending: true });
 
       if (error) throw error;
 
