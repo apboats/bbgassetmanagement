@@ -10,6 +10,7 @@ import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
+import { supabase } from '../../supabaseClient';
 import { SEASONS, SEASON_LABELS, getActiveSeason } from '../../utils/seasonHelpers';
 
 // Helper to format time ago
@@ -230,7 +231,58 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [workOrdersLastSynced, setWorkOrdersLastSynced] = useState(null);
   const [workOrdersFromCache, setWorkOrdersFromCache] = useState(false);
 
-  const fetchWorkOrders = async (refresh = false) => {
+  // Load work orders from database (fast, uses cron-synced data)
+  const loadWorkOrdersFromDB = async () => {
+    if (!boat.id) {
+      setWorkOrdersError('No boat ID available');
+      return;
+    }
+
+    setLoadingWorkOrders(true);
+    setWorkOrdersError('');
+
+    try {
+      // Query work orders directly from database
+      // Filter: matching boat_id AND no rigging_id (rigging_id means internal work order)
+      const { data: workOrdersData, error } = await supabase
+        .from('work_orders')
+        .select(`
+          *,
+          operations:work_order_operations(*)
+        `)
+        .eq('boat_id', boat.id)
+        .eq('status', 'O')  // Only open work orders
+        .is('rigging_id', null)  // Exclude internal work orders
+        .order('last_mod_date', { ascending: false });
+
+      if (error) throw error;
+
+      setWorkOrders(workOrdersData || []);
+      setWorkOrdersLastSynced(workOrdersData?.[0]?.last_synced || null);
+      setWorkOrdersFromCache(true);
+      setShowWorkOrders(true);
+
+      // Auto-populate work order numbers
+      if (workOrdersData && workOrdersData.length > 0) {
+        const allWorkOrderNumbers = workOrdersData
+          .map(wo => wo.id)
+          .filter(Boolean)
+          .join(', ');
+
+        if (allWorkOrderNumbers && allWorkOrderNumbers !== boat.workOrderNumber) {
+          onUpdateBoat({ ...boat, workOrderNumber: allWorkOrderNumbers });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading work orders from DB:', error);
+      setWorkOrdersError(error.message);
+    } finally {
+      setLoadingWorkOrders(false);
+    }
+  };
+
+  // Sync fresh data from Dockmaster API (for "Sync Now" button)
+  const syncWorkOrdersFromAPI = async () => {
     if (!boat.customerId && !boat.id) {
       setWorkOrdersError('No customer ID associated with this boat. Work orders cannot be fetched.');
       return;
@@ -248,7 +300,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
         customerId: String(boat.customerId || ''),
         boatId: String(boat.dockmasterId || ''),
         boatUuid: String(boat.id || ''),
-        refresh: Boolean(refresh),
+        refresh: true,  // Always refresh when syncing from API
       };
 
       const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-workorders`, {
@@ -268,28 +320,21 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
       const data = await response.json();
       setWorkOrders(data.workOrders || []);
       setWorkOrdersLastSynced(data.lastSynced);
-      setWorkOrdersFromCache(data.fromCache || false);
-      setShowWorkOrders(true);
+      setWorkOrdersFromCache(false);  // Fresh from API
 
       // Auto-populate ALL work order numbers (comma-separated)
       if (data.workOrders && data.workOrders.length > 0) {
-        console.log('[BoatDetailsModal] Work orders received:', data.workOrders);
         const allWorkOrderNumbers = data.workOrders
           .map(wo => wo.id)
           .filter(Boolean)
           .join(', ');
 
-        console.log('[BoatDetailsModal] Auto-populating work order numbers:', allWorkOrderNumbers);
         if (allWorkOrderNumbers) {
-          const updatedBoat = { ...boat, workOrderNumber: allWorkOrderNumbers };
-          console.log('[BoatDetailsModal] Calling onUpdateBoat with:', updatedBoat);
-          onUpdateBoat(updatedBoat);
+          onUpdateBoat({ ...boat, workOrderNumber: allWorkOrderNumbers });
         }
-      } else {
-        console.log('[BoatDetailsModal] No work orders to auto-populate');
       }
     } catch (error) {
-      console.error('Error fetching work orders:', error);
+      console.error('Error syncing work orders from API:', error);
       setWorkOrdersError(error.message);
     } finally {
       setLoadingWorkOrders(false);
@@ -944,7 +989,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
               {/* View Work Orders Button - only for customer boats with customerId */}
               {!boat.isInventory && boat.customerId && (
                 <button
-                  onClick={() => fetchWorkOrders()}
+                  onClick={() => loadWorkOrdersFromDB()}
                   disabled={loadingWorkOrders}
                   className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 text-white font-semibold rounded-lg transition-all shadow-md"
                 >
@@ -1374,7 +1419,7 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
           lastSynced={workOrdersLastSynced}
           fromCache={workOrdersFromCache}
           loading={loadingWorkOrders}
-          onRefresh={() => fetchWorkOrders(true)}
+          onRefresh={() => syncWorkOrdersFromAPI()}
           onClose={() => setShowWorkOrders(false)}
           variant="customer"
         />
