@@ -84,6 +84,22 @@ export function ReportsView({ currentUser }) {
 
       if (woError) throw woError;
 
+      // Debug: Check why 554750 isn't showing
+      console.log('Total work orders from query:', workOrders?.length);
+      const wo554750 = (workOrders || []).find(wo => wo.id === '554750');
+      if (wo554750) {
+        const lastLaborDate = getLastLaborDate(wo554750);
+        console.log('WO 554750 found:', {
+          total_charges: wo554750.total_charges,
+          operations: wo554750.operations?.length,
+          lastLaborDate,
+          cutoffDate,
+          isInShop: isBoatInShop(wo554750, locations || [], inventoryBoats || [])
+        });
+      } else {
+        console.log('WO 554750 NOT found in query results');
+      }
+
       // Filter work orders client-side based on labor date and shop location
       const filteredWorkOrders = (workOrders || []).filter(wo => {
         // 1. Must have a labor punch (last_worked_at on operations)
