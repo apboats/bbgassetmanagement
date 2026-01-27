@@ -76,35 +76,13 @@ export function ReportsView({ currentUser }) {
         .select(`
           *,
           operations:work_order_operations(*),
-          boat:boats!boat_id(id, name, owner, dockmaster_id, work_order_number, location)
+          boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
         `)
         .eq('status', 'O')
         .gt('total_charges', 0)
         .limit(10000);
 
       if (woError) throw woError;
-
-      // Debug: Check why 554750 isn't showing
-      const wo554750 = (workOrders || []).find(wo => wo.id === '554750');
-      if (wo554750) {
-        console.log('WO 554750 found in raw data:', {
-          status: wo554750.status,
-          total_charges: wo554750.total_charges,
-          operations: wo554750.operations?.map(op => ({
-            opcode: op.opcode,
-            last_worked_at: op.last_worked_at
-          })),
-          boat: wo554750.boat,
-          rigging_id: wo554750.rigging_id
-        });
-
-        const lastLaborDate = getLastLaborDate(wo554750);
-        console.log('Last labor date:', lastLaborDate);
-        console.log('Cutoff date:', cutoffDate);
-        console.log('Is in shop:', isBoatInShop(wo554750, locations || [], inventoryBoats || []));
-      } else {
-        console.log('WO 554750 NOT in raw data - filtered at DB level (status != O or total_charges <= 0)');
-      }
 
       // Filter work orders client-side based on labor date and shop location
       const filteredWorkOrders = (workOrders || []).filter(wo => {
