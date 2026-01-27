@@ -521,7 +521,7 @@ export const LoginForm = () => {
           <div className="mx-auto mb-4 flex items-center justify-center">
             <img
               src="/images/logo.png"
-              alt="Boats by George"
+              alt="Boats By George"
               className="h-24 w-auto object-contain"
               onError={(e) => {
                 // Fallback to default icon if logo not found
@@ -536,7 +536,7 @@ export const LoginForm = () => {
             </div>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Boats by George
+            Boats By George
           </h1>
           <p className="text-slate-600">Asset Management System</p>
         </div>
