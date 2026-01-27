@@ -3,24 +3,37 @@ import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-rea
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
 
-// Helper: Parse MM/DD/YYYY date string (Dockmaster format)
-const parseMMDDYYYY = (dateStr) => {
+// Helper: Parse MM/DD/YYYY date string with optional time (Dockmaster format)
+const parseDateTime = (dateStr, timeStr) => {
   if (!dateStr) return null;
-  // Handle MM/DD/YYYY format
-  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (match) {
-    const [, month, day, year] = match;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+  // Parse date (MM/DD/YYYY format)
+  const dateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!dateMatch) {
+    // Fallback to standard parsing
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? null : parsed;
   }
-  // Fallback to standard parsing
-  const parsed = new Date(dateStr);
-  return isNaN(parsed.getTime()) ? null : parsed;
+
+  const [, month, day, year] = dateMatch;
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+  // Add time if provided (HH:MM:SS or HH:MM format)
+  if (timeStr) {
+    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (timeMatch) {
+      const [, hours, minutes, seconds = '0'] = timeMatch;
+      date.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds));
+    }
+  }
+
+  return date;
 };
 
 // Helper: Get the most recent activity date for a work order
 const getActivityDate = (wo) => {
-  // Parse last_mod_date (MM/DD/YYYY format from Dockmaster)
-  const woDate = parseMMDDYYYY(wo.last_mod_date);
+  // Parse last_mod_date + last_mod_time (Dockmaster format)
+  const woDate = parseDateTime(wo.last_mod_date, wo.last_mod_time);
 
   // Find most recent last_worked_at from operations
   let latestOpDate = null;
@@ -105,52 +118,20 @@ export function ReportsView({ currentUser }) {
 
       if (woError) throw woError;
 
-      // Debug: Show filter stats
-      console.log(`Loaded ${workOrders?.length || 0} work orders with charges > 0`);
-      console.log(`Cutoff date: ${cutoffDate.toISOString()} (${daysBack} days back)`);
-
-      // Find the most recent dates in the dataset
-      if (workOrders && workOrders.length > 0) {
-        const withParsedDates = workOrders
-          .map(wo => ({ wo, date: parseMMDDYYYY(wo.last_mod_date) }))
-          .filter(x => x.date)
-          .sort((a, b) => b.date.getTime() - a.date.getTime());
-
-        console.log('Most recent last_mod_date values (after proper sorting):');
-        withParsedDates.slice(0, 5).forEach(({ wo, date }) => {
-          console.log(`  WO ${wo.id}: last_mod_date="${wo.last_mod_date}" -> ${date.toISOString()}, charges=${wo.total_charges}`);
-        });
-      }
-
       // Filter work orders client-side based on activity date and shop location
-      let filteredOutByDate = 0;
-      let filteredOutByShop = 0;
-      let filteredOutByNoDate = 0;
-
       const filteredWorkOrders = (workOrders || []).filter(wo => {
         // 1. Must have an activity date (last_mod_date or last_worked_at on operations)
         const activityDate = getActivityDate(wo);
-        if (!activityDate) {
-          filteredOutByNoDate++;
-          return false;
-        }
+        if (!activityDate) return false;
 
         // 2. Activity date must be within the selected range
-        if (activityDate < cutoffDate) {
-          filteredOutByDate++;
-          return false;
-        }
+        if (activityDate < cutoffDate) return false;
 
         // 3. Boat must not be in a shop location
-        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) {
-          filteredOutByShop++;
-          return false;
-        }
+        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) return false;
 
         return true;
       });
-
-      console.log(`Filter results: ${filteredWorkOrders.length} passed, ${filteredOutByNoDate} no date, ${filteredOutByDate} too old, ${filteredOutByShop} in shop`);
 
       // Sort by activity date (most recent first)
       filteredWorkOrders.sort((a, b) => {
