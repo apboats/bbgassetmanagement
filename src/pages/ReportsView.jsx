@@ -79,8 +79,6 @@ export function ReportsView({ currentUser }) {
       cutoffDate.setDate(cutoffDate.getDate() - daysBack);
       cutoffDate.setHours(0, 0, 0, 0); // Start of day for fair comparison
 
-      console.log('Filter settings:', { daysBack, cutoffDate: cutoffDate.toISOString() });
-
       // Fetch locations to check if boats are in shop
       const { data: locations } = await supabase
         .from('locations')
@@ -104,15 +102,6 @@ export function ReportsView({ currentUser }) {
         .order('last_mod_date', { ascending: false, nullsFirst: false });
 
       if (woError) throw woError;
-
-      // Debug: Log a sample of dates
-      if (workOrders && workOrders.length > 0) {
-        console.log('Sample work order dates:');
-        workOrders.slice(0, 5).forEach(wo => {
-          const parsed = getActivityDate(wo);
-          console.log(`  WO ${wo.id}: last_mod_date="${wo.last_mod_date}" -> parsed=${parsed?.toISOString() || 'null'}`);
-        });
-      }
 
       // Filter work orders client-side based on activity date and shop location
       const filteredWorkOrders = (workOrders || []).filter(wo => {
