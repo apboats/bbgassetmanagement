@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, ChevronRight, History } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
+import { supabase } from '../../supabaseClient';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
@@ -70,7 +71,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);
 
-  // Fetch work orders for this inventory boat (queries pre-synced data, no Dockmaster fetch)
+  // Query database directly (fast, uses cron-synced data)
   const fetchWorkOrders = async () => {
     if (!boat.dockmasterId) {
       setWorkOrdersError('No Dockmaster ID available for this boat');
@@ -81,32 +82,24 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
     setWorkOrdersError('');
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const { data: workOrders, error } = await supabase
+        .from('work_orders')
+        .select(`
+          *,
+          operations:work_order_operations(*)
+        `)
+        .eq('rigging_id', boat.dockmasterId)  // Match rigging_id to inventory boat's dockmaster_id
+        .eq('status', 'O')  // Only open work orders
+        .order('id', { ascending: true });  // Sort by WO number ascending
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/dockmaster-internal-workorders-query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({
-          dockmasterId: boat.dockmasterId,
-        }),
-      });
+      if (error) throw error;
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setWorkOrders(data.workOrders || []);
-        setWorkOrdersLastSynced(data.lastSynced);
-        setShowWorkOrders(true);
-      } else {
-        setWorkOrdersError(data.error || 'Failed to fetch work orders');
-      }
+      setWorkOrders(workOrders || []);
+      setWorkOrdersLastSynced(workOrders?.[0]?.last_synced || null);
+      setShowWorkOrders(true);
     } catch (error) {
-      console.error('Error fetching work orders:', error);
-      setWorkOrdersError(error.message || 'Failed to fetch work orders');
+      console.error('Error loading work orders from DB:', error);
+      setWorkOrdersError(error.message);
     } finally {
       setLoadingWorkOrders(false);
     }
