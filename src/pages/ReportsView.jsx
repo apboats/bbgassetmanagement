@@ -90,6 +90,7 @@ export function ReportsView({ currentUser }) {
         .select('id, dockmaster_id, location');
 
       // Query work orders with charges and status='O'
+      // Note: Supabase default limit is 1000, we need more
       const { data: workOrders, error: woError } = await supabase
         .from('work_orders')
         .select(`
@@ -99,13 +100,22 @@ export function ReportsView({ currentUser }) {
         `)
         .eq('status', 'O')
         .gt('total_charges', 0)
-        .order('last_mod_date', { ascending: false, nullsFirst: false });
+        .order('last_mod_date', { ascending: false, nullsFirst: false })
+        .limit(5000);
 
       if (woError) throw woError;
 
       // Debug: Show filter stats
       console.log(`Loaded ${workOrders?.length || 0} work orders with charges > 0`);
       console.log(`Cutoff date: ${cutoffDate.toISOString()} (${daysBack} days back)`);
+
+      // Show the 5 most recent last_mod_date values
+      if (workOrders && workOrders.length > 0) {
+        console.log('Most recent last_mod_date values:');
+        workOrders.slice(0, 5).forEach(wo => {
+          console.log(`  WO ${wo.id}: last_mod_date="${wo.last_mod_date}", total_charges=${wo.total_charges}`);
+        });
+      }
 
       // Filter work orders client-side based on activity date and shop location
       let filteredOutByDate = 0;
