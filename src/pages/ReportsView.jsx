@@ -68,9 +68,27 @@ export function ReportsView({ currentUser }) {
         .from('inventory_boats')
         .select('id, dockmaster_id, location');
 
-      // Query work orders with charges and status='O'
-      // Note: Don't sort by last_mod_date in DB - it's stored as text (MM/DD/YYYY)
-      // which sorts alphabetically, not chronologically
+      // Step 1: Find operations with recent labor activity (last_worked_at >= cutoff)
+      // This is more efficient than fetching all work orders
+      const { data: recentOps, error: opsError } = await supabase
+        .from('work_order_operations')
+        .select('work_order_id')
+        .gte('last_worked_at', cutoffDate.toISOString())
+        .limit(10000);
+
+      if (opsError) throw opsError;
+
+      // Get unique work order IDs
+      const workOrderIds = [...new Set((recentOps || []).map(op => op.work_order_id))];
+      console.log('Work orders with recent labor:', workOrderIds.length);
+
+      if (workOrderIds.length === 0) {
+        setUnbilledData({ workOrders: [] });
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 2: Fetch those work orders with their operations and boat info
       const { data: workOrders, error: woError } = await supabase
         .from('work_orders')
         .select(`
@@ -78,49 +96,17 @@ export function ReportsView({ currentUser }) {
           operations:work_order_operations(*),
           boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
         `)
+        .in('id', workOrderIds)
         .eq('status', 'O')
-        .gt('total_charges', 0)
-        .limit(10000);
+        .gt('total_charges', 0);
 
       if (woError) throw woError;
 
-      // Debug: Check why 554750 isn't showing
-      console.log('Total work orders from query:', workOrders?.length);
+      console.log('Work orders after filters:', workOrders?.length);
 
-      // Direct query for 554750 to bypass any limit issues
-      const { data: wo554750Direct } = await supabase
-        .from('work_orders')
-        .select('*, operations:work_order_operations(*)')
-        .eq('id', '554750')
-        .single();
-
-      if (wo554750Direct) {
-        const lastLaborDate = getLastLaborDate(wo554750Direct);
-        console.log('WO 554750 direct query:', {
-          status: wo554750Direct.status,
-          total_charges: wo554750Direct.total_charges,
-          operations: wo554750Direct.operations?.map(op => ({ opcode: op.opcode, last_worked_at: op.last_worked_at })),
-          lastLaborDate,
-          cutoffDate,
-          isInShop: isBoatInShop(wo554750Direct, locations || [], inventoryBoats || [])
-        });
-      } else {
-        console.log('WO 554750 NOT found even with direct query');
-      }
-
-      // Filter work orders client-side based on labor date and shop location
+      // Filter out boats in shop locations
       const filteredWorkOrders = (workOrders || []).filter(wo => {
-        // 1. Must have a labor punch (last_worked_at on operations)
-        const lastLaborDate = getLastLaborDate(wo);
-        if (!lastLaborDate) return false;
-
-        // 2. Labor date must be within the selected range
-        if (lastLaborDate < cutoffDate) return false;
-
-        // 3. Boat must not be in a shop location
-        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) return false;
-
-        return true;
+        return !isBoatInShop(wo, locations || [], inventoryBoats || []);
       });
 
       // Sort by last labor date (most recent first)
