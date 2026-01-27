@@ -1,7 +1,65 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-react';
+import { FileText, Calendar, DollarSign, Package, AlertCircle, Printer } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
+
+// Print styles - injected into document when printing
+const printStyles = `
+@media print {
+  /* Hide non-printable elements */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    margin: 0.5in;
+    size: landscape;
+  }
+
+  /* Ensure table fits on page */
+  .print-table {
+    width: 100%;
+    font-size: 10pt;
+    border-collapse: collapse;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+  }
+
+  .print-table th {
+    background-color: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Checkbox styling for print */
+  .print-checkbox {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #333;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* Notes line for print */
+  .print-notes-line {
+    border-bottom: 1px solid #999;
+    min-width: 150px;
+    display: inline-block;
+  }
+
+  /* Page break handling */
+  .print-row {
+    page-break-inside: avoid;
+  }
+}
+`;
 
 // Helper: Get the most recent labor activity date for a work order
 // Only considers last_worked_at from operations (actual labor punches)
@@ -80,7 +138,6 @@ export function ReportsView({ currentUser }) {
 
       // Get unique work order IDs
       const workOrderIds = [...new Set((recentOps || []).map(op => op.work_order_id))];
-      console.log('Work orders with recent labor:', workOrderIds.length);
 
       if (workOrderIds.length === 0) {
         setUnbilledData({ workOrders: [] });
@@ -101,8 +158,6 @@ export function ReportsView({ currentUser }) {
         .gt('total_charges', 0);
 
       if (woError) throw woError;
-
-      console.log('Work orders after filters:', workOrders?.length);
 
       // Filter out boats in shop locations
       const filteredWorkOrders = (workOrders || []).filter(wo => {
@@ -133,6 +188,26 @@ export function ReportsView({ currentUser }) {
       newExpanded.add(woId);
     }
     setExpandedWOs(newExpanded);
+  };
+
+  // Print handler
+  const handlePrint = () => {
+    // Inject print styles
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'print-styles';
+    styleSheet.textContent = printStyles;
+    document.head.appendChild(styleSheet);
+
+    // Trigger print
+    window.print();
+
+    // Clean up styles after print dialog closes
+    setTimeout(() => {
+      const existingStyle = document.getElementById('print-styles');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    }, 1000);
   };
 
   // Calculate totals
@@ -166,9 +241,17 @@ export function ReportsView({ currentUser }) {
         </label>
         <button
           onClick={loadUnbilledWork}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors no-print"
         >
           Refresh
+        </button>
+        <button
+          onClick={handlePrint}
+          disabled={unbilledData.workOrders.length === 0}
+          className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 no-print"
+        >
+          <Printer className="w-4 h-4" />
+          Print Report
         </button>
       </div>
 
@@ -227,10 +310,19 @@ export function ReportsView({ currentUser }) {
         </div>
       )}
 
+      {/* Print Header - only visible when printing */}
+      <div className="hidden print:block mb-4">
+        <h2 className="text-xl font-bold">Unbilled Work Orders Report</h2>
+        <p className="text-sm text-gray-600">
+          Generated: {new Date().toLocaleDateString()} | Filter: Last {daysBack} days |
+          Total: {totalWorkOrders} work orders | ${totalCharges.toFixed(2)} unbilled
+        </p>
+      </div>
+
       {/* Work Orders Table */}
       {!isLoading && unbilledData.workOrders.length > 0 && (
-        <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden print:shadow-none print:border-0">
+          <table className="w-full print-table">
             <thead className="bg-slate-100 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
@@ -239,7 +331,7 @@ export function ReportsView({ currentUser }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Boat / Owner
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider no-print">
                   Category
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
@@ -248,8 +340,11 @@ export function ReportsView({ currentUser }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Last Labor
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider no-print">
                   Operations
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider hidden print:table-cell" style={{ width: '200px' }}>
+                  Status
                 </th>
               </tr>
             </thead>
@@ -263,13 +358,13 @@ export function ReportsView({ currentUser }) {
                   <React.Fragment key={wo.id}>
                     {/* Work Order Row */}
                     <tr
-                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                      className="hover:bg-slate-50 cursor-pointer transition-colors print-row"
                       onClick={() => toggleWorkOrder(wo.id)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <svg
-                            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            className={`w-4 h-4 text-slate-400 transition-transform no-print ${isExpanded ? 'rotate-90' : ''}`}
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -279,14 +374,14 @@ export function ReportsView({ currentUser }) {
                           <span className="font-mono font-semibold text-slate-900">{wo.id}</span>
                         </div>
                         {wo.title && (
-                          <p className="text-xs text-slate-600 mt-1 ml-6">{wo.title}</p>
+                          <p className="text-xs text-slate-600 mt-1 ml-6 print:ml-0">{wo.title}</p>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{boat.name || 'Unknown Boat'}</p>
                         <p className="text-sm text-slate-600">{boat.owner || 'Unknown Owner'}</p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 no-print">
                         <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                           {wo.category || 'General'}
                         </span>
@@ -304,7 +399,7 @@ export function ReportsView({ currentUser }) {
                               <p className="text-sm text-slate-700">
                                 {activityDate.toLocaleDateString()}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-500 no-print">
                                 {activityDate.toLocaleTimeString()}
                               </p>
                             </>
@@ -313,16 +408,30 @@ export function ReportsView({ currentUser }) {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center no-print">
                         <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
                           {operations.length} ops
                         </span>
                       </td>
+                      {/* Billing Status - only visible when printing */}
+                      <td className="px-4 py-3 hidden print:table-cell text-xs">
+                        <div className="space-y-1">
+                          <div>
+                            <span className="print-checkbox"></span>
+                            <span>Billed</span>
+                          </div>
+                          <div>
+                            <span className="print-checkbox"></span>
+                            <span>Not billed:</span>
+                            <span className="print-notes-line ml-1"></span>
+                          </div>
+                        </div>
+                      </td>
                     </tr>
 
-                    {/* Expanded Operations */}
+                    {/* Expanded Operations - hidden when printing */}
                     {isExpanded && operations.length > 0 && (
-                      <tr>
+                      <tr className="no-print">
                         <td colSpan={6} className="px-4 py-2 bg-slate-50">
                           <div className="pl-6">
                             <p className="text-xs font-semibold text-slate-700 uppercase mb-2">Operations</p>
