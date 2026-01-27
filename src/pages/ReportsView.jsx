@@ -103,20 +103,39 @@ export function ReportsView({ currentUser }) {
 
       if (woError) throw woError;
 
+      // Debug: Show filter stats
+      console.log(`Loaded ${workOrders?.length || 0} work orders with charges > 0`);
+      console.log(`Cutoff date: ${cutoffDate.toISOString()} (${daysBack} days back)`);
+
       // Filter work orders client-side based on activity date and shop location
+      let filteredOutByDate = 0;
+      let filteredOutByShop = 0;
+      let filteredOutByNoDate = 0;
+
       const filteredWorkOrders = (workOrders || []).filter(wo => {
         // 1. Must have an activity date (last_mod_date or last_worked_at on operations)
         const activityDate = getActivityDate(wo);
-        if (!activityDate) return false;
+        if (!activityDate) {
+          filteredOutByNoDate++;
+          return false;
+        }
 
         // 2. Activity date must be within the selected range
-        if (activityDate < cutoffDate) return false;
+        if (activityDate < cutoffDate) {
+          filteredOutByDate++;
+          return false;
+        }
 
         // 3. Boat must not be in a shop location
-        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) return false;
+        if (isBoatInShop(wo, locations || [], inventoryBoats || [])) {
+          filteredOutByShop++;
+          return false;
+        }
 
         return true;
       });
+
+      console.log(`Filter results: ${filteredWorkOrders.length} passed, ${filteredOutByNoDate} no date, ${filteredOutByDate} too old, ${filteredOutByShop} in shop`);
 
       // Sort by activity date (most recent first)
       filteredWorkOrders.sort((a, b) => {
