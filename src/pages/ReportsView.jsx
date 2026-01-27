@@ -3,16 +3,31 @@ import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-rea
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
 
+// Helper: Parse MM/DD/YYYY date string (Dockmaster format)
+const parseMMDDYYYY = (dateStr) => {
+  if (!dateStr) return null;
+  // Handle MM/DD/YYYY format
+  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    const [, month, day, year] = match;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  // Fallback to standard parsing
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
 // Helper: Get the most recent activity date for a work order
 const getActivityDate = (wo) => {
-  const woDate = wo.last_mod_date ? new Date(wo.last_mod_date) : null;
+  // Parse last_mod_date (MM/DD/YYYY format from Dockmaster)
+  const woDate = parseMMDDYYYY(wo.last_mod_date);
 
   // Find most recent last_worked_at from operations
   let latestOpDate = null;
   for (const op of (wo.operations || [])) {
     if (op.last_worked_at) {
       const opDate = new Date(op.last_worked_at);
-      if (!latestOpDate || opDate > latestOpDate) {
+      if (!isNaN(opDate.getTime()) && (!latestOpDate || opDate > latestOpDate)) {
         latestOpDate = opDate;
       }
     }
@@ -22,7 +37,7 @@ const getActivityDate = (wo) => {
   if (woDate && latestOpDate) {
     return woDate > latestOpDate ? woDate : latestOpDate;
   }
-  return woDate || latestOpDate; // Returns null if both are null
+  return woDate || latestOpDate;
 };
 
 // Helper: Check if boat is in a shop location
