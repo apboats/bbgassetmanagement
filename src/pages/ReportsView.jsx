@@ -126,18 +126,25 @@ export function ReportsView({ currentUser }) {
         .from('inventory_boats')
         .select('id, dockmaster_id, location');
 
-      // Step 1: Find operations with recent labor activity (last_worked_at >= cutoff)
-      // This is more efficient than fetching all work orders
+      // Step 1: Query operations with recent labor activity to get work order IDs
+      // Use a direct query on operations table with date filter - much more efficient
       const { data: recentOps, error: opsError } = await supabase
         .from('work_order_operations')
-        .select('work_order_id')
-        .gte('last_worked_at', cutoffDate.toISOString())
-        .limit(10000);
+        .select('work_order_id, last_worked_at')
+        .gte('last_worked_at', cutoffDate.toISOString());
 
       if (opsError) throw opsError;
 
-      // Get unique work order IDs
-      const workOrderIds = [...new Set((recentOps || []).map(op => op.work_order_id))];
+      // Build a map of work_order_id -> latest last_worked_at
+      const woLastWorkedMap = new Map();
+      for (const op of (recentOps || [])) {
+        const existing = woLastWorkedMap.get(op.work_order_id);
+        if (!existing || new Date(op.last_worked_at) > new Date(existing)) {
+          woLastWorkedMap.set(op.work_order_id, op.last_worked_at);
+        }
+      }
+
+      const workOrderIds = [...woLastWorkedMap.keys()];
 
       if (workOrderIds.length === 0) {
         setUnbilledData({ workOrders: [] });
@@ -145,22 +152,60 @@ export function ReportsView({ currentUser }) {
         return;
       }
 
-      // Step 2: Fetch those work orders with their operations and boat info
-      const { data: workOrders, error: woError } = await supabase
-        .from('work_orders')
-        .select(`
-          *,
-          operations:work_order_operations(*),
-          boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
-        `)
-        .in('id', workOrderIds)
-        .eq('status', 'O')
-        .gt('total_charges', 0);
+      // Step 2: Fetch work orders in batches (Supabase .in() has limits)
+      const BATCH_SIZE = 500;
+      const allWorkOrders = [];
 
-      if (woError) throw woError;
+      for (let i = 0; i < workOrderIds.length; i += BATCH_SIZE) {
+        const batchIds = workOrderIds.slice(i, i + BATCH_SIZE);
+
+        const { data: batchWOs, error: woError } = await supabase
+          .from('work_orders')
+          .select(`
+            *,
+            boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
+          `)
+          .in('id', batchIds)
+          .eq('status', 'O')
+          .gt('total_charges', 0);
+
+        if (woError) throw woError;
+        if (batchWOs) allWorkOrders.push(...batchWOs);
+      }
+
+      // Step 3: Fetch operations only for the matching work orders (in batches)
+      const matchingWOIds = allWorkOrders.map(wo => wo.id);
+      const allOperations = [];
+
+      for (let i = 0; i < matchingWOIds.length; i += BATCH_SIZE) {
+        const batchIds = matchingWOIds.slice(i, i + BATCH_SIZE);
+
+        const { data: batchOps, error: batchOpsError } = await supabase
+          .from('work_order_operations')
+          .select('*')
+          .in('work_order_id', batchIds);
+
+        if (batchOpsError) throw batchOpsError;
+        if (batchOps) allOperations.push(...batchOps);
+      }
+
+      // Group operations by work_order_id
+      const opsByWO = new Map();
+      for (const op of allOperations) {
+        if (!opsByWO.has(op.work_order_id)) {
+          opsByWO.set(op.work_order_id, []);
+        }
+        opsByWO.get(op.work_order_id).push(op);
+      }
+
+      // Attach operations to work orders
+      const workOrdersWithRecentLabor = allWorkOrders.map(wo => ({
+        ...wo,
+        operations: opsByWO.get(wo.id) || []
+      }));
 
       // Filter out boats in shop locations
-      const filteredWorkOrders = (workOrders || []).filter(wo => {
+      const filteredWorkOrders = workOrdersWithRecentLabor.filter(wo => {
         return !isBoatInShop(wo, locations || [], inventoryBoats || []);
       });
 
