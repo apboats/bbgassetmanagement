@@ -128,16 +128,36 @@ export function ReportsView({ currentUser }) {
 
       // Step 1: Query operations with recent labor activity to get work order IDs
       // Use a direct query on operations table with date filter - much more efficient
-      const { data: recentOps, error: opsError } = await supabase
-        .from('work_order_operations')
-        .select('work_order_id, last_worked_at')
-        .gte('last_worked_at', cutoffDate.toISOString());
+      // Note: Supabase default limit is 1000, so we need to paginate
+      console.log('Cutoff date:', cutoffDate.toISOString());
 
-      if (opsError) throw opsError;
+      let allRecentOps = [];
+      let offset = 0;
+      const PAGE_SIZE = 1000;
+
+      while (true) {
+        const { data: pageOps, error: opsError } = await supabase
+          .from('work_order_operations')
+          .select('work_order_id, last_worked_at')
+          .gte('last_worked_at', cutoffDate.toISOString())
+          .range(offset, offset + PAGE_SIZE - 1);
+
+        if (opsError) throw opsError;
+
+        if (!pageOps || pageOps.length === 0) break;
+
+        allRecentOps.push(...pageOps);
+        console.log(`Fetched ${pageOps.length} operations (offset ${offset}), total so far: ${allRecentOps.length}`);
+
+        if (pageOps.length < PAGE_SIZE) break; // Last page
+        offset += PAGE_SIZE;
+      }
+
+      console.log('Total operations with recent labor:', allRecentOps.length);
 
       // Build a map of work_order_id -> latest last_worked_at
       const woLastWorkedMap = new Map();
-      for (const op of (recentOps || [])) {
+      for (const op of allRecentOps) {
         const existing = woLastWorkedMap.get(op.work_order_id);
         if (!existing || new Date(op.last_worked_at) > new Date(existing)) {
           woLastWorkedMap.set(op.work_order_id, op.last_worked_at);
@@ -145,6 +165,7 @@ export function ReportsView({ currentUser }) {
       }
 
       const workOrderIds = [...woLastWorkedMap.keys()];
+      console.log('Unique work order IDs with recent labor:', workOrderIds.length);
 
       if (workOrderIds.length === 0) {
         setUnbilledData({ workOrders: [] });
@@ -170,8 +191,13 @@ export function ReportsView({ currentUser }) {
           .gt('total_charges', 0);
 
         if (woError) throw woError;
-        if (batchWOs) allWorkOrders.push(...batchWOs);
+        if (batchWOs) {
+          console.log(`Work orders batch ${i / BATCH_SIZE + 1}: fetched ${batchWOs.length} open WOs with charges`);
+          allWorkOrders.push(...batchWOs);
+        }
       }
+
+      console.log('Total open work orders with charges:', allWorkOrders.length);
 
       // Step 3: Fetch operations only for the matching work orders (in batches)
       const matchingWOIds = allWorkOrders.map(wo => wo.id);
@@ -188,6 +214,8 @@ export function ReportsView({ currentUser }) {
         if (batchOpsError) throw batchOpsError;
         if (batchOps) allOperations.push(...batchOps);
       }
+
+      console.log('Total operations for matching WOs:', allOperations.length);
 
       // Group operations by work_order_id
       const opsByWO = new Map();
