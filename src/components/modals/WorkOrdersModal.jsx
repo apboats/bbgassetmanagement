@@ -5,8 +5,9 @@
 // Used by both BoatDetailsModal and InventoryBoatDetailsModal
 // ============================================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Wrench, DollarSign } from 'lucide-react';
+import { OperationDetailsModal } from './OperationDetailsModal';
 
 export function WorkOrdersModal({
   workOrders = [],
@@ -19,6 +20,9 @@ export function WorkOrdersModal({
   onClose,
   variant = 'customer' // 'customer' or 'inventory'
 }) {
+  const [selectedOperation, setSelectedOperation] = useState(null);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState(null);
+
   const isInventory = variant === 'inventory';
   const headerGradient = isInventory
     ? 'from-purple-600 to-purple-700'
@@ -163,12 +167,16 @@ export function WorkOrdersModal({
                           return (
                             <div
                               key={op.id || idx}
-                              className={`flex items-center justify-between p-3 rounded-lg border-2 ${
+                              onClick={() => {
+                                setSelectedOperation(op);
+                                setSelectedWorkOrderId(wo.id);
+                              }}
+                              className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
                                 isClosed
-                                  ? 'bg-green-50 border-green-200'
+                                  ? 'bg-green-50 border-green-200 hover:border-green-400'
                                   : isUnbilled
-                                  ? 'bg-orange-50 border-orange-300'
-                                  : 'bg-white border-slate-200'
+                                  ? 'bg-orange-50 border-orange-300 hover:border-orange-400'
+                                  : 'bg-white border-slate-200 hover:border-blue-400'
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -262,6 +270,18 @@ export function WorkOrdersModal({
           </div>
         </div>
       </div>
+
+      {/* Operation Details Modal */}
+      {selectedOperation && (
+        <OperationDetailsModal
+          operation={selectedOperation}
+          workOrderId={selectedWorkOrderId}
+          onClose={() => {
+            setSelectedOperation(null);
+            setSelectedWorkOrderId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
