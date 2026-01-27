@@ -224,13 +224,26 @@ serve(async (req) => {
 
         // Update operations if present in response
         if (wo.operations && wo.operations.length > 0) {
+          // Preserve last_worked_at values before deleting operations
+          const { data: existingOps } = await supabase
+            .from('work_order_operations')
+            .select('opcode, last_worked_at')
+            .eq('work_order_id', wo.id)
+
+          const lastWorkedAtMap = new Map()
+          for (const op of (existingOps || [])) {
+            if (op.last_worked_at) {
+              lastWorkedAtMap.set(op.opcode, op.last_worked_at)
+            }
+          }
+
           // Delete old operations
           await supabase
             .from('work_order_operations')
             .delete()
             .eq('work_order_id', wo.id)
 
-          // Insert new operations
+          // Insert new operations with preserved last_worked_at
           const opsWithWoId = wo.operations.map((op: any) => ({
             id: op.id,
             work_order_id: wo.id,
@@ -282,6 +295,8 @@ serve(async (req) => {
             est_complete_date: op.estCompleteDate || null,
             req_comp_date: op.reqCompDate || null,
             standard_hours: op.standardHours || 0,
+            // Preserve last_worked_at if it existed
+            last_worked_at: lastWorkedAtMap.get(op.opcode) || null,
           }))
 
           await supabase
