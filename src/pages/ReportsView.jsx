@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, DollarSign, Package, AlertCircle, Printer } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FileText, Calendar, DollarSign, Package, AlertCircle, Printer, Save, Send, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
+import { WorkOrdersModal } from '../components/modals/WorkOrdersModal';
+import { OperationDetailsModal } from '../components/modals/OperationDetailsModal';
 
 // Print styles - injected into document when printing
 const printStyles = `
@@ -61,9 +63,37 @@ const printStyles = `
 }
 `;
 
+// Helper: Get Monday of a given week
+const getMonday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+// Helper: Get Sunday of a given week
+const getSunday = (date) => {
+  const monday = getMonday(date);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return sunday;
+};
+
+// Helper: Format date as YYYY-MM-DD for database
+const formatDateForDB = (date) => {
+  return date.toISOString().split('T')[0];
+};
+
+// Helper: Format date range for display
+const formatWeekRange = (monday, sunday) => {
+  const options = { month: 'short', day: 'numeric' };
+  return `${monday.toLocaleDateString('en-US', options)} - ${sunday.toLocaleDateString('en-US', options)}, ${monday.getFullYear()}`;
+};
+
 // Helper: Get the most recent labor activity date for a work order
-// Only considers last_worked_at from operations (actual labor punches)
-// Ignores last_mod_date/time since that updates for non-labor changes (parts, etc.)
 const getLastLaborDate = (wo) => {
   let latestOpDate = null;
   for (const op of (wo.operations || [])) {
@@ -82,10 +112,8 @@ const isBoatInShop = (wo, locations, inventoryBoats) => {
   let boatLocation = null;
 
   if (wo.boat?.location) {
-    // Customer boat - use boat.location
     boatLocation = wo.boat.location;
   } else if (wo.rigging_id) {
-    // Internal work order - find inventory boat by rigging_id
     const invBoat = inventoryBoats.find(b => b.dockmaster_id === wo.rigging_id);
     boatLocation = invBoat?.location;
   }
@@ -103,9 +131,76 @@ export function ReportsView({ currentUser }) {
   const [daysBack, setDaysBack] = useState(7);
   const [expandedWOs, setExpandedWOs] = useState(new Set());
 
+  // Modal state for clickable work orders and operations
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
+  const [selectedOperation, setSelectedOperation] = useState(null);
+  const [selectedWOIdForOp, setSelectedWOIdForOp] = useState(null);
+
+  // Weekly report state
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getMonday(new Date()));
+  const [weeklyReport, setWeeklyReport] = useState(null);
+  const [reportItems, setReportItems] = useState({});  // { workOrderId: { billing_status, notes } }
+  const [reportNotes, setReportNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const currentWeekEnd = getSunday(currentWeekStart);
+
+  // Load weekly report for selected week
+  const loadWeeklyReport = useCallback(async () => {
+    try {
+      const weekStartStr = formatDateForDB(currentWeekStart);
+
+      const { data: report, error: reportError } = await supabase
+        .from('weekly_reports')
+        .select('*')
+        .eq('week_start', weekStartStr)
+        .single();
+
+      if (reportError && reportError.code !== 'PGRST116') {
+        // PGRST116 = no rows found, which is ok
+        console.error('Error loading weekly report:', reportError);
+      }
+
+      if (report) {
+        setWeeklyReport(report);
+        setReportNotes(report.notes || '');
+
+        // Load report items
+        const { data: items, error: itemsError } = await supabase
+          .from('weekly_report_items')
+          .select('*')
+          .eq('report_id', report.id);
+
+        if (itemsError) {
+          console.error('Error loading report items:', itemsError);
+        } else {
+          const itemsMap = {};
+          for (const item of (items || [])) {
+            itemsMap[item.work_order_id] = {
+              billing_status: item.billing_status,
+              notes: item.notes || ''
+            };
+          }
+          setReportItems(itemsMap);
+        }
+      } else {
+        setWeeklyReport(null);
+        setReportNotes('');
+        setReportItems({});
+      }
+    } catch (err) {
+      console.error('Error in loadWeeklyReport:', err);
+    }
+  }, [currentWeekStart]);
+
   useEffect(() => {
     loadUnbilledWork();
   }, [daysBack]);
+
+  useEffect(() => {
+    loadWeeklyReport();
+  }, [loadWeeklyReport]);
 
   const loadUnbilledWork = async () => {
     setIsLoading(true);
@@ -114,22 +209,15 @@ export function ReportsView({ currentUser }) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-      cutoffDate.setHours(0, 0, 0, 0); // Start of day for fair comparison
+      cutoffDate.setHours(0, 0, 0, 0);
 
-      // Fetch locations to check if boats are in shop
       const { data: locations } = await supabase
         .from('locations')
         .select('id, name, type');
 
-      // Fetch inventory boats for internal work order matching
       const { data: inventoryBoats } = await supabase
         .from('inventory_boats')
         .select('id, dockmaster_id, location');
-
-      // Step 1: Query operations with recent labor activity to get work order IDs
-      // Use a direct query on operations table with date filter - much more efficient
-      // Note: Supabase default limit is 1000, so we need to paginate
-      console.log('Cutoff date:', cutoffDate.toISOString());
 
       let allRecentOps = [];
       let offset = 0;
@@ -143,19 +231,13 @@ export function ReportsView({ currentUser }) {
           .range(offset, offset + PAGE_SIZE - 1);
 
         if (opsError) throw opsError;
-
         if (!pageOps || pageOps.length === 0) break;
 
         allRecentOps.push(...pageOps);
-        console.log(`Fetched ${pageOps.length} operations (offset ${offset}), total so far: ${allRecentOps.length}`);
-
-        if (pageOps.length < PAGE_SIZE) break; // Last page
+        if (pageOps.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
 
-      console.log('Total operations with recent labor:', allRecentOps.length);
-
-      // Build a map of work_order_id -> latest last_worked_at
       const woLastWorkedMap = new Map();
       for (const op of allRecentOps) {
         const existing = woLastWorkedMap.get(op.work_order_id);
@@ -165,7 +247,6 @@ export function ReportsView({ currentUser }) {
       }
 
       const workOrderIds = [...woLastWorkedMap.keys()];
-      console.log('Unique work order IDs with recent labor:', workOrderIds.length);
 
       if (workOrderIds.length === 0) {
         setUnbilledData({ workOrders: [] });
@@ -173,7 +254,6 @@ export function ReportsView({ currentUser }) {
         return;
       }
 
-      // Step 2: Fetch work orders in batches (Supabase .in() has limits)
       const BATCH_SIZE = 500;
       const allWorkOrders = [];
 
@@ -191,15 +271,9 @@ export function ReportsView({ currentUser }) {
           .gt('total_charges', 0);
 
         if (woError) throw woError;
-        if (batchWOs) {
-          console.log(`Work orders batch ${i / BATCH_SIZE + 1}: fetched ${batchWOs.length} open WOs with charges`);
-          allWorkOrders.push(...batchWOs);
-        }
+        if (batchWOs) allWorkOrders.push(...batchWOs);
       }
 
-      console.log('Total open work orders with charges:', allWorkOrders.length);
-
-      // Step 3: Fetch operations only for the matching work orders (in batches)
       const matchingWOIds = allWorkOrders.map(wo => wo.id);
       const allOperations = [];
 
@@ -215,9 +289,6 @@ export function ReportsView({ currentUser }) {
         if (batchOps) allOperations.push(...batchOps);
       }
 
-      console.log('Total operations for matching WOs:', allOperations.length);
-
-      // Group operations by work_order_id
       const opsByWO = new Map();
       for (const op of allOperations) {
         if (!opsByWO.has(op.work_order_id)) {
@@ -226,18 +297,15 @@ export function ReportsView({ currentUser }) {
         opsByWO.get(op.work_order_id).push(op);
       }
 
-      // Attach operations to work orders
       const workOrdersWithRecentLabor = allWorkOrders.map(wo => ({
         ...wo,
         operations: opsByWO.get(wo.id) || []
       }));
 
-      // Filter out boats in shop locations
       const filteredWorkOrders = workOrdersWithRecentLabor.filter(wo => {
         return !isBoatInShop(wo, locations || [], inventoryBoats || []);
       });
 
-      // Sort by last labor date (most recent first)
       filteredWorkOrders.sort((a, b) => {
         const dateA = getLastLaborDate(a);
         const dateB = getLastLaborDate(b);
@@ -263,18 +331,140 @@ export function ReportsView({ currentUser }) {
     setExpandedWOs(newExpanded);
   };
 
+  // Navigate weeks
+  const goToPreviousWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() - 7);
+    setCurrentWeekStart(newStart);
+  };
+
+  const goToNextWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() + 7);
+    setCurrentWeekStart(newStart);
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeekStart(getMonday(new Date()));
+  };
+
+  // Update report item (billing status or notes)
+  const updateReportItem = (workOrderId, field, value) => {
+    setReportItems(prev => ({
+      ...prev,
+      [workOrderId]: {
+        ...prev[workOrderId],
+        [field]: value
+      }
+    }));
+  };
+
+  // Save report as draft
+  const saveReport = async (status = 'draft') => {
+    setIsSaving(true);
+    setSaveMessage('');
+
+    try {
+      const weekStartStr = formatDateForDB(currentWeekStart);
+      const weekEndStr = formatDateForDB(currentWeekEnd);
+      const totalWOs = unbilledData.workOrders.length;
+      const totalCharges = unbilledData.workOrders.reduce((sum, wo) => sum + (wo.total_charges || 0), 0);
+
+      let reportId = weeklyReport?.id;
+
+      if (reportId) {
+        // Update existing report
+        const updateData = {
+          notes: reportNotes,
+          total_work_orders: totalWOs,
+          total_charges: totalCharges,
+          status,
+        };
+
+        if (status === 'submitted' && weeklyReport.status !== 'submitted') {
+          updateData.submitted_at = new Date().toISOString();
+        }
+
+        const { error: updateError } = await supabase
+          .from('weekly_reports')
+          .update(updateData)
+          .eq('id', reportId);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new report
+        const { data: newReport, error: createError } = await supabase
+          .from('weekly_reports')
+          .insert({
+            week_start: weekStartStr,
+            week_end: weekEndStr,
+            created_by: currentUser?.id,
+            notes: reportNotes,
+            total_work_orders: totalWOs,
+            total_charges: totalCharges,
+            status,
+            submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        reportId = newReport.id;
+      }
+
+      // Save/update report items
+      for (const [woId, item] of Object.entries(reportItems)) {
+        if (item.billing_status || item.notes) {
+          const { error: itemError } = await supabase
+            .from('weekly_report_items')
+            .upsert({
+              report_id: reportId,
+              work_order_id: parseInt(woId),
+              billing_status: item.billing_status || 'pending',
+              notes: item.notes || '',
+            }, {
+              onConflict: 'report_id,work_order_id'
+            });
+
+          if (itemError) {
+            console.error('Error saving report item:', itemError);
+          }
+        }
+      }
+
+      // If submitting, send notification to managers
+      if (status === 'submitted') {
+        try {
+          await supabase.functions.invoke('notify-report-submitted', {
+            body: { reportId }
+          });
+        } catch (notifyErr) {
+          console.error('Failed to send notification:', notifyErr);
+          // Don't fail the save if notification fails
+        }
+      }
+
+      // Reload the report
+      await loadWeeklyReport();
+      setSaveMessage(status === 'submitted' ? 'Report submitted!' : 'Draft saved!');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (err) {
+      console.error('Error saving report:', err);
+      setSaveMessage('Error saving report');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Print handler
   const handlePrint = () => {
-    // Inject print styles
     const styleSheet = document.createElement('style');
     styleSheet.id = 'print-styles';
     styleSheet.textContent = printStyles;
     document.head.appendChild(styleSheet);
 
-    // Trigger print
     window.print();
 
-    // Clean up styles after print dialog closes
     setTimeout(() => {
       const existingStyle = document.getElementById('print-styles');
       if (existingStyle) {
@@ -288,16 +478,126 @@ export function ReportsView({ currentUser }) {
   const totalOperations = unbilledData.workOrders.reduce((sum, wo) => sum + (wo.operations?.length || 0), 0);
   const totalCharges = unbilledData.workOrders.reduce((sum, wo) => sum + (wo.total_charges || 0), 0);
 
+  // Status badge component
+  const StatusBadge = ({ status }) => {
+    const configs = {
+      draft: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock, label: 'Draft' },
+      submitted: { bg: 'bg-blue-100', text: 'text-blue-800', icon: Send, label: 'Submitted' },
+      approved: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Approved' },
+    };
+    const config = configs[status] || configs.draft;
+    const Icon = config.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
+        <Icon className="w-4 h-4" />
+        {config.label}
+      </span>
+    );
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Reports</h1>
-        <p className="text-slate-600">View unbilled work orders and operations with recent updates</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Weekly Reports</h1>
+        <p className="text-slate-600">Track unbilled work orders and submit weekly billing reports</p>
+      </div>
+
+      {/* Weekly Report Status Banner */}
+      <div className="mb-6 bg-white rounded-xl shadow-md border border-slate-200 p-4 no-print">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Week Navigation */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={goToPreviousWeek}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Previous week"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div className="text-center">
+              <p className="text-sm text-slate-500">Week of</p>
+              <p className="font-semibold text-slate-900">
+                {formatWeekRange(currentWeekStart, currentWeekEnd)}
+              </p>
+            </div>
+            <button
+              onClick={goToNextWeek}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Next week"
+            >
+              <ChevronRight className="w-5 h-5 text-slate-600" />
+            </button>
+            <button
+              onClick={goToCurrentWeek}
+              className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              Today
+            </button>
+          </div>
+
+          {/* Report Status */}
+          <div className="flex items-center gap-4">
+            {weeklyReport ? (
+              <StatusBadge status={weeklyReport.status} />
+            ) : (
+              <span className="text-sm text-slate-500">No report yet</span>
+            )}
+
+            {weeklyReport?.submitted_at && (
+              <span className="text-xs text-slate-500">
+                Submitted: {new Date(weeklyReport.submitted_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => saveReport('draft')}
+              disabled={isSaving || weeklyReport?.status === 'approved'}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4" />
+              Save Draft
+            </button>
+            <button
+              onClick={() => saveReport('submitted')}
+              disabled={isSaving || weeklyReport?.status === 'approved' || weeklyReport?.status === 'submitted'}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+              Submit Report
+            </button>
+          </div>
+        </div>
+
+        {/* Save Message */}
+        {saveMessage && (
+          <div className={`mt-3 text-sm font-medium ${saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+            {saveMessage}
+          </div>
+        )}
+
+        {/* Report Notes */}
+        <div className="mt-4 pt-4 border-t border-slate-200">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Weekly Notes / Summary
+          </label>
+          <textarea
+            value={reportNotes}
+            onChange={(e) => setReportNotes(e.target.value)}
+            placeholder="Add notes about this week's billing review..."
+            rows={3}
+            disabled={weeklyReport?.status === 'approved'}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+          />
+        </div>
       </div>
 
       {/* Filter Controls */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex items-center gap-4 no-print">
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
           <Calendar className="w-4 h-4" />
           Last Updated:
@@ -314,14 +614,14 @@ export function ReportsView({ currentUser }) {
         </label>
         <button
           onClick={loadUnbilledWork}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors no-print"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
         >
           Refresh
         </button>
         <button
           onClick={handlePrint}
           disabled={unbilledData.workOrders.length === 0}
-          className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 no-print"
+          className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Printer className="w-4 h-4" />
           Print Report
@@ -387,9 +687,16 @@ export function ReportsView({ currentUser }) {
       <div className="hidden print:block mb-4">
         <h2 className="text-xl font-bold">Unbilled Work Orders Report</h2>
         <p className="text-sm text-gray-600">
-          Generated: {new Date().toLocaleDateString()} | Filter: Last {daysBack} days |
+          Week: {formatWeekRange(currentWeekStart, currentWeekEnd)} |
+          Generated: {new Date().toLocaleDateString()} |
           Total: {totalWorkOrders} work orders | ${totalCharges.toFixed(2)} unbilled
         </p>
+        {reportNotes && (
+          <div className="mt-2 p-2 bg-gray-100 rounded">
+            <p className="text-sm font-medium">Notes:</p>
+            <p className="text-sm">{reportNotes}</p>
+          </div>
+        )}
       </div>
 
       {/* Work Orders Table */}
@@ -404,9 +711,6 @@ export function ReportsView({ currentUser }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Boat / Owner
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider no-print">
-                  Category
-                </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Charges
                 </th>
@@ -416,8 +720,11 @@ export function ReportsView({ currentUser }) {
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider no-print">
                   Operations
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider hidden print:table-cell" style={{ width: '200px' }}>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider" style={{ minWidth: '120px' }}>
                   Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider no-print" style={{ minWidth: '200px' }}>
+                  Notes
                 </th>
               </tr>
             </thead>
@@ -426,38 +733,46 @@ export function ReportsView({ currentUser }) {
                 const isExpanded = expandedWOs.has(wo.id);
                 const boat = wo.boat || {};
                 const operations = wo.operations || [];
+                const item = reportItems[wo.id] || {};
 
                 return (
                   <React.Fragment key={wo.id}>
                     {/* Work Order Row */}
                     <tr
-                      className="hover:bg-slate-50 cursor-pointer transition-colors print-row"
-                      onClick={() => toggleWorkOrder(wo.id)}
+                      className="hover:bg-slate-50 transition-colors print-row"
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <svg
-                            className={`w-4 h-4 text-slate-400 transition-transform no-print ${isExpanded ? 'rotate-90' : ''}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                          <button
+                            onClick={() => toggleWorkOrder(wo.id)}
+                            className="p-1 hover:bg-slate-200 rounded no-print"
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                          <span className="font-mono font-semibold text-slate-900">{wo.id}</span>
+                            <svg
+                              className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedWorkOrder(wo);
+                            }}
+                            className="font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {wo.id}
+                          </button>
                         </div>
                         {wo.title && (
-                          <p className="text-xs text-slate-600 mt-1 ml-6 print:ml-0">{wo.title}</p>
+                          <p className="text-xs text-slate-600 mt-1 ml-7 print:ml-0">{wo.title}</p>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{boat.name || 'Unknown Boat'}</p>
                         <p className="text-sm text-slate-600">{boat.owner || 'Unknown Owner'}</p>
-                      </td>
-                      <td className="px-4 py-3 no-print">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                          {wo.category || 'General'}
-                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-semibold text-slate-900">
@@ -486,36 +801,56 @@ export function ReportsView({ currentUser }) {
                           {operations.length} ops
                         </span>
                       </td>
-                      {/* Billing Status - only visible when printing */}
-                      <td className="px-4 py-3 hidden print:table-cell text-xs">
-                        <div className="space-y-1">
-                          <div>
-                            <span className="print-checkbox"></span>
-                            <span>Billed</span>
-                          </div>
-                          <div>
-                            <span className="print-checkbox"></span>
-                            <span>Not billed:</span>
-                            <span className="print-notes-line ml-1"></span>
-                          </div>
-                        </div>
+                      {/* Billing Status Dropdown */}
+                      <td className="px-4 py-3">
+                        <select
+                          value={item.billing_status || 'pending'}
+                          onChange={(e) => updateReportItem(wo.id, 'billing_status', e.target.value)}
+                          disabled={weeklyReport?.status === 'approved'}
+                          className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed ${
+                            item.billing_status === 'billed'
+                              ? 'bg-green-50 border-green-300 text-green-800'
+                              : item.billing_status === 'not_billed'
+                              ? 'bg-red-50 border-red-300 text-red-800'
+                              : 'bg-yellow-50 border-yellow-300 text-yellow-800'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="billed">Billed</option>
+                          <option value="not_billed">Not Billed</option>
+                        </select>
+                      </td>
+                      {/* Notes Input */}
+                      <td className="px-4 py-3 no-print">
+                        <input
+                          type="text"
+                          value={item.notes || ''}
+                          onChange={(e) => updateReportItem(wo.id, 'notes', e.target.value)}
+                          placeholder="Add note..."
+                          disabled={weeklyReport?.status === 'approved'}
+                          className="w-full px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        />
                       </td>
                     </tr>
 
                     {/* Expanded Operations - hidden when printing */}
                     {isExpanded && operations.length > 0 && (
                       <tr className="no-print">
-                        <td colSpan={6} className="px-4 py-2 bg-slate-50">
-                          <div className="pl-6">
+                        <td colSpan={7} className="px-4 py-2 bg-slate-50">
+                          <div className="pl-7">
                             <p className="text-xs font-semibold text-slate-700 uppercase mb-2">Operations</p>
                             <div className="space-y-1">
                               {operations.map((op, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex items-center justify-between p-2 bg-white rounded border border-slate-200"
+                                  onClick={() => {
+                                    setSelectedOperation(op);
+                                    setSelectedWOIdForOp(wo.id);
+                                  }}
+                                  className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
                                 >
                                   <div className="flex items-center gap-3">
-                                    <span className="font-mono text-xs font-semibold text-slate-700">
+                                    <span className="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800">
                                       {op.opcode}
                                     </span>
                                     <span className="text-sm text-slate-600">
@@ -543,6 +878,39 @@ export function ReportsView({ currentUser }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Work Order Details Modal */}
+      {selectedWorkOrder && (
+        <WorkOrdersModal
+          workOrders={[{
+            ...selectedWorkOrder,
+            totalCharges: selectedWorkOrder.total_charges,
+            creationDate: selectedWorkOrder.creation_date,
+            operations: (selectedWorkOrder.operations || []).map(op => ({
+              ...op,
+              opcodeDesc: op.opcode_desc,
+              totalCharges: op.total_charges,
+              flagLaborFinished: op.flag_labor_finished,
+            }))
+          }]}
+          boatName={selectedWorkOrder.boat?.name || 'Unknown Boat'}
+          boatOwner={selectedWorkOrder.boat?.owner || ''}
+          onClose={() => setSelectedWorkOrder(null)}
+          variant="customer"
+        />
+      )}
+
+      {/* Operation Details Modal */}
+      {selectedOperation && (
+        <OperationDetailsModal
+          operation={selectedOperation}
+          workOrderId={selectedWOIdForOp}
+          onClose={() => {
+            setSelectedOperation(null);
+            setSelectedWOIdForOp(null);
+          }}
+        />
       )}
     </div>
   );
