@@ -208,6 +208,7 @@ serve(async (req) => {
         customer_id: customerId,
         customer_name: detail.customerName || '',
         clerk_id: detail.clerkId || null,
+        dockmaster_boat_id: detail.boatId || null,
         boat_id: boatUuid,
         rigging_id: detail.riggingId || null,
         rigging_type: detail.riggingType || null,
@@ -328,6 +329,19 @@ serve(async (req) => {
           continue
         }
 
+        // Preserve last_worked_at values before deleting operations
+        const { data: existingOps } = await supabase
+          .from('work_order_operations')
+          .select('opcode, last_worked_at')
+          .eq('work_order_id', wo.id)
+
+        const lastWorkedAtMap = new Map()
+        for (const op of (existingOps || [])) {
+          if (op.last_worked_at) {
+            lastWorkedAtMap.set(op.opcode, op.last_worked_at)
+          }
+        }
+
         // Delete old operations and insert new ones
         await supabase
           .from('work_order_operations')
@@ -338,12 +352,14 @@ serve(async (req) => {
           const opsWithWoId = operations.map((op: any) => ({
             ...op,
             work_order_id: wo.id,
+            // Preserve last_worked_at if it existed
+            last_worked_at: lastWorkedAtMap.get(op.opcode) || null,
           }))
-          
+
           const { error: opsError } = await supabase
             .from('work_order_operations')
             .insert(opsWithWoId)
-          
+
           if (opsError) {
             console.error('Error saving operations:', opsError)
           }
