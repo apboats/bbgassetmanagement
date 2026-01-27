@@ -90,7 +90,8 @@ export function ReportsView({ currentUser }) {
         .select('id, dockmaster_id, location');
 
       // Query work orders with charges and status='O'
-      // Note: Supabase default limit is 1000, we need more
+      // Note: Don't sort by last_mod_date in DB - it's stored as text (MM/DD/YYYY)
+      // which sorts alphabetically, not chronologically
       const { data: workOrders, error: woError } = await supabase
         .from('work_orders')
         .select(`
@@ -100,8 +101,7 @@ export function ReportsView({ currentUser }) {
         `)
         .eq('status', 'O')
         .gt('total_charges', 0)
-        .order('last_mod_date', { ascending: false, nullsFirst: false })
-        .limit(5000);
+        .limit(10000);
 
       if (woError) throw woError;
 
@@ -109,11 +109,16 @@ export function ReportsView({ currentUser }) {
       console.log(`Loaded ${workOrders?.length || 0} work orders with charges > 0`);
       console.log(`Cutoff date: ${cutoffDate.toISOString()} (${daysBack} days back)`);
 
-      // Show the 5 most recent last_mod_date values
+      // Find the most recent dates in the dataset
       if (workOrders && workOrders.length > 0) {
-        console.log('Most recent last_mod_date values:');
-        workOrders.slice(0, 5).forEach(wo => {
-          console.log(`  WO ${wo.id}: last_mod_date="${wo.last_mod_date}", total_charges=${wo.total_charges}`);
+        const withParsedDates = workOrders
+          .map(wo => ({ wo, date: parseMMDDYYYY(wo.last_mod_date) }))
+          .filter(x => x.date)
+          .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+        console.log('Most recent last_mod_date values (after proper sorting):');
+        withParsedDates.slice(0, 5).forEach(({ wo, date }) => {
+          console.log(`  WO ${wo.id}: last_mod_date="${wo.last_mod_date}" -> ${date.toISOString()}, charges=${wo.total_charges}`);
         });
       }
 
