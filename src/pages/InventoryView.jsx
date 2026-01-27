@@ -5,11 +5,10 @@ import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDet
 import { InventoryBoatCard } from '../components/InventoryBoatCard';
 import { findBoatLocationData, useBoatLocation } from '../components/BoatComponents';
 
-export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, onSyncRiggingWOs, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isSyncingRiggingWOs, setIsSyncingRiggingWOs] = useState(false);
   const [filterYear, setFilterYear] = useState('all');
   const [filterMake, setFilterMake] = useState('all');
   const [filterModel, setFilterModel] = useState('all');
@@ -62,17 +61,6 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     setIsSyncing(true);
     await onSyncNow(true); // Full sync (3 years back) when manually triggered
     setIsSyncing(false);
-  };
-
-  const handleSyncRiggingWOs = async () => {
-    setIsSyncingRiggingWOs(true);
-    try {
-      await onSyncRiggingWOs(true); // Full sync (3 years back) when manually triggered
-    } catch (error) {
-      console.error('Failed to sync rigging work orders:', error);
-    } finally {
-      setIsSyncingRiggingWOs(false);
-    }
   };
 
   const handleViewBoat = (boat) => {
@@ -156,25 +144,6 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Sync Now
-              </>
-            )}
-          </button>
-          <button
-            onClick={handleSyncRiggingWOs}
-            disabled={isSyncingRiggingWOs}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-medium rounded-lg transition-colors shadow-md"
-          >
-            {isSyncingRiggingWOs ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Syncing WOs...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Sync Rigging WOs
               </>
             )}
           </button>
