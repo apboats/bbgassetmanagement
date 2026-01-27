@@ -3,39 +3,10 @@ import { FileText, Calendar, DollarSign, Package, AlertCircle } from 'lucide-rea
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
 
-// Helper: Parse MM/DD/YYYY date string with optional time (Dockmaster format)
-const parseDateTime = (dateStr, timeStr) => {
-  if (!dateStr) return null;
-
-  // Parse date (MM/DD/YYYY format)
-  const dateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!dateMatch) {
-    // Fallback to standard parsing
-    const parsed = new Date(dateStr);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const [, month, day, year] = dateMatch;
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-  // Add time if provided (HH:MM:SS or HH:MM format)
-  if (timeStr) {
-    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-    if (timeMatch) {
-      const [, hours, minutes, seconds = '0'] = timeMatch;
-      date.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds));
-    }
-  }
-
-  return date;
-};
-
-// Helper: Get the most recent activity date for a work order
-const getActivityDate = (wo) => {
-  // Parse last_mod_date + last_mod_time (Dockmaster format)
-  const woDate = parseDateTime(wo.last_mod_date, wo.last_mod_time);
-
-  // Find most recent last_worked_at from operations
+// Helper: Get the most recent labor activity date for a work order
+// Only considers last_worked_at from operations (actual labor punches)
+// Ignores last_mod_date/time since that updates for non-labor changes (parts, etc.)
+const getLastLaborDate = (wo) => {
   let latestOpDate = null;
   for (const op of (wo.operations || [])) {
     if (op.last_worked_at) {
@@ -45,12 +16,7 @@ const getActivityDate = (wo) => {
       }
     }
   }
-
-  // Return the more recent of the two
-  if (woDate && latestOpDate) {
-    return woDate > latestOpDate ? woDate : latestOpDate;
-  }
-  return woDate || latestOpDate;
+  return latestOpDate;
 };
 
 // Helper: Check if boat is in a shop location
@@ -118,14 +84,14 @@ export function ReportsView({ currentUser }) {
 
       if (woError) throw woError;
 
-      // Filter work orders client-side based on activity date and shop location
+      // Filter work orders client-side based on labor date and shop location
       const filteredWorkOrders = (workOrders || []).filter(wo => {
-        // 1. Must have an activity date (last_mod_date or last_worked_at on operations)
-        const activityDate = getActivityDate(wo);
-        if (!activityDate) return false;
+        // 1. Must have a labor punch (last_worked_at on operations)
+        const lastLaborDate = getLastLaborDate(wo);
+        if (!lastLaborDate) return false;
 
-        // 2. Activity date must be within the selected range
-        if (activityDate < cutoffDate) return false;
+        // 2. Labor date must be within the selected range
+        if (lastLaborDate < cutoffDate) return false;
 
         // 3. Boat must not be in a shop location
         if (isBoatInShop(wo, locations || [], inventoryBoats || [])) return false;
@@ -133,10 +99,10 @@ export function ReportsView({ currentUser }) {
         return true;
       });
 
-      // Sort by activity date (most recent first)
+      // Sort by last labor date (most recent first)
       filteredWorkOrders.sort((a, b) => {
-        const dateA = getActivityDate(a);
-        const dateB = getActivityDate(b);
+        const dateA = getLastLaborDate(a);
+        const dateB = getLastLaborDate(b);
         return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
       });
 
@@ -270,7 +236,7 @@ export function ReportsView({ currentUser }) {
                   Charges
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Last Activity
+                  Last Labor
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Operations
@@ -322,7 +288,7 @@ export function ReportsView({ currentUser }) {
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const activityDate = getActivityDate(wo);
+                          const activityDate = getLastLaborDate(wo);
                           return activityDate ? (
                             <>
                               <p className="text-sm text-slate-700">
