@@ -352,6 +352,21 @@ serve(async (req) => {
       for (const [, data] of latestWorkTime) {
         console.log(`Updating operation: WO=${data.workOrderId}, opcode=${data.opCode}, timestamp=${data.timestamp}`)
 
+        // First check if the operation exists
+        const { data: existingOp, error: selectError } = await supabase
+          .from('work_order_operations')
+          .select('id, work_order_id, opcode')
+          .eq('work_order_id', data.workOrderId)
+          .eq('opcode', data.opCode)
+          .single()
+
+        if (selectError || !existingOp) {
+          console.log(`  Operation not found in DB: WO=${data.workOrderId}, opcode=${data.opCode}`)
+          continue
+        }
+
+        console.log(`  Found operation: id=${existingOp.id}`)
+
         // Update the operation's last_worked_at based on time entry timestamp
         const { error: updateError } = await supabase
           .from('work_order_operations')
@@ -364,6 +379,7 @@ serve(async (req) => {
         if (updateError) {
           console.error(`Failed to update operation: WO=${data.workOrderId}, opcode=${data.opCode}:`, updateError)
         } else {
+          console.log(`  Successfully updated last_worked_at`)
           timeEntriesProcessed++
         }
       }
