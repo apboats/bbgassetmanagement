@@ -86,18 +86,26 @@ export function ReportsView({ currentUser }) {
 
       // Debug: Check why 554750 isn't showing
       console.log('Total work orders from query:', workOrders?.length);
-      const wo554750 = (workOrders || []).find(wo => wo.id === '554750');
-      if (wo554750) {
-        const lastLaborDate = getLastLaborDate(wo554750);
-        console.log('WO 554750 found:', {
-          total_charges: wo554750.total_charges,
-          operations: wo554750.operations?.length,
+
+      // Direct query for 554750 to bypass any limit issues
+      const { data: wo554750Direct } = await supabase
+        .from('work_orders')
+        .select('*, operations:work_order_operations(*)')
+        .eq('id', '554750')
+        .single();
+
+      if (wo554750Direct) {
+        const lastLaborDate = getLastLaborDate(wo554750Direct);
+        console.log('WO 554750 direct query:', {
+          status: wo554750Direct.status,
+          total_charges: wo554750Direct.total_charges,
+          operations: wo554750Direct.operations?.map(op => ({ opcode: op.opcode, last_worked_at: op.last_worked_at })),
           lastLaborDate,
           cutoffDate,
-          isInShop: isBoatInShop(wo554750, locations || [], inventoryBoats || [])
+          isInShop: isBoatInShop(wo554750Direct, locations || [], inventoryBoats || [])
         });
       } else {
-        console.log('WO 554750 NOT found in query results');
+        console.log('WO 554750 NOT found even with direct query');
       }
 
       // Filter work orders client-side based on labor date and shop location
