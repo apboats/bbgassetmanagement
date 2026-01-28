@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, Search, X, Package, Map, Users, Edit2 } from 'lucide-react';
-import Tesseract from 'tesseract.js';
+import { supabase } from '../supabaseClient';
 import { boatsService, inventoryBoatsService, boatLifecycleService } from '../services/supabaseService';
 
 export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations }) {
@@ -143,28 +143,31 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     }
   };
 
-  // OCR processing
+  // OCR processing using Google Cloud Vision via Edge Function
   const processImage = async (imageDataUrl) => {
     setIsProcessing(true);
     setOcrResult('');
 
     try {
-      const worker = await Tesseract.createWorker('eng', 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        }
+      // Call the edge function for OCR
+      const { data, error } = await supabase.functions.invoke('ocr-hull-id', {
+        body: { imageBase64: imageDataUrl }
       });
 
-      const { data } = await worker.recognize(imageDataUrl);
-      await worker.terminate();
+      if (error) {
+        console.error('OCR function error:', error);
+        throw new Error(error.message || 'OCR service error');
+      }
 
-      // Extract alphanumeric text, remove special characters
-      const cleanedText = data.text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to process image');
+      }
+
+      const cleanedText = data.text || '';
+      const confidence = data.confidence || 0;
 
       setOcrResult(cleanedText);
-      setOcrConfidence(data.confidence);
+      setOcrConfidence(confidence);
 
       // Search for boat with this Hull ID
       if (cleanedText.length >= 8) {
@@ -176,6 +179,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     } catch (error) {
       console.error('OCR error:', error);
       alert('Failed to process image. Please try again.');
+      setShowManualSearch(true);
     } finally {
       setIsProcessing(false);
     }
