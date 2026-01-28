@@ -31,6 +31,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   const streamRef = useRef(null);
   const scanIntervalRef = useRef(null);
   const isProcessingRef = useRef(false); // Track processing state for interval
+  const isCameraReadyRef = useRef(false); // Track camera ready state for interval
 
   // Effect to initialize camera when isCameraActive becomes true
   useEffect(() => {
@@ -69,6 +70,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
             videoRef.current.play()
               .then(() => {
                 console.log('[Camera] Video playing successfully');
+                isCameraReadyRef.current = true;
                 setIsCameraReady(true);
               })
               .catch(err => {
@@ -132,6 +134,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+    isCameraReadyRef.current = false;
     setIsCameraReady(false);
     setScanStatus('');
   };
@@ -176,7 +179,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   // Auto-scan function that runs periodically
   const performAutoScan = async () => {
     // Skip if already processing or not ready
-    if (isProcessingRef.current || !isCameraReady || !videoRef.current) {
+    if (isProcessingRef.current || !isCameraReadyRef.current || !videoRef.current) {
       return;
     }
 
