@@ -214,8 +214,9 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
       const cleanedText = data.text;
       const confidence = data.confidence || 0;
 
-      // Only proceed if we have a valid Hull ID length
-      if (cleanedText.length >= 12 && confidence >= 75) {
+      // Hull ID format: 12 characters (3 letters + 5 alphanumeric + 1 letter + 3 digits)
+      // Only proceed if we have exactly 12 chars and good confidence
+      if (cleanedText.length === 12 && confidence >= 70) {
         console.log('Auto-scan found valid Hull ID:', cleanedText, 'confidence:', confidence);
 
         // Stop scanning and process the result
@@ -227,7 +228,10 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
         // Search for the boat
         await searchBoatByHullId(cleanedText);
       } else if (cleanedText.length >= 8) {
-        setScanStatus(`Detected: ${cleanedText.substring(0, 10)}... (hold steady)`);
+        // Show partial detection
+        setScanStatus(`Detected: ${cleanedText} (${cleanedText.length}/12 chars)`);
+      } else if (cleanedText.length > 0) {
+        setScanStatus(`Reading: ${cleanedText}...`);
       } else {
         setScanStatus('Point at Hull ID tag...');
       }
