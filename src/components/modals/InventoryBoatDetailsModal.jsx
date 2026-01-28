@@ -198,25 +198,192 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             </div>
           )}
 
-          {/* Boat Info Grid */}
+          {/* Boat Info Grid - Core Identifiers */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-xs text-slate-500 mb-0.5">Hull ID</p>
-              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.hullId || 'N/A'}</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.hullId || boat.hull_id || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Stock #</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.stockNumber || boat.stock_number || 'N/A'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-500 mb-0.5">Color</p>
+              <p className="text-sm font-semibold text-slate-900">{boat.color || 'N/A'}</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg">
               <p className="text-xs text-slate-500 mb-0.5">Dockmaster ID</p>
-              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.dockmasterId || 'N/A'}</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-0.5">Length</p>
-              <p className="text-sm font-semibold text-slate-900">{boat.length || 'N/A'}</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-0.5">Beam</p>
-              <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
+              <p className="text-sm font-semibold text-slate-900 font-mono">{boat.dockmasterId || boat.dockmaster_id || 'N/A'}</p>
             </div>
           </div>
+
+          {/* Pricing Info */}
+          {(boat.listPrice || boat.list_price || boat.totalCost || boat.total_cost) && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+              <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {(boat.listPrice || boat.list_price) && (
+                  <div>
+                    <p className="text-xs text-green-600">List Price</p>
+                    <p className="text-lg font-bold text-green-900">
+                      ${Number(boat.listPrice || boat.list_price).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {(boat.totalCost || boat.total_cost) && (
+                  <div>
+                    <p className="text-xs text-green-600">Total Cost</p>
+                    <p className="text-lg font-bold text-green-900">
+                      ${Number(boat.totalCost || boat.total_cost).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Boat Specs */}
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <h4 className="text-sm font-medium text-slate-700 mb-3">Specifications</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Length</p>
+                <p className="text-sm font-semibold text-slate-900">{boat.length || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Beam</p>
+                <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
+              </div>
+              {(boat.draft) && (
+                <div>
+                  <p className="text-xs text-slate-500">Draft</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.draft}</p>
+                </div>
+              )}
+              {(boat.weight) && (
+                <div>
+                  <p className="text-xs text-slate-500">Weight</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.weight}</p>
+                </div>
+              )}
+              {(boat.hullType || boat.hull_type) && (
+                <div>
+                  <p className="text-xs text-slate-500">Hull Type</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.hullType || boat.hull_type}</p>
+                </div>
+              )}
+              {(boat.hullMaterial || boat.hull_material) && (
+                <div>
+                  <p className="text-xs text-slate-500">Hull Material</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.hullMaterial || boat.hull_material}</p>
+                </div>
+              )}
+              {(boat.fuelCapacity || boat.fuel_capacity) && (
+                <div>
+                  <p className="text-xs text-slate-500">Fuel Capacity</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.fuelCapacity || boat.fuel_capacity}</p>
+                </div>
+              )}
+              {(boat.motorRating || boat.motor_rating) && (
+                <div>
+                  <p className="text-xs text-slate-500">Max HP Rating</p>
+                  <p className="text-sm font-semibold text-slate-900">{boat.motorRating || boat.motor_rating}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Motors Section */}
+          {boat.motors && boat.motors.length > 0 && (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+              <h4 className="text-sm font-medium text-orange-800 mb-3">
+                Engine{boat.motors.length > 1 ? 's' : ''} ({boat.motors.length})
+              </h4>
+              <div className="space-y-3">
+                {boat.motors.map((motor, idx) => (
+                  <div key={motor.id || idx} className="p-3 bg-white rounded-lg border border-orange-100">
+                    <p className="font-semibold text-slate-900">
+                      {motor.vendorName} {motor.modelNumber}
+                      {motor.horsePower && <span className="text-orange-600 ml-1">({motor.horsePower} HP)</span>}
+                    </p>
+                    {motor.year && <p className="text-xs text-slate-600">Year: {motor.year}</p>}
+                    {motor.serialNumber && (
+                      <p className="text-xs text-slate-500 font-mono mt-1">S/N: {motor.serialNumber}</p>
+                    )}
+                    {motor.shaftLength && <p className="text-xs text-slate-500">Shaft: {motor.shaftLength}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Trailers Section */}
+          {boat.trailers && boat.trailers.length > 0 && (
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+              <h4 className="text-sm font-medium text-purple-800 mb-3">
+                Trailer{boat.trailers.length > 1 ? 's' : ''}
+              </h4>
+              <div className="space-y-3">
+                {boat.trailers.map((trailer, idx) => (
+                  <div key={trailer.id || idx} className="p-3 bg-white rounded-lg border border-purple-100">
+                    <p className="font-semibold text-slate-900">
+                      {trailer.vendorName} {trailer.modelNumber}
+                    </p>
+                    {trailer.year && <p className="text-xs text-slate-600">Year: {trailer.year}</p>}
+                    {trailer.serialNumber && (
+                      <p className="text-xs text-slate-500 font-mono mt-1">S/N: {trailer.serialNumber}</p>
+                    )}
+                    {trailer.weightCapacity && (
+                      <p className="text-xs text-slate-500">Capacity: {trailer.weightCapacity}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Options Section */}
+          {boat.options && boat.options.length > 0 && (
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">
+                Options ({boat.options.length})
+              </h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {boat.options.map((opt, idx) => (
+                  <div key={opt.optionCode || idx} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-700">{opt.desc || opt.optionCode}</span>
+                    {opt.price && <span className="text-slate-500">${opt.price}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Accessories Section */}
+          {boat.accessories && boat.accessories.length > 0 && (
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">
+                Accessories ({boat.accessories.length})
+              </h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {boat.accessories.map((acc, idx) => (
+                  <div key={acc.accCode || idx} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-700">{acc.desc || acc.accCode}</span>
+                    {acc.qty > 1 && <span className="text-slate-400 text-xs">x{acc.qty}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comments from Dockmaster */}
+          {boat.comments && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <h4 className="text-sm font-medium text-yellow-800 mb-2">Dockmaster Comments</h4>
+              <p className="text-sm text-yellow-900 whitespace-pre-wrap">{boat.comments}</p>
+            </div>
+          )}
 
           {/* Notes Section */}
           <div className="p-4 bg-slate-50 rounded-xl">
