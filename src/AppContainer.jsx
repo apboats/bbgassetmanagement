@@ -593,6 +593,7 @@ function AppContainer() {
       if (result.boats && result.boats.length > 0) {
         // Transform API boats to our format and sync to database
         const boatsToSync = result.boats.map((apiBoat) => ({
+          // Core identifiers
           dockmaster_id: apiBoat.dockmasterId,
           hull_id: apiBoat.hullId,
           name: apiBoat.name,
@@ -603,8 +604,35 @@ function AppContainer() {
           status: 'needs-approval',
           sales_status: apiBoat.salesStatus,
           qr_code: `INV-${apiBoat.dockmasterId}`,
+
+          // Dimensions
           length: apiBoat.length,
           beam: apiBoat.beam,
+
+          // New basic details
+          stock_number: apiBoat.stockNumber,
+          color: apiBoat.color,
+          list_price: apiBoat.listPrice,
+          total_cost: apiBoat.totalCost,
+          received_date: apiBoat.receivedDate,
+          comments: apiBoat.comments,
+
+          // New boat specs
+          draft: apiBoat.draft,
+          weight: apiBoat.weight,
+          hull_type: apiBoat.hullType,
+          hull_material: apiBoat.hullMaterial,
+          fuel_capacity: apiBoat.fuelCapacity,
+          water_capacity: apiBoat.waterCapacity,
+          motor_rating: apiBoat.motorRating,
+          sleep_capacity: apiBoat.sleepCapacity,
+
+          // JSONB fields
+          motors: apiBoat.motors,
+          trailers: apiBoat.trailers,
+          options: apiBoat.options,
+          accessories: apiBoat.accessories,
+          raw_data: apiBoat.rawData,
         }))
 
         await inventoryBoatsService.sync(boatsToSync, fullSync)
