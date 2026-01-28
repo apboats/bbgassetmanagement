@@ -363,7 +363,7 @@ export default function BoatsByGeorgeAssetManager({
         {currentView === 'inventory' && (
           <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} lastSync={lastInventorySync}
             onSyncNow={syncInventoryBoats} onSyncRiggingWOs={syncInternalWorkOrders} onUpdateInventoryBoats={saveInventoryBoats}
-            onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
+            onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} currentUser={currentUser} />
         )}
         {currentView === 'shows' && (
           <BoatShowPlanner inventoryBoats={inventoryBoats} />

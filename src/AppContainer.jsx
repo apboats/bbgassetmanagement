@@ -10,6 +10,15 @@ import { useAuth } from './AuthProvider'
 import supabaseService, { getAllBoatsCombined, boatLifecycleService } from './services/supabaseService'
 import App from './App'
 
+// Debounce helper to prevent rapid-fire API calls from real-time subscriptions
+function debounce(fn, delay) {
+  let timeoutId
+  return (...args) => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), delay)
+  }
+}
+
 const {
   boats: boatsService,
   inventoryBoats: inventoryBoatsService,
@@ -42,34 +51,49 @@ function AppContainer() {
   }, [user])
 
   // Subscribe to real-time updates (optional but recommended)
+  // Debounced callbacks prevent connection pool exhaustion during bulk syncs
   useEffect(() => {
     if (!user) return
 
     console.log('Setting up real-time subscriptions...')
-    
+
+    // Create debounced loaders - wait 1 second after last change before reloading
+    // This prevents hundreds of requests when bulk syncing inventory
+    const debouncedLoadBoats = debounce(() => {
+      console.log('Real-time update: reloading boats (debounced)')
+      loadBoats()
+    }, 1000)
+
+    const debouncedLoadLocations = debounce(() => {
+      console.log('Real-time update: reloading locations (debounced)')
+      loadLocations()
+    }, 1000)
+
+    const debouncedLoadInventoryBoats = debounce(() => {
+      console.log('Real-time update: reloading inventory boats (debounced)')
+      loadInventoryBoats()
+    }, 1000)
+
     try {
       // Subscribe to boats changes
       const boatsChannel = supabaseService.subscriptions.subscribeToBoats(() => {
         console.log('Real-time update: boats changed')
-        loadBoats()
-        // Also reload locations since boat moves update location.boats object
-        loadLocations()
+        debouncedLoadBoats()
+        debouncedLoadLocations()
       })
 
       // Subscribe to locations changes
       const locationsChannel = supabaseService.subscriptions.subscribeToLocations(() => {
         console.log('Real-time update: locations changed')
-        loadLocations()
-        // Also reload boats since location changes may affect boat.location/slot
-        loadBoats()
+        debouncedLoadLocations()
+        debouncedLoadBoats()
       })
 
       // Subscribe to inventory boats changes
       const inventoryChannel = supabaseService.subscriptions.subscribeToInventoryBoats(() => {
         console.log('Real-time update: inventory boats changed')
-        loadInventoryBoats()
-        // Also reload locations since inventory boat moves update location.boats object
-        loadLocations()
+        debouncedLoadInventoryBoats()
+        debouncedLoadLocations()
       })
 
       console.log('Real-time subscriptions active')
