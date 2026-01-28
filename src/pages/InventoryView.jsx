@@ -5,7 +5,7 @@ import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDet
 import { InventoryBoatCard } from '../components/InventoryBoatCard';
 import { findBoatLocationData, useBoatLocation } from '../components/BoatComponents';
 
-export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat, currentUser }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -456,6 +456,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
     </div>
