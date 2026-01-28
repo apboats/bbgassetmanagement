@@ -169,22 +169,86 @@ serve(async (req) => {
 
     console.log(`Filtered to ${filteredBoats.length} boats with valid status`)
 
-    // Transform to our format - only the fields we need
+    // Transform to our format - import ALL fields from API
     const transformedBoats = filteredBoats.map((item: any) => {
       const rawStatus = item.status || ''
       // Normalize status to code
       const statusCode = STATUS_TEXT_TO_CODE[rawStatus] || rawStatus
-      
+
+      // Combine packaged and bundled motors into one array
+      const allMotors = [
+        ...(item.packagesMotors || []),
+        ...(item.bundledMotors || [])
+      ].map((motor: any) => ({
+        id: motor.id,
+        serialNumber: motor.serialNumber,
+        description: motor.description,
+        color: motor.color,
+        vendorName: motor.motorModelInfo?.vendorName || '',
+        modelNumber: motor.motorModelInfo?.modelNumber || '',
+        year: motor.motorModelInfo?.year || '',
+        horsePower: motor.motorModelInfo?.horsePowerRating || '',
+        shaftLength: motor.motorModelInfo?.shaftLength || '',
+        powerType: motor.motorModelInfo?.powerType || '',
+        strokes: motor.motorModelInfo?.strokes || '',
+      }))
+
+      // Combine packaged and bundled trailers into one array
+      const allTrailers = [
+        ...(item.packagedTrailers || []),
+        ...(item.bundledTrailers || [])
+      ].map((trailer: any) => ({
+        id: trailer.id,
+        serialNumber: trailer.serialNumber,
+        description: trailer.description,
+        vendorName: trailer.trailerModelInfo?.vendorName || '',
+        modelNumber: trailer.trailerModelInfo?.modelNumber || '',
+        year: trailer.trailerModelInfo?.year || '',
+        length: trailer.trailerModelInfo?.length || '',
+        weight: trailer.trailerModelInfo?.weight || '',
+        weightCapacity: trailer.trailerModelInfo?.weightCapacity || '',
+      }))
+
       return {
+        // Core identifiers (existing)
         dockmasterId: item.id,
-        hullId: item.serialNumber || null, // serialNumber is the HIN/Hull ID
+        hullId: item.serialNumber || item.hin || null,
         name: item.description || `${item.boatModelInfo?.vendorName || ''} ${item.boatModelInfo?.modelNumber || ''}`.trim() || 'Unknown',
         model: item.boatModelInfo?.modelNumber || '',
         make: item.boatModelInfo?.vendorName || '',
         year: item.boatModelInfo?.year || null,
-        salesStatus: statusCode, // Store normalized code
-        length: item.boatModelInfo?.length || null, // For free-layout sizing
-        beam: item.boatModelInfo?.beam || null, // For free-layout sizing
+        salesStatus: statusCode,
+
+        // Dimensions (existing)
+        length: item.boatModelInfo?.length || null,
+        beam: item.boatModelInfo?.beam || null,
+
+        // New basic details
+        stockNumber: item.stockNumber || null,
+        color: item.color || null,
+        listPrice: item.listPrice || null,
+        totalCost: item.totalCost || null,
+        receivedDate: item.receivedDate || null,
+        comments: item.comments || null,
+
+        // New boat specs from boatModelInfo
+        draft: item.boatModelInfo?.draft || null,
+        weight: item.boatModelInfo?.weight || null,
+        hullType: item.boatModelInfo?.hullType || null,
+        hullMaterial: item.boatModelInfo?.hullMaterial || null,
+        fuelCapacity: item.boatModelInfo?.fuelCapacity || null,
+        waterCapacity: item.boatModelInfo?.waterCapacity || null,
+        motorRating: item.boatModelInfo?.motorRating || null,
+        sleepCapacity: item.boatModelInfo?.sleepCapacity || null,
+
+        // JSONB fields for complex data
+        motors: allMotors.length > 0 ? allMotors : null,
+        trailers: allTrailers.length > 0 ? allTrailers : null,
+        options: item.options && item.options.length > 0 ? item.options : null,
+        accessories: item.accessories && item.accessories.length > 0 ? item.accessories : null,
+
+        // Store raw API response for reference
+        rawData: item,
       }
     })
 
