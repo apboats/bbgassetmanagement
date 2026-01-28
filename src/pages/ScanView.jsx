@@ -17,6 +17,8 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   const [ocrResult, setOcrResult] = useState('');
   const [ocrConfidence, setOcrConfidence] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [scanStatus, setScanStatus] = useState(''); // For showing scan progress
+  const [lastScanTime, setLastScanTime] = useState(0);
 
   // Manual search states
   const [showManualSearch, setShowManualSearch] = useState(false);
@@ -27,6 +29,8 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const scanIntervalRef = useRef(null);
+  const isProcessingRef = useRef(false); // Track processing state for interval
 
   // Effect to initialize camera when isCameraActive becomes true
   useEffect(() => {
@@ -114,6 +118,11 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
 
   const stopCamera = () => {
     console.log('[Camera] Stopping camera...');
+    // Stop auto-scan interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
     if (streamRef.current) {
       const tracks = streamRef.current.getTracks();
       tracks.forEach(track => track.stop());
@@ -124,24 +133,131 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     }
     setIsCameraActive(false);
     setIsCameraReady(false);
+    setScanStatus('');
   };
 
-  const captureImage = () => {
+  // Capture just the focus box region for better OCR accuracy
+  const captureImage = (forAutoScan = false) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
     if (video && canvas) {
       const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const imageDataUrl = canvas.toDataURL('image/png');
-      setCapturedImage(imageDataUrl);
-      stopCamera();
-      processImage(imageDataUrl);
+      // Calculate the focus box region (center 80% width, 15% height)
+      const boxWidth = video.videoWidth * 0.8;
+      const boxHeight = video.videoHeight * 0.15;
+      const boxX = (video.videoWidth - boxWidth) / 2;
+      const boxY = (video.videoHeight - boxHeight) / 2;
+
+      // Set canvas to focus box size
+      canvas.width = boxWidth;
+      canvas.height = boxHeight;
+
+      // Draw only the focus box region
+      context.drawImage(
+        video,
+        boxX, boxY, boxWidth, boxHeight,  // Source rectangle
+        0, 0, boxWidth, boxHeight          // Destination rectangle
+      );
+
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+      if (!forAutoScan) {
+        setCapturedImage(imageDataUrl);
+        stopCamera();
+      }
+
+      return imageDataUrl;
+    }
+    return null;
+  };
+
+  // Auto-scan function that runs periodically
+  const performAutoScan = async () => {
+    // Skip if already processing or not ready
+    if (isProcessingRef.current || !isCameraReady || !videoRef.current) {
+      return;
+    }
+
+    isProcessingRef.current = true;
+    setScanStatus('Scanning...');
+
+    try {
+      const imageDataUrl = captureImage(true);
+      if (!imageDataUrl) {
+        isProcessingRef.current = false;
+        return;
+      }
+
+      // Call the edge function for OCR
+      const { data, error } = await supabase.functions.invoke('ocr-hull-id', {
+        body: { imageBase64: imageDataUrl }
+      });
+
+      if (error) {
+        console.log('Auto-scan OCR error:', error.message);
+        setScanStatus('Scanning...');
+        isProcessingRef.current = false;
+        return;
+      }
+
+      if (!data.success || !data.text) {
+        setScanStatus('Point at Hull ID tag...');
+        isProcessingRef.current = false;
+        return;
+      }
+
+      const cleanedText = data.text;
+      const confidence = data.confidence || 0;
+
+      // Only proceed if we have a valid Hull ID length
+      if (cleanedText.length >= 12 && confidence >= 75) {
+        console.log('Auto-scan found valid Hull ID:', cleanedText, 'confidence:', confidence);
+
+        // Stop scanning and process the result
+        stopCamera();
+        setCapturedImage(imageDataUrl);
+        setOcrResult(cleanedText);
+        setOcrConfidence(confidence);
+
+        // Search for the boat
+        await searchBoatByHullId(cleanedText);
+      } else if (cleanedText.length >= 8) {
+        setScanStatus(`Detected: ${cleanedText.substring(0, 10)}... (hold steady)`);
+      } else {
+        setScanStatus('Point at Hull ID tag...');
+      }
+    } catch (err) {
+      console.log('Auto-scan error:', err.message);
+      setScanStatus('Scanning...');
+    } finally {
+      isProcessingRef.current = false;
     }
   };
+
+  // Start auto-scanning when camera is ready
+  useEffect(() => {
+    if (isCameraReady && !scanIntervalRef.current) {
+      console.log('[AutoScan] Starting auto-scan interval');
+      setScanStatus('Point at Hull ID tag...');
+
+      // Start scanning every 2 seconds
+      scanIntervalRef.current = setInterval(() => {
+        performAutoScan();
+      }, 2000);
+
+      // Do an immediate first scan after a short delay
+      setTimeout(() => performAutoScan(), 500);
+    }
+
+    return () => {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+    };
+  }, [isCameraReady]);
 
   // OCR processing using Google Cloud Vision via Edge Function
   const processImage = async (imageDataUrl) => {
@@ -403,9 +519,10 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
             </div>
           )}
 
-          {/* Active Camera with Capture Button */}
+          {/* Active Camera with Focus Box Overlay */}
           {isCameraActive && (
             <div className="relative">
+              {/* Video element */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -413,12 +530,68 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
                 muted
                 className="w-full rounded-lg"
               />
+
+              {/* Focus box overlay */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Dark overlay with transparent center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {/* Top dark area */}
+                  <div className="absolute top-0 left-0 right-0 h-[42.5%] bg-black/50" />
+                  {/* Bottom dark area */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[42.5%] bg-black/50" />
+                  {/* Left dark area (in the middle band) */}
+                  <div className="absolute top-[42.5%] bottom-[42.5%] left-0 w-[10%] bg-black/50" />
+                  {/* Right dark area (in the middle band) */}
+                  <div className="absolute top-[42.5%] bottom-[42.5%] right-0 w-[10%] bg-black/50" />
+
+                  {/* Focus box border */}
+                  <div
+                    className="absolute border-2 border-blue-400 rounded-lg"
+                    style={{
+                      width: '80%',
+                      height: '15%',
+                      top: '42.5%',
+                      left: '10%',
+                    }}
+                  >
+                    {/* Corner markers */}
+                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl-lg" />
+                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-blue-400 rounded-tr-lg" />
+                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-blue-400 rounded-bl-lg" />
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-400 rounded-br-lg" />
+                  </div>
+                </div>
+
+                {/* Scan status text */}
+                <div className="absolute bottom-20 left-0 right-0 text-center">
+                  <div className={`inline-block px-4 py-2 rounded-full text-white text-sm font-medium ${
+                    scanStatus.includes('Detected') ? 'bg-green-600' : 'bg-black/70'
+                  }`}>
+                    {scanStatus || 'Initializing camera...'}
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="absolute top-4 left-0 right-0 text-center">
+                  <div className="inline-block px-4 py-2 bg-black/70 rounded-full text-white text-sm">
+                    Position Hull ID tag in the box
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual capture and cancel buttons */}
               <div className="mt-4 flex gap-2 justify-center">
                 <button
-                  onClick={captureImage}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  onClick={() => {
+                    const imageDataUrl = captureImage(false);
+                    if (imageDataUrl) {
+                      processImage(imageDataUrl);
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 transition-colors"
                 >
-                  Capture Hull ID
+                  Capture Now
                 </button>
                 <button
                   onClick={stopCamera}
