@@ -64,6 +64,10 @@ function AppContainer() {
     loadInventoryBoats: null
   })
 
+  // Ref to store inventory channel so we can unsubscribe/resubscribe during sync
+  const inventoryChannelRef = useRef(null)
+  const resubscribeInventoryRef = useRef(null)
+
   // Load all data on mount
   useEffect(() => {
     if (user) {
@@ -130,11 +134,24 @@ function AppContainer() {
       })
 
       // Subscribe to inventory boats changes
-      const inventoryChannel = supabaseService.subscriptions.subscribeToInventoryBoats(() => {
-        console.log('Real-time update: inventory boats changed')
-        debouncedLoadInventoryBoats()
-        debouncedLoadLocations()
-      })
+      // Store channel ref so we can unsubscribe during sync
+      const subscribeToInventory = () => {
+        return supabaseService.subscriptions.subscribeToInventoryBoats(() => {
+          // Skip entirely if sync is in progress - don't even log
+          if (syncInProgressRef.current) return
+          console.log('Real-time update: inventory boats changed')
+          debouncedLoadInventoryBoats()
+          debouncedLoadLocations()
+        })
+      }
+
+      inventoryChannelRef.current = subscribeToInventory()
+
+      // Store the resubscribe function so sync can call it after completion
+      resubscribeInventoryRef.current = () => {
+        console.log('Re-subscribing to inventory real-time updates...')
+        inventoryChannelRef.current = subscribeToInventory()
+      }
 
       console.log('Real-time subscriptions active')
 
@@ -142,7 +159,9 @@ function AppContainer() {
         console.log('Cleaning up real-time subscriptions...')
         supabaseService.subscriptions.unsubscribe(boatsChannel)
         supabaseService.subscriptions.unsubscribe(locationsChannel)
-        supabaseService.subscriptions.unsubscribe(inventoryChannel)
+        if (inventoryChannelRef.current) {
+          supabaseService.subscriptions.unsubscribe(inventoryChannelRef.current)
+        }
       }
     } catch (error) {
       console.error('Error setting up real-time subscriptions:', error)
@@ -642,6 +661,13 @@ function AppContainer() {
     if (debouncedFns.loadInventoryBoats) debouncedFns.loadInventoryBoats.cancel()
     console.log('Cancelled pending debounced reloads')
 
+    // Unsubscribe from inventory real-time updates to prevent 200+ events during sync
+    if (inventoryChannelRef.current) {
+      console.log('Unsubscribing from inventory real-time updates during sync...')
+      supabaseService.subscriptions.unsubscribe(inventoryChannelRef.current)
+      inventoryChannelRef.current = null
+    }
+
     try {
       // Call the Dockmaster inventory edge function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -724,11 +750,20 @@ function AppContainer() {
       await loadInventoryBoats()
       await loadDockmasterConfig()
 
+      // Re-subscribe to inventory real-time updates now that sync is done
+      if (resubscribeInventoryRef.current) {
+        resubscribeInventoryRef.current()
+      }
+
       console.log('Inventory sync completed successfully')
       return { success: true, count: result.boats?.length || 0 }
     } catch (error) {
       // Make sure to clear flag even on error
       syncInProgressRef.current = false
+      // Re-subscribe even on error
+      if (resubscribeInventoryRef.current) {
+        resubscribeInventoryRef.current()
+      }
       console.error('Error syncing inventory:', error)
       throw error
     }
