@@ -10,13 +10,23 @@ import { useAuth } from './AuthProvider'
 import supabaseService, { getAllBoatsCombined, boatLifecycleService } from './services/supabaseService'
 import App from './App'
 
-// Debounce helper to prevent rapid-fire API calls from real-time subscriptions
-function debounce(fn, delay) {
-  let timeoutId
-  return (...args) => {
-    clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => fn(...args), delay)
+// Debounce helper with cancel capability to prevent rapid-fire API calls
+function createCancellableDebounce(fn, delay) {
+  let timeoutId = null
+  const debouncedFn = (...args) => {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
+      timeoutId = null
+      fn(...args)
+    }, delay)
   }
+  debouncedFn.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+  return debouncedFn
 }
 
 const {
@@ -47,6 +57,13 @@ function AppContainer() {
   // trying to reload data while the database is busy with bulk operations
   const syncInProgressRef = useRef(false)
 
+  // Refs to store debounced functions so we can cancel them when sync starts
+  const debouncedFunctionsRef = useRef({
+    loadBoats: null,
+    loadLocations: null,
+    loadInventoryBoats: null
+  })
+
   // Load all data on mount
   useEffect(() => {
     if (user) {
@@ -61,10 +78,9 @@ function AppContainer() {
 
     console.log('Setting up real-time subscriptions...')
 
-    // Create debounced loaders - wait 2 seconds after last change before reloading
-    // This prevents hundreds of requests when bulk syncing inventory
-    // Also skip if a sync is in progress to avoid timeouts
-    const debouncedLoadBoats = debounce(() => {
+    // Create cancellable debounced loaders - wait 2 seconds after last change before reloading
+    // These can be cancelled when sync starts to prevent any pending reloads from firing
+    const debouncedLoadBoats = createCancellableDebounce(() => {
       if (syncInProgressRef.current) {
         console.log('Real-time update: skipping boats reload (sync in progress)')
         return
@@ -73,7 +89,7 @@ function AppContainer() {
       loadBoats()
     }, 2000)
 
-    const debouncedLoadLocations = debounce(() => {
+    const debouncedLoadLocations = createCancellableDebounce(() => {
       if (syncInProgressRef.current) {
         console.log('Real-time update: skipping locations reload (sync in progress)')
         return
@@ -82,7 +98,7 @@ function AppContainer() {
       loadLocations()
     }, 2000)
 
-    const debouncedLoadInventoryBoats = debounce(() => {
+    const debouncedLoadInventoryBoats = createCancellableDebounce(() => {
       if (syncInProgressRef.current) {
         console.log('Real-time update: skipping inventory boats reload (sync in progress)')
         return
@@ -90,6 +106,13 @@ function AppContainer() {
       console.log('Real-time update: reloading inventory boats (debounced)')
       loadInventoryBoats()
     }, 2000)
+
+    // Store references so sync can cancel pending debounced calls
+    debouncedFunctionsRef.current = {
+      loadBoats: debouncedLoadBoats,
+      loadLocations: debouncedLoadLocations,
+      loadInventoryBoats: debouncedLoadInventoryBoats
+    }
 
     try {
       // Subscribe to boats changes
@@ -611,6 +634,13 @@ function AppContainer() {
     // while database is busy with bulk operations
     syncInProgressRef.current = true
     console.log('Sync started - blocking real-time reloads')
+
+    // Cancel any pending debounced reloads to prevent them from firing during/after sync
+    const debouncedFns = debouncedFunctionsRef.current
+    if (debouncedFns.loadBoats) debouncedFns.loadBoats.cancel()
+    if (debouncedFns.loadLocations) debouncedFns.loadLocations.cancel()
+    if (debouncedFns.loadInventoryBoats) debouncedFns.loadInventoryBoats.cancel()
+    console.log('Cancelled pending debounced reloads')
 
     try {
       // Call the Dockmaster inventory edge function
