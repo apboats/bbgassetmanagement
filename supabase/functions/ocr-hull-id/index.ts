@@ -85,35 +85,56 @@ serve(async (req) => {
     // First annotation contains all detected text
     const fullText = textAnnotations[0].description || ''
 
-    // Clean the text: uppercase, keep only alphanumeric characters
+    // Clean the text: uppercase, remove spaces/dashes/special chars
     const cleanedText = fullText.toUpperCase().replace(/[^A-Z0-9]/g, '')
 
-    // Try to find a Hull ID pattern (typically 12-17 alphanumeric characters)
-    // Hull IDs often start with letters followed by numbers
-    // Common patterns: ABC12345D678901 or similar
-    let hullId = cleanedText
+    // Hull ID format (after removing US- prefix):
+    // XXX + NNNNN + LN + YY = 12 characters total
+    // - 3 letters (manufacturer code)
+    // - 5 alphanumeric (serial number)
+    // - 1 letter + 1 number (date of manufacture)
+    // - 2 numbers (model year)
+    // Pattern: [A-Z]{3}[A-Z0-9]{5}[A-Z][0-9]{3}
 
-    // If the cleaned text is very long, try to find the most likely Hull ID
-    // Hull IDs are typically 12-17 characters
-    if (cleanedText.length > 20) {
-      // Look for a sequence that looks like a Hull ID
-      const matches = cleanedText.match(/[A-Z]{2,4}[A-Z0-9]{8,14}/g)
-      if (matches && matches.length > 0) {
-        // Take the longest match that's within Hull ID length range
-        hullId = matches
-          .filter(m => m.length >= 12 && m.length <= 17)
-          .sort((a, b) => b.length - a.length)[0] || matches[0]
-      }
+    let hullId = ''
+    let confidence = 0
+
+    // Remove US prefix if present
+    let searchText = cleanedText
+    if (searchText.startsWith('US')) {
+      searchText = searchText.substring(2)
     }
 
-    // Calculate a confidence score based on text length and pattern match
-    let confidence = 0
-    if (hullId.length >= 12 && hullId.length <= 17) {
-      confidence = 95 // Good length for Hull ID
-    } else if (hullId.length >= 8) {
-      confidence = 75 // Acceptable length
-    } else if (hullId.length > 0) {
-      confidence = 50 // Short text detected
+    // Try to find the exact Hull ID pattern
+    // 3 letters + 5 alphanumeric + 1 letter + 1 digit + 2 digits = 12 chars
+    const exactPattern = /([A-Z]{3}[A-Z0-9]{5}[A-Z][0-9]{3})/g
+    const exactMatches = searchText.match(exactPattern)
+
+    if (exactMatches && exactMatches.length > 0) {
+      hullId = exactMatches[0]
+      confidence = 98 // Exact pattern match
+    } else {
+      // Fallback: look for any 12-character alphanumeric sequence starting with 3 letters
+      const fallbackPattern = /([A-Z]{3}[A-Z0-9]{9})/g
+      const fallbackMatches = searchText.match(fallbackPattern)
+
+      if (fallbackMatches && fallbackMatches.length > 0) {
+        hullId = fallbackMatches[0]
+        confidence = 85 // Close pattern match
+      } else if (searchText.length >= 12) {
+        // Last resort: take first 12 characters if it starts with letters
+        const startLetters = searchText.match(/^[A-Z]{3}/)
+        if (startLetters) {
+          hullId = searchText.substring(0, 12)
+          confidence = 70 // Partial match
+        } else {
+          hullId = searchText.substring(0, Math.min(12, searchText.length))
+          confidence = 50 // Low confidence
+        }
+      } else if (searchText.length > 0) {
+        hullId = searchText
+        confidence = 40 // Very low confidence - incomplete
+      }
     }
 
     console.log('OCR Result:', {
