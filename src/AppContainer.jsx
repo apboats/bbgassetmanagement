@@ -5,7 +5,7 @@
 // It wraps the UI layer (App.jsx) and passes data + callbacks as props
 // ============================================================================
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from './AuthProvider'
 import supabaseService, { getAllBoatsCombined, boatLifecycleService } from './services/supabaseService'
 import App from './App'
@@ -43,6 +43,10 @@ function AppContainer() {
   const [lastInventorySync, setLastInventorySync] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Ref to track if a sync is in progress - prevents real-time callbacks from
+  // trying to reload data while the database is busy with bulk operations
+  const syncInProgressRef = useRef(false)
+
   // Load all data on mount
   useEffect(() => {
     if (user) {
@@ -57,22 +61,35 @@ function AppContainer() {
 
     console.log('Setting up real-time subscriptions...')
 
-    // Create debounced loaders - wait 1 second after last change before reloading
+    // Create debounced loaders - wait 2 seconds after last change before reloading
     // This prevents hundreds of requests when bulk syncing inventory
+    // Also skip if a sync is in progress to avoid timeouts
     const debouncedLoadBoats = debounce(() => {
+      if (syncInProgressRef.current) {
+        console.log('Real-time update: skipping boats reload (sync in progress)')
+        return
+      }
       console.log('Real-time update: reloading boats (debounced)')
       loadBoats()
-    }, 1000)
+    }, 2000)
 
     const debouncedLoadLocations = debounce(() => {
+      if (syncInProgressRef.current) {
+        console.log('Real-time update: skipping locations reload (sync in progress)')
+        return
+      }
       console.log('Real-time update: reloading locations (debounced)')
       loadLocations()
-    }, 1000)
+    }, 2000)
 
     const debouncedLoadInventoryBoats = debounce(() => {
+      if (syncInProgressRef.current) {
+        console.log('Real-time update: skipping inventory boats reload (sync in progress)')
+        return
+      }
       console.log('Real-time update: reloading inventory boats (debounced)')
       loadInventoryBoats()
-    }, 1000)
+    }, 2000)
 
     try {
       // Subscribe to boats changes
@@ -590,6 +607,11 @@ function AppContainer() {
   }
 
   const handleSyncInventory = async (fullSync = false) => {
+    // Set flag to prevent real-time subscription callbacks from trying to reload
+    // while database is busy with bulk operations
+    syncInProgressRef.current = true
+    console.log('Sync started - blocking real-time reloads')
+
     try {
       // Call the Dockmaster inventory edge function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -664,12 +686,19 @@ function AppContainer() {
 
       // Update the last sync time
       await dockmasterService.updateLastSync()
+
+      // Clear the sync flag before reloading so real-time updates work again
+      syncInProgressRef.current = false
+      console.log('Sync completed - re-enabling real-time reloads')
+
       await loadInventoryBoats()
       await loadDockmasterConfig()
 
       console.log('Inventory sync completed successfully')
       return { success: true, count: result.boats?.length || 0 }
     } catch (error) {
+      // Make sure to clear flag even on error
+      syncInProgressRef.current = false
       console.error('Error syncing inventory:', error)
       throw error
     }
