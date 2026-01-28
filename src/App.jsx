@@ -205,13 +205,22 @@ export default function BoatsByGeorgeAssetManager({
   };
 
   // Set up sync interval
+  // Note: Added delay to ensure AppContainer's refs are initialized before first sync
   useEffect(() => {
     if (!dockmasterConfig?.username || !dockmasterConfig?.password) return;
-    
-    syncInventoryBoats(false);
+
+    // Small delay to ensure AppContainer's subscription refs are initialized
+    const initialSyncTimeout = setTimeout(() => {
+      syncInventoryBoats(false);
+    }, 1000);
+
     const syncInterval = setInterval(() => syncInventoryBoats(false), 1800000);
-    return () => clearInterval(syncInterval);
-  }, []);
+
+    return () => {
+      clearTimeout(initialSyncTimeout);
+      clearInterval(syncInterval);
+    };
+  }, [dockmasterConfig]);
 
   const handleLogin = (user) => {
     setIsAuthenticated(true);
