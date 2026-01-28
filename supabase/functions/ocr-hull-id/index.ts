@@ -89,12 +89,12 @@ serve(async (req) => {
     const cleanedText = fullText.toUpperCase().replace(/[^A-Z0-9]/g, '')
 
     // Hull ID format (after removing US- prefix):
-    // XXX + NNNNN + LN + YY = 12 characters total
-    // - 3 letters (manufacturer code)
-    // - 5 alphanumeric (serial number)
-    // - 1 letter + 1 number (date of manufacture)
-    // - 2 numbers (model year)
-    // Pattern: [A-Z]{3}[A-Z0-9]{5}[A-Z][0-9]{3}
+    // MIC + SERIAL + DATE + YEAR = 12 characters total
+    // - 3 characters (manufacturer code) - positions 0-2 (usually letters, but can include numbers like MB2)
+    // - 5 alphanumeric (serial number) - positions 3-7
+    // - 1 letter + 1 number (date of manufacture) - positions 8-9
+    // - 2 numbers (model year) - positions 10-11
+    // Pattern: [A-Z0-9]{3}[A-Z0-9]{5}[A-Z][0-9]{3}
 
     let hullId = ''
     let confidence = 0
@@ -105,32 +105,86 @@ serve(async (req) => {
       searchText = searchText.substring(2)
     }
 
-    // Try to find the exact Hull ID pattern
-    // 3 letters + 5 alphanumeric + 1 letter + 1 digit + 2 digits = 12 chars
-    const exactPattern = /([A-Z]{3}[A-Z0-9]{5}[A-Z][0-9]{3})/g
-    const exactMatches = searchText.match(exactPattern)
+    // Common OCR corrections based on position in Hull ID
+    // Position 8 MUST be a letter (month code A-L), positions 9-11 MUST be numbers
+    // Positions 0-2 and 3-7 can be letters or numbers, so no forced correction there
+    const correctOcrMistakes = (text: string): string => {
+      if (text.length < 12) return text
 
-    if (exactMatches && exactMatches.length > 0) {
-      hullId = exactMatches[0]
-      confidence = 98 // Exact pattern match
+      const chars = text.substring(0, 12).split('')
+
+      // Positions 0-2: Manufacturer code - can be letters OR numbers (e.g., MB2, CCB, FGE)
+      // No correction needed - leave as-is
+
+      // Positions 3-7: Can be letters or numbers (serial) - no correction needed
+
+      // Position 8: Must be a letter (month code: A=Jan, B=Feb, ... L=Dec)
+      chars[8] = digitToLetter(chars[8])
+
+      // Positions 9-11: Must be numbers (year digits)
+      for (let i = 9; i < 12; i++) {
+        chars[i] = letterToDigit(chars[i])
+      }
+
+      return chars.join('')
+    }
+
+    // Convert commonly confused digits to letters
+    const digitToLetter = (char: string): string => {
+      const digitToLetterMap: Record<string, string> = {
+        '0': 'O',
+        '1': 'I',
+        '2': 'Z',
+        '5': 'S',
+        '8': 'B',
+      }
+      return digitToLetterMap[char] || char
+    }
+
+    // Convert commonly confused letters to digits
+    const letterToDigit = (char: string): string => {
+      const letterToDigitMap: Record<string, string> = {
+        'O': '0',
+        'I': '1',
+        'L': '1',
+        'Z': '2',
+        'S': '5',
+        'B': '8',
+      }
+      return letterToDigitMap[char] || char
+    }
+
+    // First, try to apply OCR corrections if we have at least 12 characters
+    if (searchText.length >= 12) {
+      // Extract first 12 chars and apply corrections based on known positions
+      const correctedText = correctOcrMistakes(searchText)
+
+      // Check if corrected text matches exact pattern
+      // Manufacturer code: 2 letters + 1 alphanumeric (e.g., CCB, MB2, FGE)
+      const exactPattern = /^[A-Z]{2}[A-Z0-9][A-Z0-9]{5}[A-Z][0-9]{3}$/
+      if (exactPattern.test(correctedText)) {
+        hullId = correctedText
+        confidence = 95 // Corrected to match pattern
+      } else {
+        // Try original text with pattern matching
+        const patternMatch = searchText.match(/([A-Z]{2}[A-Z0-9][A-Z0-9]{5}[A-Z][0-9]{3})/g)
+        if (patternMatch && patternMatch.length > 0) {
+          hullId = patternMatch[0]
+          confidence = 98 // Exact pattern match
+        } else {
+          // Use corrected text even if not perfect pattern
+          hullId = correctedText
+          confidence = 80 // Corrected but may have issues
+        }
+      }
     } else {
-      // Fallback: look for any 12-character alphanumeric sequence starting with 3 letters
-      const fallbackPattern = /([A-Z]{3}[A-Z0-9]{9})/g
+      // Not enough characters - try to find any pattern
+      const fallbackPattern = /([A-Z]{2}[A-Z0-9][A-Z0-9]{5,9})/g
       const fallbackMatches = searchText.match(fallbackPattern)
 
       if (fallbackMatches && fallbackMatches.length > 0) {
         hullId = fallbackMatches[0]
-        confidence = 85 // Close pattern match
-      } else if (searchText.length >= 12) {
-        // Last resort: take first 12 characters if it starts with letters
-        const startLetters = searchText.match(/^[A-Z]{3}/)
-        if (startLetters) {
-          hullId = searchText.substring(0, 12)
-          confidence = 70 // Partial match
-        } else {
-          hullId = searchText.substring(0, Math.min(12, searchText.length))
-          confidence = 50 // Low confidence
-        }
+        confidence = 60 // Partial match
       } else if (searchText.length > 0) {
         hullId = searchText
         confidence = 40 // Very low confidence - incomplete
@@ -140,6 +194,7 @@ serve(async (req) => {
     console.log('OCR Result:', {
       rawText: fullText.substring(0, 100),
       cleanedText: cleanedText.substring(0, 50),
+      searchText: searchText.substring(0, 20),
       hullId,
       confidence
     })
