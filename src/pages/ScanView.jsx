@@ -346,30 +346,65 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     }
   };
 
-  // Manual search
-  const searchBoatsManually = () => {
-    const query = searchQuery.toLowerCase().trim();
+  // Manual search - searches both customer and inventory boats from database
+  const searchBoatsManually = async () => {
+    const query = searchQuery.trim();
 
     if (!query) {
       alert('Please enter a search term');
       return;
     }
 
-    // Search across all boats, but exclude archived boats
-    const results = boats.filter(boat => {
-      // Check if boat matches search query
-      const matchesQuery = boat.name?.toLowerCase().includes(query) ||
-        boat.owner?.toLowerCase().includes(query) ||
-        boat.hullId?.toLowerCase().includes(query) ||
-        boat.model?.toLowerCase().includes(query);
+    setIsLoading(true);
+    try {
+      // Search customer boats from database
+      const { data: customerBoats, error: customerError } = await supabase
+        .from('boats')
+        .select('*')
+        .or(`name.ilike.%${query}%,owner.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%`)
+        .neq('status', 'archived')
+        .limit(20);
 
-      // Exclude archived boats from search results
-      const isNotArchived = boat.status !== 'archived';
+      if (customerError) {
+        console.error('Customer boat search error:', customerError);
+      }
 
-      return matchesQuery && isNotArchived;
-    });
+      // Search inventory boats from database
+      const { data: inventoryBoats, error: inventoryError } = await supabase
+        .from('inventory_boats')
+        .select('*')
+        .or(`name.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,manufacturer.ilike.%${query}%`)
+        .limit(20);
 
-    setSearchResults(results);
+      if (inventoryError) {
+        console.error('Inventory boat search error:', inventoryError);
+      }
+
+      // Combine results, marking inventory boats
+      const combinedResults = [
+        ...(customerBoats || []).map(b => ({
+          ...b,
+          hullId: b.hull_id, // Normalize field name
+          boatType: 'customer'
+        })),
+        ...(inventoryBoats || []).map(b => ({
+          ...b,
+          hullId: b.hull_id, // Normalize field name
+          boatType: 'inventory'
+        }))
+      ];
+
+      setSearchResults(combinedResults);
+
+      if (combinedResults.length === 0) {
+        alert(`No boats found matching "${query}"`);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Error searching. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectBoatFromSearch = (boat) => {
@@ -668,12 +703,19 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {searchResults.map(boat => (
                     <button
-                      key={boat.id}
+                      key={`${boat.boatType}-${boat.id}`}
                       onClick={() => selectBoatFromSearch(boat)}
                       className="w-full p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
                     >
-                      <p className="font-bold text-slate-900">{boat.name}</p>
-                      <p className="text-sm text-slate-600">{boat.model} • {boat.owner}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-slate-900">{boat.name}</p>
+                        {boat.boatType === 'inventory' && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Inventory</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        {boat.model} {boat.owner ? `• ${boat.owner}` : boat.manufacturer ? `• ${boat.manufacturer}` : ''}
+                      </p>
                       {boat.hullId && (
                         <p className="text-xs text-slate-500 font-mono mt-1">Hull ID: {boat.hullId}</p>
                       )}
