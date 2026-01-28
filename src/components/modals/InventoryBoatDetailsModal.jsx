@@ -28,7 +28,7 @@ function getTimeAgo(date) {
   return date.toLocaleDateString();
 }
 
-export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose }) {
+export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose, currentUser }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('layout');
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
@@ -219,169 +219,196 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           </div>
 
           {/* Pricing Info */}
-          {(boat.listPrice || boat.list_price || boat.totalCost || boat.total_cost) && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-              <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
-              <div className="grid grid-cols-2 gap-3">
-                {(boat.listPrice || boat.list_price) && (
-                  <div>
-                    <p className="text-xs text-green-600">List Price</p>
-                    <p className="text-lg font-bold text-green-900">
-                      ${Number(boat.listPrice || boat.list_price).toLocaleString()}
-                    </p>
-                  </div>
-                )}
-                {(boat.totalCost || boat.total_cost) && (
-                  <div>
-                    <p className="text-xs text-green-600">Total Cost</p>
-                    <p className="text-lg font-bold text-green-900">
-                      ${Number(boat.totalCost || boat.total_cost).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+          {(() => {
+            const hasListPrice = boat.listPrice || boat.list_price;
+            const hasTotalCost = boat.totalCost || boat.total_cost;
+            const canSeeCost = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+            const showPricingSection = hasListPrice || (hasTotalCost && canSeeCost);
+
+            if (!showPricingSection) return null;
+
+            return (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
+                <div className={`grid ${hasListPrice && hasTotalCost && canSeeCost ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                  {hasListPrice && (
+                    <div>
+                      <p className="text-xs text-green-600">List Price</p>
+                      <p className="text-lg font-bold text-green-900">
+                        ${Number(boat.listPrice || boat.list_price).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {hasTotalCost && canSeeCost && (
+                    <div>
+                      <p className="text-xs text-green-600">Total Cost</p>
+                      <p className="text-lg font-bold text-green-900">
+                        ${Number(boat.totalCost || boat.total_cost).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })()}
+
+          {/* Boat Specs - Compact inline display */}
+          {(() => {
+            const specs = [
+              { label: 'Length', value: boat.length },
+              { label: 'Beam', value: boat.beam },
+              { label: 'Draft', value: boat.draft },
+              { label: 'Weight', value: boat.weight },
+              { label: 'Hull', value: boat.hullType || boat.hull_type },
+              { label: 'Material', value: boat.hullMaterial || boat.hull_material },
+              { label: 'Fuel Cap.', value: boat.fuelCapacity || boat.fuel_capacity },
+              { label: 'Max HP', value: boat.motorRating || boat.motor_rating },
+            ].filter(s => s.value);
+
+            if (specs.length === 0) return null;
+
+            return (
+              <div className="p-3 bg-slate-50 rounded-xl">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {specs.map((spec, idx) => (
+                    <span key={idx} className="text-sm">
+                      <span className="text-slate-500">{spec.label}:</span>{' '}
+                      <span className="font-medium text-slate-900">{spec.value}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Motors & Trailers - Side by side when both exist */}
+          {(boat.motors?.length > 0 || boat.trailers?.length > 0) && (
+            <div className={`grid ${boat.motors?.length > 0 && boat.trailers?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+              {/* Motors */}
+              {boat.motors?.length > 0 && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <h4 className="text-sm font-semibold text-orange-800">
+                      {boat.motors.length > 1 ? `${boat.motors.length} Engines` : 'Engine'}
+                    </h4>
+                  </div>
+                  <div className="space-y-2">
+                    {boat.motors.map((motor, idx) => (
+                      <div key={motor.id || idx} className="text-sm">
+                        <p className="font-medium text-slate-900">
+                          {motor.vendorName} {motor.modelNumber}
+                          {motor.horsePower && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded">
+                              {motor.horsePower} HP
+                            </span>
+                          )}
+                        </p>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {[
+                            motor.year && `${motor.year}`,
+                            motor.serialNumber && `S/N: ${motor.serialNumber}`,
+                            motor.shaftLength && `${motor.shaftLength} shaft`
+                          ].filter(Boolean).join(' | ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Trailers */}
+              {boat.trailers?.length > 0 && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <h4 className="text-sm font-semibold text-purple-800">
+                      {boat.trailers.length > 1 ? `${boat.trailers.length} Trailers` : 'Trailer'}
+                    </h4>
+                  </div>
+                  <div className="space-y-2">
+                    {boat.trailers.map((trailer, idx) => (
+                      <div key={trailer.id || idx} className="text-sm">
+                        <p className="font-medium text-slate-900">
+                          {trailer.vendorName} {trailer.modelNumber}
+                        </p>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {[
+                            trailer.year && `${trailer.year}`,
+                            trailer.serialNumber && `S/N: ${trailer.serialNumber}`,
+                            trailer.weightCapacity && `Cap: ${trailer.weightCapacity}`
+                          ].filter(Boolean).join(' | ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Boat Specs */}
-          <div className="p-4 bg-slate-50 rounded-xl">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Specifications</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-slate-500">Length</p>
-                <p className="text-sm font-semibold text-slate-900">{boat.length || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Beam</p>
-                <p className="text-sm font-semibold text-slate-900">{boat.beam || 'N/A'}</p>
-              </div>
-              {(boat.draft) && (
+          {/* Options & Accessories - Collapsible tags display */}
+          {(boat.options?.length > 0 || boat.accessories?.length > 0) && (
+            <div className="p-3 bg-slate-50 rounded-xl space-y-3">
+              {/* Options */}
+              {boat.options?.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-500">Draft</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.draft}</p>
-                </div>
-              )}
-              {(boat.weight) && (
-                <div>
-                  <p className="text-xs text-slate-500">Weight</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.weight}</p>
-                </div>
-              )}
-              {(boat.hullType || boat.hull_type) && (
-                <div>
-                  <p className="text-xs text-slate-500">Hull Type</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.hullType || boat.hull_type}</p>
-                </div>
-              )}
-              {(boat.hullMaterial || boat.hull_material) && (
-                <div>
-                  <p className="text-xs text-slate-500">Hull Material</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.hullMaterial || boat.hull_material}</p>
-                </div>
-              )}
-              {(boat.fuelCapacity || boat.fuel_capacity) && (
-                <div>
-                  <p className="text-xs text-slate-500">Fuel Capacity</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.fuelCapacity || boat.fuel_capacity}</p>
-                </div>
-              )}
-              {(boat.motorRating || boat.motor_rating) && (
-                <div>
-                  <p className="text-xs text-slate-500">Max HP Rating</p>
-                  <p className="text-sm font-semibold text-slate-900">{boat.motorRating || boat.motor_rating}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Motors Section */}
-          {boat.motors && boat.motors.length > 0 && (
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
-              <h4 className="text-sm font-medium text-orange-800 mb-3">
-                Engine{boat.motors.length > 1 ? 's' : ''} ({boat.motors.length})
-              </h4>
-              <div className="space-y-3">
-                {boat.motors.map((motor, idx) => (
-                  <div key={motor.id || idx} className="p-3 bg-white rounded-lg border border-orange-100">
-                    <p className="font-semibold text-slate-900">
-                      {motor.vendorName} {motor.modelNumber}
-                      {motor.horsePower && <span className="text-orange-600 ml-1">({motor.horsePower} HP)</span>}
-                    </p>
-                    {motor.year && <p className="text-xs text-slate-600">Year: {motor.year}</p>}
-                    {motor.serialNumber && (
-                      <p className="text-xs text-slate-500 font-mono mt-1">S/N: {motor.serialNumber}</p>
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                    Options ({boat.options.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {boat.options.slice(0, 8).map((opt, idx) => (
+                      <span key={opt.optionCode || idx} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-700">
+                        {opt.desc || opt.optionCode}
+                      </span>
+                    ))}
+                    {boat.options.length > 8 && (
+                      <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-500 font-medium">
+                        +{boat.options.length - 8} more
+                      </span>
                     )}
-                    {motor.shaftLength && <p className="text-xs text-slate-500">Shaft: {motor.shaftLength}</p>}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
-          {/* Trailers Section */}
-          {boat.trailers && boat.trailers.length > 0 && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-              <h4 className="text-sm font-medium text-purple-800 mb-3">
-                Trailer{boat.trailers.length > 1 ? 's' : ''}
-              </h4>
-              <div className="space-y-3">
-                {boat.trailers.map((trailer, idx) => (
-                  <div key={trailer.id || idx} className="p-3 bg-white rounded-lg border border-purple-100">
-                    <p className="font-semibold text-slate-900">
-                      {trailer.vendorName} {trailer.modelNumber}
-                    </p>
-                    {trailer.year && <p className="text-xs text-slate-600">Year: {trailer.year}</p>}
-                    {trailer.serialNumber && (
-                      <p className="text-xs text-slate-500 font-mono mt-1">S/N: {trailer.serialNumber}</p>
-                    )}
-                    {trailer.weightCapacity && (
-                      <p className="text-xs text-slate-500">Capacity: {trailer.weightCapacity}</p>
+              {/* Accessories */}
+              {boat.accessories?.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                    Accessories ({boat.accessories.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {boat.accessories.slice(0, 8).map((acc, idx) => (
+                      <span key={acc.accCode || idx} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-700">
+                        {acc.desc || acc.accCode}
+                        {acc.qty > 1 && <span className="text-slate-400 ml-1">x{acc.qty}</span>}
+                      </span>
+                    ))}
+                    {boat.accessories.length > 8 && (
+                      <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-500 font-medium">
+                        +{boat.accessories.length - 8} more
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Options Section */}
-          {boat.options && boat.options.length > 0 && (
-            <div className="p-4 bg-slate-50 rounded-xl">
-              <h4 className="text-sm font-medium text-slate-700 mb-2">
-                Options ({boat.options.length})
-              </h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {boat.options.map((opt, idx) => (
-                  <div key={opt.optionCode || idx} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{opt.desc || opt.optionCode}</span>
-                    {opt.price && <span className="text-slate-500">${opt.price}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Accessories Section */}
-          {boat.accessories && boat.accessories.length > 0 && (
-            <div className="p-4 bg-slate-50 rounded-xl">
-              <h4 className="text-sm font-medium text-slate-700 mb-2">
-                Accessories ({boat.accessories.length})
-              </h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {boat.accessories.map((acc, idx) => (
-                  <div key={acc.accCode || idx} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{acc.desc || acc.accCode}</span>
-                    {acc.qty > 1 && <span className="text-slate-400 text-xs">x{acc.qty}</span>}
-                  </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Comments from Dockmaster */}
           {boat.comments && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-              <h4 className="text-sm font-medium text-yellow-800 mb-2">Dockmaster Comments</h4>
-              <p className="text-sm text-yellow-900 whitespace-pre-wrap">{boat.comments}</p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+                <h4 className="text-sm font-medium text-amber-800">Dockmaster Comments</h4>
+              </div>
+              <p className="text-sm text-amber-900 whitespace-pre-wrap">{boat.comments}</p>
             </div>
           )}
 
