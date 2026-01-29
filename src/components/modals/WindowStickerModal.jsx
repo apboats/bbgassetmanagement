@@ -58,7 +58,7 @@ export function WindowStickerModal({ boat, onClose }) {
               text-align: left;
             }
             .dealer-logo {
-              max-height: 50px;
+              max-height: 70px;
               width: auto;
             }
             .boat-location {
@@ -444,7 +444,7 @@ export function WindowStickerModal({ boat, onClose }) {
             {/* Header with Dealer & Boat Info */}
             <div className="header flex justify-between items-start border-b-4 border-blue-700 pb-3 mb-4">
               <div className="dealer-info">
-                <img src="/images/logo.png" alt="Boats by George" className="dealer-logo h-12 w-auto" />
+                <img src="/images/logo.png" alt="Boats by George" className="dealer-logo h-16 w-auto" />
               </div>
               <div className="boat-title text-right">
                 <div className="boat-year-make text-sm text-slate-500">{boat.year} {boat.make}</div>
