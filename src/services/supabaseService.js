@@ -826,6 +826,7 @@ export const inventoryBoatsService = {
   },
 
   // Sync from Dockmaster API
+  // Uses batch upsert to minimize database operations and real-time events
   async sync(apiBoats, fullSync = false) {
     // Get existing inventory boats
     const existing = await this.getAll()
@@ -833,52 +834,41 @@ export const inventoryBoatsService = {
       existing.map(b => [b.dockmaster_id, b])
     )
 
-    const toUpdate = []
-    const toCreate = []
     const existingIds = new Set()
+    const boatsToUpsert = []
 
-    // Process API boats
+    // Process API boats - prepare for batch upsert
     for (const apiBoat of apiBoats) {
       existingIds.add(apiBoat.dockmaster_id)
-      
-      if (existingMap.has(apiBoat.dockmaster_id)) {
-        // Update existing
-        const existingBoat = existingMap.get(apiBoat.dockmaster_id)
-        toUpdate.push({
-          id: existingBoat.id,
-          ...apiBoat,
-          last_synced: new Date().toISOString()
+
+      const existingBoat = existingMap.get(apiBoat.dockmaster_id)
+
+      // Prepare boat data for upsert (preserve location/slot if exists)
+      boatsToUpsert.push({
+        ...apiBoat,
+        // Preserve existing location assignment if boat exists
+        location: existingBoat?.location || null,
+        slot: existingBoat?.slot || null,
+        last_synced: new Date().toISOString()
+      })
+    }
+
+    // Single batch upsert operation instead of N individual updates
+    // This triggers only ONE real-time event instead of N events
+    if (boatsToUpsert.length > 0) {
+      console.log(`Upserting ${boatsToUpsert.length} boats in single batch operation`)
+      const { error } = await supabase
+        .from('inventory_boats')
+        .upsert(boatsToUpsert, {
+          onConflict: 'dockmaster_id',
+          ignoreDuplicates: false
         })
-      } else {
-        // Create new
-        toCreate.push({
-          ...apiBoat,
-          last_synced: new Date().toISOString()
-        })
+
+      if (error) {
+        console.error('Error upserting inventory boats:', error)
+        throw error
       }
     }
-
-    // Batch operations
-    const operations = []
-
-    if (toCreate.length > 0) {
-      operations.push(
-        supabase.from('inventory_boats').insert(toCreate)
-      )
-    }
-
-    if (toUpdate.length > 0) {
-      operations.push(
-        ...toUpdate.map(boat => 
-          supabase
-            .from('inventory_boats')
-            .update(boat)
-            .eq('id', boat.id)
-        )
-      )
-    }
-
-    await Promise.all(operations)
 
     // Only delete boats on full sync (incremental sync only returns today's changes)
     if (fullSync) {
