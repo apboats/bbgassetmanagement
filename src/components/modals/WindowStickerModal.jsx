@@ -12,6 +12,7 @@ export function WindowStickerModal({ boat, onClose }) {
   const printRef = useRef(null);
   const [discountAmount, setDiscountAmount] = useState('');
   const [discountType, setDiscountType] = useState('dollar'); // 'dollar' or 'percent'
+  const [dealNotes, setDealNotes] = useState(''); // Special deal notes
 
   // Get the boat's current location
   const boatLocation = boat.location || boat.locationName || null;
@@ -240,18 +241,37 @@ export function WindowStickerModal({ boat, onClose }) {
               color: #dc2626;
             }
             .pricing-row.sale-price {
-              border-top: 3px solid #dc2626;
+              border-top: 3px solid #16a34a;
               margin-top: 8px;
               padding-top: 12px;
               font-size: 22px;
               font-weight: bold;
             }
             .pricing-row.sale-price .pricing-label {
-              color: #dc2626;
+              color: #16a34a;
             }
             .pricing-row.sale-price .pricing-value {
-              color: #dc2626;
+              color: #16a34a;
               font-size: 28px;
+            }
+            .deal-notes-box {
+              background: #fffbeb;
+              border: 2px dashed #f59e0b;
+              border-radius: 8px;
+              padding: 12px;
+              margin-top: 12px;
+            }
+            .deal-notes-title {
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #b45309;
+              margin-bottom: 6px;
+            }
+            .deal-notes-content {
+              font-size: 13px;
+              color: #78350f;
+              white-space: pre-wrap;
             }
             .footer {
               margin-top: 16px;
@@ -362,47 +382,59 @@ export function WindowStickerModal({ boat, onClose }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-center justify-between flex-shrink-0">
-          <div>
-            <h3 className="text-lg font-bold">Window Sticker Preview</h3>
-            <p className="text-blue-100 text-sm">Print-ready format</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Discount Input */}
-            <div className="flex items-center gap-1 bg-blue-500 rounded-lg px-2 py-1">
-              <input
-                type="number"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                placeholder="Discount"
-                className="w-20 px-2 py-1 rounded text-sm text-slate-900 bg-white"
-                min="0"
-              />
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-lg font-bold">Window Sticker Preview</h3>
+              <p className="text-blue-100 text-sm">Print-ready format</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Discount Input */}
+              <div className="flex items-center gap-1 bg-blue-500 rounded-lg px-2 py-1">
+                <input
+                  type="number"
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  placeholder="Discount"
+                  className="w-20 px-2 py-1 rounded text-sm text-slate-900 bg-white"
+                  min="0"
+                />
+                <button
+                  onClick={() => setDiscountType('dollar')}
+                  className={`p-1.5 rounded ${discountType === 'dollar' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
+                  title="Dollar discount"
+                >
+                  <DollarSign className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setDiscountType('percent')}
+                  className={`p-1.5 rounded ${discountType === 'percent' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
+                  title="Percent discount"
+                >
+                  <Percent className="w-4 h-4" />
+                </button>
+              </div>
               <button
-                onClick={() => setDiscountType('dollar')}
-                className={`p-1.5 rounded ${discountType === 'dollar' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
-                title="Dollar discount"
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors"
               >
-                <DollarSign className="w-4 h-4" />
+                <Printer className="w-4 h-4" />
+                Print
               </button>
-              <button
-                onClick={() => setDiscountType('percent')}
-                className={`p-1.5 rounded ${discountType === 'percent' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
-                title="Percent discount"
-              >
-                <Percent className="w-4 h-4" />
+              <button onClick={onClose} className="p-2 hover:bg-blue-500 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
-            <button onClick={onClose} className="p-2 hover:bg-blue-500 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+          </div>
+          {/* Deal Notes Input */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={dealNotes}
+              onChange={(e) => setDealNotes(e.target.value)}
+              placeholder="Special deal notes (e.g., 'Includes cover, trailer prep, free delivery')"
+              className="flex-1 px-3 py-2 rounded-lg text-sm text-slate-900 bg-white placeholder-slate-400"
+            />
           </div>
         </div>
 
@@ -549,10 +581,10 @@ export function WindowStickerModal({ boat, onClose }) {
 
             {/* MSRP Box */}
             {totalMSRP > 0 && (
-              <div className="pricing-box bg-gradient-to-r from-green-50 to-emerald-100 border-4 border-green-500 rounded-xl p-4 mt-4">
+              <div className={`pricing-box rounded-xl p-4 mt-4 ${hasDiscount ? 'bg-gradient-to-r from-slate-50 to-slate-100 border-4 border-slate-300' : 'bg-gradient-to-r from-green-50 to-emerald-100 border-4 border-green-500'}`}>
                 <div className={`pricing-row ${hasDiscount ? 'flex justify-between items-center mb-2' : 'total flex justify-between items-center'}`}>
-                  <span className="pricing-label text-lg font-bold text-green-800">TOTAL MSRP</span>
-                  <span className={`pricing-value font-bold text-green-700 ${hasDiscount ? 'text-xl line-through opacity-70' : 'text-3xl'}`}>
+                  <span className={`pricing-label text-lg font-bold ${hasDiscount ? 'text-slate-700' : 'text-green-800'}`}>TOTAL MSRP</span>
+                  <span className={`pricing-value font-bold ${hasDiscount ? 'text-xl line-through text-slate-500' : 'text-3xl text-green-700'}`}>
                     {formatPrice(totalMSRP)}
                   </span>
                 </div>
@@ -564,12 +596,20 @@ export function WindowStickerModal({ boat, onClose }) {
                       </span>
                       <span className="pricing-value text-lg font-semibold">-{formatPrice(calculatedDiscount)}</span>
                     </div>
-                    <div className="pricing-row sale-price flex justify-between items-center border-t-2 border-red-400 mt-2 pt-2">
-                      <span className="pricing-label text-xl font-bold text-red-600">SALE PRICE</span>
-                      <span className="pricing-value text-3xl font-bold text-red-600">{formatPrice(salePrice)}</span>
+                    <div className="pricing-row sale-price flex justify-between items-center border-t-2 border-green-500 mt-2 pt-2">
+                      <span className="pricing-label text-xl font-bold text-green-600">SALE PRICE</span>
+                      <span className="pricing-value text-3xl font-bold text-green-600">{formatPrice(salePrice)}</span>
                     </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Deal Notes */}
+            {dealNotes.trim() && (
+              <div className="deal-notes-box bg-amber-50 border-2 border-dashed border-amber-400 rounded-lg p-3 mt-4">
+                <div className="deal-notes-title text-xs font-bold uppercase text-amber-700 mb-1">Special Deal Notes</div>
+                <div className="deal-notes-content text-sm text-amber-900 whitespace-pre-wrap">{dealNotes}</div>
               </div>
             )}
 
