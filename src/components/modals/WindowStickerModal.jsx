@@ -182,23 +182,20 @@ export function WindowStickerModal({ boat, onClose }) {
               margin-top: 4px;
             }
             .options-container {
-              column-count: 2;
-              column-gap: 16px;
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 1px 16px;
+              font-size: 10px;
             }
             .options-container.many-options {
-              column-count: 3;
+              grid-template-columns: repeat(3, 1fr);
               font-size: 9px;
             }
             .option-item {
               display: flex;
               justify-content: space-between;
               gap: 4px;
-              break-inside: avoid;
               padding: 1px 0;
-              font-size: 10px;
-            }
-            .options-container.many-options .option-item {
-              font-size: 9px;
             }
             .option-desc {
               color: #334155;
@@ -213,6 +210,9 @@ export function WindowStickerModal({ boat, onClose }) {
               font-weight: 600;
               color: #0f172a;
               flex-shrink: 0;
+            }
+            .section {
+              margin-bottom: 16px;
             }
             .pricing-box {
               background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
@@ -557,17 +557,17 @@ export function WindowStickerModal({ boat, onClose }) {
 
             {/* Options */}
             {boat.options?.length > 0 && (
-              <div className="section mb-4">
+              <div className="section mb-6">
                 <div className="section-title text-xs font-bold uppercase tracking-wide text-blue-700 border-b border-slate-200 pb-1 mb-2">
                   Factory Options & Equipment ({boat.options.length})
                 </div>
-                <div className={`options-container ${boat.options.length > 20 ? 'many-options' : ''}`}>
+                <div className={`options-container grid gap-x-4 gap-y-0.5 ${boat.options.length > 20 ? 'many-options grid-cols-3 text-[9px]' : 'grid-cols-2 text-[10px]'}`}>
                   {boat.options.map((opt, idx) => (
-                    <div key={idx} className="option-item">
-                      <span className="option-desc text-slate-700">
+                    <div key={idx} className="option-item flex justify-between gap-1">
+                      <span className="option-desc text-slate-700 truncate">
                         {opt.desc || opt.description || opt.optionCode}
                       </span>
-                      <span className="option-price text-slate-900">
+                      <span className="option-price text-slate-900 font-semibold flex-shrink-0">
                         {opt.price || opt.msrp ? formatPrice(opt.price || opt.msrp) : '—'}
                       </span>
                     </div>
@@ -578,18 +578,18 @@ export function WindowStickerModal({ boat, onClose }) {
 
             {/* Accessories */}
             {boat.accessories?.length > 0 && (
-              <div className="section mb-4">
+              <div className="section mb-6">
                 <div className="section-title text-xs font-bold uppercase tracking-wide text-blue-700 border-b border-slate-200 pb-1 mb-2">
                   Accessories ({boat.accessories.length})
                 </div>
-                <div className={`options-container ${boat.accessories.length > 20 ? 'many-options' : ''}`}>
+                <div className={`options-container grid gap-x-4 gap-y-0.5 ${boat.accessories.length > 20 ? 'many-options grid-cols-3 text-[9px]' : 'grid-cols-2 text-[10px]'}`}>
                   {boat.accessories.map((acc, idx) => (
-                    <div key={idx} className="option-item">
-                      <span className="option-desc text-slate-700">
+                    <div key={idx} className="option-item flex justify-between gap-1">
+                      <span className="option-desc text-slate-700 truncate">
                         {acc.desc || acc.description || acc.accCode}
                         {acc.qty > 1 && <span className="text-slate-400 ml-1">x{acc.qty}</span>}
                       </span>
-                      <span className="option-price text-slate-900">
+                      <span className="option-price text-slate-900 font-semibold flex-shrink-0">
                         {acc.price || acc.msrp ? formatPrice(acc.price || acc.msrp) : '—'}
                       </span>
                     </div>
@@ -600,7 +600,7 @@ export function WindowStickerModal({ boat, onClose }) {
 
             {/* MSRP Box */}
             {totalMSRP > 0 && (
-              <div className={`pricing-box rounded-xl p-4 mt-4 ${hasDiscount ? 'bg-gradient-to-r from-slate-50 to-slate-100 border-4 border-slate-300' : 'bg-gradient-to-r from-green-50 to-emerald-100 border-4 border-green-500'}`}>
+              <div className={`pricing-box rounded-xl p-4 mt-6 ${hasDiscount ? 'bg-gradient-to-r from-slate-50 to-slate-100 border-4 border-slate-300' : 'bg-gradient-to-r from-green-50 to-emerald-100 border-4 border-green-500'}`}>
                 <div className={`pricing-row ${hasDiscount ? 'flex justify-between items-center mb-2' : 'total flex justify-between items-center'}`}>
                   <span className={`pricing-label text-lg font-bold ${hasDiscount ? 'text-slate-700' : 'text-green-800'}`}>TOTAL MSRP</span>
                   <span className={`pricing-value font-bold ${hasDiscount ? 'text-xl line-through text-slate-500' : 'text-3xl text-green-700'}`}>
