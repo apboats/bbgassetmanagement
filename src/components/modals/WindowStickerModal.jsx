@@ -377,10 +377,18 @@ export function WindowStickerModal({ boat, onClose }) {
   const trailersTotal = (boat.trailers || []).reduce((sum, t) => sum + (t.price || t.msrp || 0), 0);
   const totalMSRP = basePrice; // List price typically includes everything
 
+  // Find freight option (case-insensitive search)
+  const freightOption = (boat.options || []).find(opt => {
+    const desc = (opt.desc || opt.description || opt.optionCode || '').toLowerCase();
+    return desc.includes('freight');
+  });
+  const freightAmount = freightOption ? (freightOption.price || freightOption.msrp || 0) : 0;
+
   // Calculate discount and sale price
+  // For percent discounts: deduct freight, apply discount, add freight back
   const discountValue = parseFloat(discountAmount) || 0;
   const calculatedDiscount = discountType === 'percent'
-    ? (totalMSRP * discountValue / 100)
+    ? ((totalMSRP - freightAmount) * discountValue / 100)
     : discountValue;
   const salePrice = totalMSRP - calculatedDiscount;
   const hasDiscount = discountValue > 0 && totalMSRP > 0;
