@@ -257,11 +257,11 @@ function AppContainer() {
     }
   }
 
-  // Load inventory boats
-  const loadInventoryBoats = async () => {
+  // Load inventory boats with retry logic for database timeouts
+  const loadInventoryBoats = async (retryCount = 0) => {
     try {
       const data = await inventoryBoatsService.getAll()
-      
+
       // Transform snake_case DB fields to camelCase for UI
       const transformedData = data.map(boat => ({
         ...boat,
@@ -284,9 +284,16 @@ function AppContainer() {
         lastSynced: boat.last_synced,
         isInventory: true, // Mark as inventory boat
       }))
-      
+
       setInventoryBoats(transformedData)
     } catch (error) {
+      // Retry with exponential backoff for statement timeout errors
+      if (error.code === '57014' && retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000 // 1s, 2s, 4s
+        console.log(`Database busy (timeout), retrying in ${delay}ms... (attempt ${retryCount + 1}/3)`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return loadInventoryBoats(retryCount + 1)
+      }
       console.error('Error loading inventory boats:', error)
     }
   }
@@ -743,27 +750,50 @@ function AppContainer() {
       // Update the last sync time
       await dockmasterService.updateLastSync()
 
+      // Cancel any pending debounced calls that may have queued during sync
+      // This prevents them from firing after we clear the sync flag
+      const debouncedFns = debouncedFunctionsRef.current
+      if (debouncedFns.loadInventoryBoats) debouncedFns.loadInventoryBoats.cancel()
+      if (debouncedFns.loadLocations) debouncedFns.loadLocations.cancel()
+      if (debouncedFns.loadBoats) debouncedFns.loadBoats.cancel()
+      console.log('Cancelled pending debounced reloads before final load')
+
       // Clear the sync flag before reloading so real-time updates work again
       syncInProgressRef.current = false
-      console.log('Sync completed - re-enabling real-time reloads')
+      console.log('Sync completed - waiting for database to settle')
+
+      // Wait for database to settle before reloading
+      await new Promise(resolve => setTimeout(resolve, 1500))
 
       await loadInventoryBoats()
       await loadDockmasterConfig()
 
-      // Re-subscribe to inventory real-time updates now that sync is done
-      if (resubscribeInventoryRef.current) {
-        resubscribeInventoryRef.current()
-      }
+      // Re-subscribe to inventory real-time updates after a short delay
+      // This ensures any lingering real-time events from the sync have finished
+      setTimeout(() => {
+        if (resubscribeInventoryRef.current) {
+          console.log('Re-subscribing to inventory real-time updates')
+          resubscribeInventoryRef.current()
+        }
+      }, 1000)
 
       console.log('Inventory sync completed successfully')
       return { success: true, count: result.boats?.length || 0 }
     } catch (error) {
+      // Cancel pending debounced calls on error too
+      const debouncedFns = debouncedFunctionsRef.current
+      if (debouncedFns.loadInventoryBoats) debouncedFns.loadInventoryBoats.cancel()
+      if (debouncedFns.loadLocations) debouncedFns.loadLocations.cancel()
+      if (debouncedFns.loadBoats) debouncedFns.loadBoats.cancel()
+
       // Make sure to clear flag even on error
       syncInProgressRef.current = false
-      // Re-subscribe even on error
-      if (resubscribeInventoryRef.current) {
-        resubscribeInventoryRef.current()
-      }
+      // Re-subscribe after delay even on error
+      setTimeout(() => {
+        if (resubscribeInventoryRef.current) {
+          resubscribeInventoryRef.current()
+        }
+      }, 1000)
       console.error('Error syncing inventory:', error)
       throw error
     }
