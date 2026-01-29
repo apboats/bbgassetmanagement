@@ -6,12 +6,13 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Wrench, ChevronRight, History } from 'lucide-react';
+import { X, Wrench, ChevronRight, History, FileText } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
+import { WindowStickerModal } from './WindowStickerModal';
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -47,6 +48,9 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   // Notes state
   const [notesText, setNotesText] = useState(boat.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+
+  // Window sticker state
+  const [showWindowSticker, setShowWindowSticker] = useState(false);
 
   // Extract movement history loading to reusable function
   const loadMovementHistory = useCallback(async () => {
@@ -163,7 +167,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex-shrink-0">
           <div className="flex items-start justify-between">
@@ -519,31 +523,59 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             )}
           </div>
 
-          {/* Work Orders Button */}
-          {boat.dockmasterId && (
+          {/* Action Buttons Row */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Window Sticker Button */}
             <button
-              onClick={fetchWorkOrders}
-              disabled={loadingWorkOrders}
-              className="w-full p-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 hover:border-purple-300 rounded-xl transition-colors text-left"
+              onClick={() => setShowWindowSticker(true)}
+              className="p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-300 rounded-xl transition-colors text-left"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-emerald-900">Window Sticker</p>
+                  <p className="text-xs text-emerald-600">Print-ready format</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Work Orders Button */}
+            {boat.dockmasterId ? (
+              <button
+                onClick={fetchWorkOrders}
+                disabled={loadingWorkOrders}
+                className="p-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 hover:border-purple-300 rounded-xl transition-colors text-left"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                    {loadingWorkOrders ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <Wrench className="w-5 h-5 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-purple-900">Work Orders</p>
+                    <p className="text-xs text-purple-600">Rigging & prep</p>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-xl opacity-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-400 rounded-lg flex items-center justify-center">
                     <Wrench className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-purple-900">View Work Orders</p>
-                    <p className="text-xs text-purple-600">Rigging & prep work orders</p>
+                    <p className="font-semibold text-slate-500">Work Orders</p>
+                    <p className="text-xs text-slate-400">No Dockmaster ID</p>
                   </div>
                 </div>
-                {loadingWorkOrders ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-purple-400" />
-                )}
               </div>
-            </button>
-          )}
+            )}
+          </div>
 
           {/* Work Orders Error */}
           {workOrdersError && (
@@ -578,6 +610,14 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           lastSynced={workOrdersLastSynced}
           onClose={() => setShowWorkOrders(false)}
           variant="inventory"
+        />
+      )}
+
+      {/* Window Sticker Modal */}
+      {showWindowSticker && (
+        <WindowStickerModal
+          boat={boat}
+          onClose={() => setShowWindowSticker(false)}
         />
       )}
 
