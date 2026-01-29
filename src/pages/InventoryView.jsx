@@ -39,44 +39,50 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
   const years = [...new Set(inventoryBoats.map(b => b.year).filter(Boolean))].sort((a, b) => b - a);
 
   // Makes are filtered by selected year
-  const makesFiltered = inventoryBoats.filter(b =>
-    filterYear === 'all' || b.year === parseInt(filterYear)
-  );
-  const makes = [...new Set(makesFiltered.map(b => b.make).filter(Boolean))].sort();
+  const makes = React.useMemo(() => {
+    const filtered = inventoryBoats.filter(b =>
+      filterYear === 'all' || String(b.year) === filterYear
+    );
+    return [...new Set(filtered.map(b => b.make).filter(Boolean))].sort();
+  }, [inventoryBoats, filterYear]);
 
   // Models are filtered by selected year AND make
-  const modelsFiltered = inventoryBoats.filter(b =>
-    (filterYear === 'all' || b.year === parseInt(filterYear)) &&
-    (filterMake === 'all' || b.make === filterMake)
-  );
-  const models = [...new Set(modelsFiltered.map(b => b.model).filter(Boolean))].sort();
+  const models = React.useMemo(() => {
+    const filtered = inventoryBoats.filter(b =>
+      (filterYear === 'all' || String(b.year) === filterYear) &&
+      (filterMake === 'all' || b.make === filterMake)
+    );
+    return [...new Set(filtered.map(b => b.model).filter(Boolean))].sort();
+  }, [inventoryBoats, filterYear, filterMake]);
 
   // Statuses are filtered by year, make, AND model
-  const statusesFiltered = inventoryBoats.filter(b =>
-    (filterYear === 'all' || b.year === parseInt(filterYear)) &&
-    (filterMake === 'all' || b.make === filterMake) &&
-    (filterModel === 'all' || b.model === filterModel)
-  );
-  const statuses = [...new Set(statusesFiltered.map(b => b.salesStatus).filter(Boolean))].sort();
+  const statuses = React.useMemo(() => {
+    const filtered = inventoryBoats.filter(b =>
+      (filterYear === 'all' || String(b.year) === filterYear) &&
+      (filterMake === 'all' || b.make === filterMake) &&
+      (filterModel === 'all' || b.model === filterModel)
+    );
+    return [...new Set(filtered.map(b => b.salesStatus).filter(Boolean))].sort();
+  }, [inventoryBoats, filterYear, filterMake, filterModel]);
 
   // Reset downstream filters when upstream filter changes and current selection is no longer valid
-  React.useEffect(() => {
+  useEffect(() => {
     if (filterMake !== 'all' && !makes.includes(filterMake)) {
       setFilterMake('all');
     }
-  }, [filterYear, makes]);
+  }, [filterYear, makes, filterMake]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (filterModel !== 'all' && !models.includes(filterModel)) {
       setFilterModel('all');
     }
-  }, [filterYear, filterMake, models]);
+  }, [filterYear, filterMake, models, filterModel]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (filterStatus !== 'all' && !statuses.includes(filterStatus)) {
       setFilterStatus('all');
     }
-  }, [filterYear, filterMake, filterModel, statuses]);
+  }, [filterYear, filterMake, filterModel, statuses, filterStatus]);
 
   const filteredBoats = inventoryBoats.filter(boat => {
     const searchLower = searchQuery.toLowerCase();
@@ -87,11 +93,11 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
                          boat.hull_id?.toLowerCase().includes(searchLower) ||
                          boat.dockmasterId?.toLowerCase().includes(searchLower) ||
                          boat.dockmaster_id?.toLowerCase().includes(searchLower);
-    const matchesYear = filterYear === 'all' || boat.year === parseInt(filterYear);
+    const matchesYear = filterYear === 'all' || String(boat.year) === filterYear;
     const matchesMake = filterMake === 'all' || boat.make === filterMake;
     const matchesModel = filterModel === 'all' || boat.model === filterModel;
     const matchesStatus = filterStatus === 'all' || boat.salesStatus === filterStatus;
-    
+
     return matchesSearch && matchesYear && matchesMake && matchesModel && matchesStatus;
   });
 
