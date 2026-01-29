@@ -34,11 +34,49 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     }
   }, [inventoryBoats]);
 
-  // Extract unique values for filters
+  // Extract unique values for filters with cascading/progressive filtering
+  // Years are always shown from all boats
   const years = [...new Set(inventoryBoats.map(b => b.year).filter(Boolean))].sort((a, b) => b - a);
-  const makes = [...new Set(inventoryBoats.map(b => b.make).filter(Boolean))].sort();
-  const models = [...new Set(inventoryBoats.map(b => b.model).filter(Boolean))].sort();
-  const statuses = [...new Set(inventoryBoats.map(b => b.salesStatus).filter(Boolean))].sort();
+
+  // Makes are filtered by selected year
+  const makesFiltered = inventoryBoats.filter(b =>
+    filterYear === 'all' || b.year === parseInt(filterYear)
+  );
+  const makes = [...new Set(makesFiltered.map(b => b.make).filter(Boolean))].sort();
+
+  // Models are filtered by selected year AND make
+  const modelsFiltered = inventoryBoats.filter(b =>
+    (filterYear === 'all' || b.year === parseInt(filterYear)) &&
+    (filterMake === 'all' || b.make === filterMake)
+  );
+  const models = [...new Set(modelsFiltered.map(b => b.model).filter(Boolean))].sort();
+
+  // Statuses are filtered by year, make, AND model
+  const statusesFiltered = inventoryBoats.filter(b =>
+    (filterYear === 'all' || b.year === parseInt(filterYear)) &&
+    (filterMake === 'all' || b.make === filterMake) &&
+    (filterModel === 'all' || b.model === filterModel)
+  );
+  const statuses = [...new Set(statusesFiltered.map(b => b.salesStatus).filter(Boolean))].sort();
+
+  // Reset downstream filters when upstream filter changes and current selection is no longer valid
+  React.useEffect(() => {
+    if (filterMake !== 'all' && !makes.includes(filterMake)) {
+      setFilterMake('all');
+    }
+  }, [filterYear, makes]);
+
+  React.useEffect(() => {
+    if (filterModel !== 'all' && !models.includes(filterModel)) {
+      setFilterModel('all');
+    }
+  }, [filterYear, filterMake, models]);
+
+  React.useEffect(() => {
+    if (filterStatus !== 'all' && !statuses.includes(filterStatus)) {
+      setFilterStatus('all');
+    }
+  }, [filterYear, filterMake, filterModel, statuses]);
 
   const filteredBoats = inventoryBoats.filter(boat => {
     const searchLower = searchQuery.toLowerCase();
