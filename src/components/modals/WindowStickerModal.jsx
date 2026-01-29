@@ -181,19 +181,38 @@ export function WindowStickerModal({ boat, onClose }) {
               color: #6d28d9;
               margin-top: 4px;
             }
-            .options-list {
-              display: grid;
-              grid-template-columns: 1fr auto;
-              gap: 2px 12px;
-              font-size: 11px;
+            .options-container {
+              column-count: 2;
+              column-gap: 16px;
+            }
+            .options-container.many-options {
+              column-count: 3;
+              font-size: 9px;
+            }
+            .option-item {
+              display: flex;
+              justify-content: space-between;
+              gap: 4px;
+              break-inside: avoid;
+              padding: 1px 0;
+              font-size: 10px;
+            }
+            .options-container.many-options .option-item {
+              font-size: 9px;
             }
             .option-desc {
               color: #334155;
+              flex: 1;
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
             }
             .option-price {
               text-align: right;
               font-weight: 600;
               color: #0f172a;
+              flex-shrink: 0;
             }
             .pricing-box {
               background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
@@ -542,16 +561,16 @@ export function WindowStickerModal({ boat, onClose }) {
                 <div className="section-title text-xs font-bold uppercase tracking-wide text-blue-700 border-b border-slate-200 pb-1 mb-2">
                   Factory Options & Equipment ({boat.options.length})
                 </div>
-                <div className="options-list grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className={`options-container ${boat.options.length > 20 ? 'many-options' : ''}`}>
                   {boat.options.map((opt, idx) => (
-                    <React.Fragment key={idx}>
+                    <div key={idx} className="option-item">
                       <span className="option-desc text-slate-700">
                         {opt.desc || opt.description || opt.optionCode}
                       </span>
-                      <span className="option-price text-right font-semibold text-slate-900">
+                      <span className="option-price text-slate-900">
                         {opt.price || opt.msrp ? formatPrice(opt.price || opt.msrp) : '—'}
                       </span>
-                    </React.Fragment>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -563,17 +582,17 @@ export function WindowStickerModal({ boat, onClose }) {
                 <div className="section-title text-xs font-bold uppercase tracking-wide text-blue-700 border-b border-slate-200 pb-1 mb-2">
                   Accessories ({boat.accessories.length})
                 </div>
-                <div className="options-list grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className={`options-container ${boat.accessories.length > 20 ? 'many-options' : ''}`}>
                   {boat.accessories.map((acc, idx) => (
-                    <React.Fragment key={idx}>
+                    <div key={idx} className="option-item">
                       <span className="option-desc text-slate-700">
                         {acc.desc || acc.description || acc.accCode}
                         {acc.qty > 1 && <span className="text-slate-400 ml-1">x{acc.qty}</span>}
                       </span>
-                      <span className="option-price text-right font-semibold text-slate-900">
+                      <span className="option-price text-slate-900">
                         {acc.price || acc.msrp ? formatPrice(acc.price || acc.msrp) : '—'}
                       </span>
-                    </React.Fragment>
+                    </div>
                   ))}
                 </div>
               </div>
