@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText } from 'lucide-react';
 
 // Import pages
@@ -204,20 +204,28 @@ export default function BoatsByGeorgeAssetManager({
     }
   };
 
+  // Track if initial sync has run to prevent re-triggering when dockmasterConfig updates
+  const hasRunInitialSync = useRef(false);
+
   // Set up sync interval
   // Note: Added delay to ensure AppContainer's refs are initialized before first sync
   useEffect(() => {
     if (!dockmasterConfig?.username || !dockmasterConfig?.password) return;
 
-    // Small delay to ensure AppContainer's subscription refs are initialized
-    const initialSyncTimeout = setTimeout(() => {
-      syncInventoryBoats(false);
-    }, 1000);
+    // Only run initial sync once per session
+    // This prevents infinite loop when dockmasterConfig is reloaded after sync
+    let initialSyncTimeout = null;
+    if (!hasRunInitialSync.current) {
+      hasRunInitialSync.current = true;
+      initialSyncTimeout = setTimeout(() => {
+        syncInventoryBoats(false);
+      }, 1000);
+    }
 
     const syncInterval = setInterval(() => syncInventoryBoats(false), 1800000);
 
     return () => {
-      clearTimeout(initialSyncTimeout);
+      if (initialSyncTimeout) clearTimeout(initialSyncTimeout);
       clearInterval(syncInterval);
     };
   }, [dockmasterConfig]);
