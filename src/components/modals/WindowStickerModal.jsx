@@ -5,15 +5,21 @@
 // Combines marketing appeal with MSRP breakdown
 // ============================================================================
 
-import React, { useRef } from 'react';
-import { X, Printer } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Printer, DollarSign, Percent } from 'lucide-react';
 
 export function WindowStickerModal({ boat, onClose }) {
   const printRef = useRef(null);
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [discountType, setDiscountType] = useState('dollar'); // 'dollar' or 'percent'
+
+  // Get the boat's current location
+  const boatLocation = boat.location || boat.locationName || null;
 
   const handlePrint = () => {
     const printContent = printRef.current;
     const printWindow = window.open('', '_blank');
+    const logoUrl = `${window.location.origin}/images/logo.png`;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -50,14 +56,21 @@ export function WindowStickerModal({ boat, onClose }) {
             .dealer-info {
               text-align: left;
             }
-            .dealer-name {
-              font-size: 24px;
-              font-weight: bold;
-              color: #1e40af;
+            .dealer-logo {
+              max-height: 50px;
+              width: auto;
             }
-            .dealer-tagline {
+            .boat-location {
+              display: flex;
+              align-items: center;
+              gap: 4px;
               font-size: 11px;
-              color: #64748b;
+              color: #475569;
+              margin-top: 4px;
+            }
+            .boat-location svg {
+              width: 12px;
+              height: 12px;
             }
             .boat-title {
               text-align: right;
@@ -217,6 +230,29 @@ export function WindowStickerModal({ boat, onClose }) {
               color: #15803d;
               font-size: 24px;
             }
+            .pricing-row.discount {
+              color: #dc2626;
+            }
+            .pricing-row.discount .pricing-label {
+              color: #dc2626;
+            }
+            .pricing-row.discount .pricing-value {
+              color: #dc2626;
+            }
+            .pricing-row.sale-price {
+              border-top: 3px solid #dc2626;
+              margin-top: 8px;
+              padding-top: 12px;
+              font-size: 22px;
+              font-weight: bold;
+            }
+            .pricing-row.sale-price .pricing-label {
+              color: #dc2626;
+            }
+            .pricing-row.sale-price .pricing-value {
+              color: #dc2626;
+              font-size: 28px;
+            }
             .footer {
               margin-top: 16px;
               text-align: center;
@@ -252,7 +288,7 @@ export function WindowStickerModal({ boat, onClose }) {
           </style>
         </head>
         <body>
-          ${printContent.innerHTML}
+          ${printContent.innerHTML.replace(/src="\/images\/logo\.png"/g, `src="${logoUrl}"`)}
         </body>
       </html>
     `);
@@ -260,10 +296,10 @@ export function WindowStickerModal({ boat, onClose }) {
     printWindow.document.close();
     printWindow.focus();
 
-    // Wait for content to load then print
+    // Wait for content and images to load then print
     setTimeout(() => {
       printWindow.print();
-    }, 250);
+    }, 500);
   };
 
   // Format currency
@@ -302,6 +338,14 @@ export function WindowStickerModal({ boat, onClose }) {
   const trailersTotal = (boat.trailers || []).reduce((sum, t) => sum + (t.price || t.msrp || 0), 0);
   const totalMSRP = basePrice; // List price typically includes everything
 
+  // Calculate discount and sale price
+  const discountValue = parseFloat(discountAmount) || 0;
+  const calculatedDiscount = discountType === 'percent'
+    ? (totalMSRP * discountValue / 100)
+    : discountValue;
+  const salePrice = totalMSRP - calculatedDiscount;
+  const hasDiscount = discountValue > 0 && totalMSRP > 0;
+
   // Collect specs
   const specs = [
     { label: 'Length', value: boat.length },
@@ -323,7 +367,32 @@ export function WindowStickerModal({ boat, onClose }) {
             <h3 className="text-lg font-bold">Window Sticker Preview</h3>
             <p className="text-blue-100 text-sm">Print-ready format</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Discount Input */}
+            <div className="flex items-center gap-1 bg-blue-500 rounded-lg px-2 py-1">
+              <input
+                type="number"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                placeholder="Discount"
+                className="w-20 px-2 py-1 rounded text-sm text-slate-900 bg-white"
+                min="0"
+              />
+              <button
+                onClick={() => setDiscountType('dollar')}
+                className={`p-1.5 rounded ${discountType === 'dollar' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
+                title="Dollar discount"
+              >
+                <DollarSign className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setDiscountType('percent')}
+                className={`p-1.5 rounded ${discountType === 'percent' ? 'bg-white text-blue-700' : 'text-white hover:bg-blue-400'}`}
+                title="Percent discount"
+              >
+                <Percent className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors"
@@ -343,8 +412,7 @@ export function WindowStickerModal({ boat, onClose }) {
             {/* Header with Dealer & Boat Info */}
             <div className="header flex justify-between items-start border-b-4 border-blue-700 pb-3 mb-4">
               <div className="dealer-info">
-                <div className="dealer-name text-2xl font-bold text-blue-700">Boats by George</div>
-                <div className="dealer-tagline text-xs text-slate-500">Your Trusted Marine Dealer</div>
+                <img src="/images/logo.png" alt="Boats by George" className="dealer-logo h-12 w-auto" />
               </div>
               <div className="boat-title text-right">
                 <div className="boat-year-make text-sm text-slate-500">{boat.year} {boat.make}</div>
@@ -355,6 +423,12 @@ export function WindowStickerModal({ boat, onClose }) {
                 <span className={`sales-status inline-block px-3 py-1 rounded-full text-xs font-bold mt-1 ${statusInfo.class}`}>
                   {statusInfo.label}
                 </span>
+                {boatLocation && (
+                  <div className="boat-location flex items-center justify-end gap-1 text-xs text-slate-500 mt-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span>{boatLocation}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -476,17 +550,33 @@ export function WindowStickerModal({ boat, onClose }) {
             {/* MSRP Box */}
             {totalMSRP > 0 && (
               <div className="pricing-box bg-gradient-to-r from-green-50 to-emerald-100 border-4 border-green-500 rounded-xl p-4 mt-4">
-                <div className="pricing-row total flex justify-between items-center">
+                <div className={`pricing-row ${hasDiscount ? 'flex justify-between items-center mb-2' : 'total flex justify-between items-center'}`}>
                   <span className="pricing-label text-lg font-bold text-green-800">TOTAL MSRP</span>
-                  <span className="pricing-value text-3xl font-bold text-green-700">{formatPrice(totalMSRP)}</span>
+                  <span className={`pricing-value font-bold text-green-700 ${hasDiscount ? 'text-xl line-through opacity-70' : 'text-3xl'}`}>
+                    {formatPrice(totalMSRP)}
+                  </span>
                 </div>
+                {hasDiscount && (
+                  <>
+                    <div className="pricing-row discount flex justify-between items-center">
+                      <span className="pricing-label text-sm">
+                        Discount {discountType === 'percent' ? `(${discountValue}%)` : ''}
+                      </span>
+                      <span className="pricing-value text-lg font-semibold">-{formatPrice(calculatedDiscount)}</span>
+                    </div>
+                    <div className="pricing-row sale-price flex justify-between items-center border-t-2 border-red-400 mt-2 pt-2">
+                      <span className="pricing-label text-xl font-bold text-red-600">SALE PRICE</span>
+                      <span className="pricing-value text-3xl font-bold text-red-600">{formatPrice(salePrice)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
             {/* Footer */}
             <div className="footer mt-4 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-3">
               <p>Prices and specifications subject to change without notice. See dealer for details.</p>
-              <p className="mt-1">Generated {new Date().toLocaleDateString()} • Boats by George Asset Management</p>
+              <p className="mt-1">Generated {new Date().toLocaleDateString()}</p>
             </div>
           </div>
         </div>
