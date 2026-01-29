@@ -43,7 +43,9 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     const filtered = inventoryBoats.filter(b =>
       filterYear === 'all' || String(b.year) === filterYear
     );
-    return [...new Set(filtered.map(b => b.make).filter(Boolean))].sort();
+    const result = [...new Set(filtered.map(b => b.make).filter(Boolean))].sort();
+    console.log('[Cascading Filter] filterYear:', filterYear, '| makes available:', result.length, result);
+    return result;
   }, [inventoryBoats, filterYear]);
 
   // Models are filtered by selected year AND make
@@ -52,7 +54,9 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
       (filterYear === 'all' || String(b.year) === filterYear) &&
       (filterMake === 'all' || b.make === filterMake)
     );
-    return [...new Set(filtered.map(b => b.model).filter(Boolean))].sort();
+    const result = [...new Set(filtered.map(b => b.model).filter(Boolean))].sort();
+    console.log('[Cascading Filter] filterYear:', filterYear, '| filterMake:', filterMake, '| models available:', result.length);
+    return result;
   }, [inventoryBoats, filterYear, filterMake]);
 
   // Statuses are filtered by year, make, AND model
