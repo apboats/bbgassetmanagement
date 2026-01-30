@@ -679,7 +679,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                               <button
                                 key={loc.id}
                                 onClick={() => setSelectedMoveLocation(loc)}
-                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 transition-colors"
+                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 active:bg-orange-100 transition-colors touch-manipulation"
                               >
                                 <div className="flex items-center gap-2">
                                   <div className="w-3 h-3 rounded-full bg-orange-500" />
@@ -696,7 +696,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                               <button
                                 key={loc.id}
                                 onClick={() => handleMove(loc, 'pool')}
-                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                                className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 active:bg-teal-100 transition-colors touch-manipulation"
                               >
                                 <div className="flex items-center gap-2">
                                   <div className="w-3 h-3 rounded-full bg-teal-500" />
@@ -711,7 +711,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                               <button
                                 key={loc.id}
                                 onClick={() => setSelectedMoveLocation(loc)}
-                                className={`w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors`}
+                                className={`w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 active:bg-blue-100 transition-colors touch-manipulation`}
                               >
                                 <div className="flex items-center gap-2">
                                   <div className={`w-3 h-3 rounded-full ${loc.type === 'rack-building' ? 'bg-blue-500' : 'bg-purple-500'}`} />
@@ -734,7 +734,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                         <button
                           key={loc.id}
                           onClick={() => setSelectedMoveLocation(loc)}
-                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 transition-colors"
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-orange-300 hover:bg-slate-50 active:bg-orange-100 transition-colors touch-manipulation"
                         >
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-orange-500" />
@@ -751,7 +751,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                         <button
                           key={loc.id}
                           onClick={() => handleMove(loc, 'pool')}
-                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 transition-colors"
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-teal-300 hover:bg-slate-50 active:bg-teal-100 transition-colors touch-manipulation"
                         >
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-teal-500" />
@@ -766,7 +766,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                         <button
                           key={loc.id}
                           onClick={() => setSelectedMoveLocation(loc)}
-                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-colors"
+                          className="w-full p-3 text-left rounded-lg border-2 border-slate-200 hover:border-blue-300 hover:bg-slate-50 active:bg-blue-100 transition-colors touch-manipulation"
                         >
                           <div className="flex items-center gap-2">
                             <div className={`w-3 h-3 rounded-full ${loc.type === 'rack-building' ? 'bg-blue-500' : 'bg-purple-500'}`} />

@@ -1113,12 +1113,12 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 key={loc.id}
                                 onClick={() => setSelectedMoveLocation(loc)}
                                 disabled={availableSlots === 0 && boat.location !== loc.name}
-                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 touch-manipulation ${
                                   boat.location === loc.name
                                     ? 'border-orange-500 bg-orange-50'
                                     : availableSlots === 0
                                     ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                                    : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
+                                    : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50 active:bg-orange-100'
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
@@ -1144,10 +1144,10 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                   await loadMovementHistory();
                                 }
                               }}
-                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 touch-manipulation ${
                                 boat.location === loc.name
                                   ? 'border-teal-500 bg-teal-50'
-                                  : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                                  : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50 active:bg-teal-100'
                               }`}
                             >
                               <div className="flex items-center gap-2">
@@ -1173,12 +1173,12 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 key={loc.id}
                                 onClick={() => setSelectedMoveLocation(loc)}
                                 disabled={availableSlots === 0 && boat.location !== loc.name}
-                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                                className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 touch-manipulation ${
                                   boat.location === loc.name
                                     ? 'border-blue-500 bg-blue-50'
                                     : availableSlots === 0
                                     ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                                    : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                                    : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 active:bg-blue-100'
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
@@ -1213,12 +1213,12 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             key={loc.id}
                             onClick={() => setSelectedMoveLocation(loc)}
                             disabled={availableSlots === 0 && boat.location !== loc.name}
-                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors touch-manipulation ${
                               boat.location === loc.name
                                 ? 'border-orange-500 bg-orange-50'
                                 : availableSlots === 0
                                 ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                                : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
+                                : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50 active:bg-orange-100'
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -1244,10 +1244,10 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                               await loadMovementHistory();
                             }
                           }}
-                          className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                          className={`w-full p-3 text-left rounded-lg border-2 transition-colors touch-manipulation ${
                             boat.location === loc.name
                               ? 'border-teal-500 bg-teal-50'
-                              : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                              : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50 active:bg-teal-100'
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -1273,12 +1273,12 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             key={loc.id}
                             onClick={() => setSelectedMoveLocation(loc)}
                             disabled={availableSlots === 0 && boat.location !== loc.name}
-                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                            className={`w-full p-3 text-left rounded-lg border-2 transition-colors touch-manipulation ${
                               boat.location === loc.name
                                 ? 'border-blue-500 bg-blue-50'
                                 : availableSlots === 0
                                 ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 active:bg-blue-100'
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -1330,12 +1330,12 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                                 }
                               }}
                               disabled={!isPool && availableSlots === 0 && boat.location !== loc.name}
-                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 ${
+                              className={`w-full p-3 text-left rounded-lg border-2 transition-colors ml-2 touch-manipulation ${
                                 boat.location === loc.name
                                   ? 'border-blue-500 bg-blue-50'
                                   : (!isPool && availableSlots === 0)
                                   ? 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                                  : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                                  : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 active:bg-blue-100'
                               }`}
                             >
                               <div className="flex items-center gap-2">
