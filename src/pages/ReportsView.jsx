@@ -435,9 +435,17 @@ export function ReportsView({ currentUser }) {
       // If submitting, send notification to managers
       if (status === 'submitted') {
         try {
-          await supabase.functions.invoke('notify-report-submitted', {
+          const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-report-submitted', {
             body: { reportId }
           });
+          if (notifyError) {
+            console.error('Email notification error:', notifyError);
+          } else {
+            console.log('Email notification response:', notifyData);
+            if (notifyData && !notifyData.emailSent) {
+              console.warn('Email not sent:', notifyData.message || 'Unknown reason');
+            }
+          }
         } catch (notifyErr) {
           console.error('Failed to send notification:', notifyErr);
           // Don't fail the save if notification fails
