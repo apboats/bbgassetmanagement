@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 
 /**
  * Slot Grid Display Component
@@ -29,6 +29,9 @@ export function SlotGridDisplay({
 }) {
   const isUShape = location.layout === 'u-shaped';
 
+  // Track if a touch event just fired to prevent double-firing with click
+  const touchHandledRef = useRef(false);
+
   // Helper function to render a single slot
   const renderSlot = (row, col) => {
     const slotId = `${row}-${col}`;
@@ -51,8 +54,23 @@ export function SlotGridDisplay({
       }
     }
 
-    // Handle both click and touch events for better touch device support
-    const handleInteraction = (e) => {
+    // Handle touch events - set flag to prevent click from also firing
+    const handleTouchEnd = (e) => {
+      if (mode === 'select' && isAvailable && onSlotClick) {
+        e.preventDefault();
+        touchHandledRef.current = true;
+        // Reset the flag after a short delay
+        setTimeout(() => { touchHandledRef.current = false; }, 300);
+        onSlotClick(slotId);
+      }
+    };
+
+    // Handle click events - skip if touch already handled it
+    const handleClick = (e) => {
+      if (touchHandledRef.current) {
+        // Touch already handled this interaction, skip
+        return;
+      }
       if (mode === 'select' && isAvailable && onSlotClick) {
         e.preventDefault();
         onSlotClick(slotId);
@@ -62,8 +80,8 @@ export function SlotGridDisplay({
     return (
       <button
         key={slotId}
-        onClick={handleInteraction}
-        onTouchEnd={handleInteraction}
+        onClick={handleClick}
+        onTouchEnd={handleTouchEnd}
         disabled={mode === 'select' && !isAvailable}
         className={`
           relative aspect-square flex flex-col items-center justify-center rounded-lg border-2 shadow-sm
