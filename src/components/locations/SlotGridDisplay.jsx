@@ -51,16 +51,26 @@ export function SlotGridDisplay({
       }
     }
 
+    // Handle both click and touch events for better touch device support
+    const handleInteraction = (e) => {
+      if (mode === 'select' && isAvailable && onSlotClick) {
+        e.preventDefault();
+        onSlotClick(slotId);
+      }
+    };
+
     return (
       <button
         key={slotId}
-        onClick={() => mode === 'select' && isAvailable && onSlotClick?.(slotId)}
+        onClick={handleInteraction}
+        onTouchEnd={handleInteraction}
         disabled={mode === 'select' && !isAvailable}
         className={`
           relative aspect-square flex flex-col items-center justify-center rounded-lg border-2 shadow-sm
+          touch-manipulation
           ${isCurrentBoat ? 'border-blue-500 bg-blue-100 shadow-md' : ''}
           ${isOccupied && !isCurrentBoat ? 'border-slate-300 bg-slate-100 opacity-60 cursor-not-allowed' : ''}
-          ${isAvailable && mode === 'select' && interactive ? 'border-slate-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors' : ''}
+          ${isAvailable && mode === 'select' && interactive ? 'border-slate-300 hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 cursor-pointer transition-colors' : ''}
           ${!isAvailable && mode === 'display' ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100' : ''}
         `}
       >
