@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, ChevronRight, History, FileText } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
+import { usePermissions } from '../../hooks/usePermissions';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
@@ -29,7 +30,10 @@ function getTimeAgo(date) {
   return date.toLocaleDateString();
 }
 
-export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose, currentUser }) {
+export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose }) {
+  // Get permissions from centralized hook - ensures consistent access across the app
+  const { canSeeCost } = usePermissions();
+
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('layout');
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
@@ -226,7 +230,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           {(() => {
             const hasListPrice = boat.listPrice || boat.list_price;
             const hasTotalCost = boat.totalCost || boat.total_cost;
-            const canSeeCost = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+            // canSeeCost comes from usePermissions hook
             const showPricingSection = hasListPrice || (hasTotalCost && canSeeCost);
 
             if (!showPricingSection) return null;

@@ -11,6 +11,7 @@ import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
+import { usePermissions } from '../../hooks/usePermissions';
 import { SEASONS, SEASON_LABELS, getActiveSeason } from '../../utils/seasonHelpers';
 
 // Helper to format time ago
@@ -44,7 +45,10 @@ function StatusButton({ status, label, active, onClick }) {
   );
 }
 
-export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, currentUser, boats = [], inventoryBoats = [] }) {
+export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, boats = [], inventoryBoats = [] }) {
+  // Get permissions from centralized hook - ensures consistent access across the app
+  const { currentUser } = usePermissions();
+
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedMoveLocation, setSelectedMoveLocation] = useState(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState(null);
