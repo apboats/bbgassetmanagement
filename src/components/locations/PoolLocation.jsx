@@ -8,7 +8,6 @@
 import React, { useState } from 'react';
 import { Search, Package, Trash2, Pencil } from 'lucide-react';
 import { BoatCard } from '../BoatComponents';
-import { usePermissions } from '../../hooks/usePermissions';
 
 export function PoolLocation({
   location,
@@ -22,9 +21,9 @@ export function PoolLocation({
   onDragStart,
   onDragEnd,
   onDragOver,
-  onDrop
+  onDrop,
+  canManageLocations
 }) {
-  const { canManageLocations } = usePermissions();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Get boats in this pool

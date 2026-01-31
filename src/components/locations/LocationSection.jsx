@@ -23,7 +23,8 @@ export function LocationSection({
   onDrop,
   onMaximize,
   onEdit,
-  onDelete
+  onDelete,
+  canManageLocations
 }) {
   const colors = {
     blue: 'from-blue-500 to-blue-600',
@@ -55,6 +56,7 @@ export function LocationSection({
             onMaximize={() => onMaximize(location)}
             onEdit={onEdit ? () => onEdit(location) : undefined}
             onDelete={onDelete ? () => onDelete(location.id) : undefined}
+            canManageLocations={canManageLocations}
           />
         ))}
       </div>

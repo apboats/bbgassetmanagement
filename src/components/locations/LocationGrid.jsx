@@ -8,7 +8,6 @@
 import React, { useState } from 'react';
 import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign, LayoutGrid, List } from 'lucide-react';
 import { getActiveSeason } from '../../utils/seasonHelpers';
-import { usePermissions } from '../../hooks/usePermissions';
 
 // ============================================================================
 // MAXIMIZED LOCATION MODAL
@@ -436,11 +435,11 @@ export function LocationGrid({
   onMaximize,
   onEdit,
   onDelete,
-  onRemove
+  onRemove,
+  canManageLocations
 }) {
   // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
   const [viewMode, setViewMode] = useState('layout');
-  const { canManageLocations } = usePermissions();
 
   // Combine boats and inventory boats
   const allBoats = [...(boats || []), ...(inventoryBoats || [])];
