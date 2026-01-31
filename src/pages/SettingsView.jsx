@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Users, Save, X, Edit2, Trash2, Plus, Shield, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
 import { supabase } from '../supabaseClient';
+import { usersService } from '../services/supabaseService';
 import { UserModal } from '../components/modals/UserModal';
 
 export function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, users, onUpdateUsers, onReloadUsers }) {
@@ -36,9 +37,21 @@ export function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, user
     setShowAddUser(false);
   };
 
-  const handleUpdateUser = (updatedUser) => {
-    onUpdateUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-    setEditingUser(null);
+  const handleUpdateUser = async (updatedUser) => {
+    try {
+      // Find the original user to check if role changed
+      const originalUser = users.find(u => u.id === updatedUser.id);
+      if (originalUser && originalUser.role !== updatedUser.role) {
+        // Persist role change to Supabase
+        await usersService.updateRole(updatedUser.id, updatedUser.role);
+      }
+      // Update local state
+      onUpdateUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+      setEditingUser(null);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('Failed to update user role. Please try again.');
+    }
   };
 
   const handleDeleteUser = (userId) => {
