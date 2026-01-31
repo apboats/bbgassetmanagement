@@ -45,8 +45,10 @@ export function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, user
         // Persist role change to Supabase
         await usersService.updateRole(updatedUser.id, updatedUser.role);
       }
-      // Update local state
-      onUpdateUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+      // Reload users from database to get fresh data
+      if (onReloadUsers) {
+        await onReloadUsers();
+      }
       setEditingUser(null);
     } catch (error) {
       console.error('Error updating user:', error);
