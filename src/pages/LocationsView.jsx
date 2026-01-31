@@ -566,7 +566,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
-                    currentUser={currentUser}
                   />
                 )}
 
@@ -586,7 +585,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
-                    currentUser={currentUser}
                   />
                 )}
 
@@ -606,7 +604,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
-                    currentUser={currentUser}
                   />
                 )}
 
@@ -638,8 +635,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                             setSelectedSlot('pool');
                             setShowBoatAssignModal(true);
                           }}
-                          currentUser={currentUser}
-                        />
+                              />
                       ))}
                     </div>
                   </div>
@@ -682,7 +678,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 onDragEnd={handleDragEnd}
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
-                currentUser={currentUser}
               />
             )}
 
@@ -702,7 +697,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 onDragEnd={handleDragEnd}
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
-                currentUser={currentUser}
               />
             )}
 
@@ -722,7 +716,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 onDragEnd={handleDragEnd}
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
-                currentUser={currentUser}
               />
             )}
 
@@ -754,8 +747,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                         setSelectedSlot('pool');
                         setShowBoatAssignModal(true);
                       }}
-                      currentUser={currentUser}
-                    />
+                      />
                   ))}
                 </div>
               </div>
@@ -819,7 +811,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (
@@ -833,7 +824,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
 
