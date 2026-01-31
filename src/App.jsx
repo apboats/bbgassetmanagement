@@ -359,28 +359,28 @@ export default function BoatsByGeorgeAssetManager({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} currentUser={currentUser} />
+          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
         )}
         {currentView === 'locations' && (
           <LocationsView locations={locations} sites={sites} boats={getCombinedBoats()} onUpdateLocations={saveLocations}
             onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }}
-            onMoveBoat={onMoveBoat} onAddSite={onAddSite} onUpdateSite={onUpdateSite} onDeleteSite={onDeleteSite} onReorderSites={onReorderSites} currentUser={currentUser} />
+            onMoveBoat={onMoveBoat} onAddSite={onAddSite} onUpdateSite={onUpdateSite} onDeleteSite={onDeleteSite} onReorderSites={onReorderSites} />
         )}
         {currentView === 'boats' && (
-          <BoatsView boats={boats} locations={locations} sites={sites} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} currentUser={currentUser} />
+          <BoatsView boats={boats} locations={locations} sites={sites} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
         )}
         {currentView === 'scan' && (
           <ScanView boats={boats} locations={locations} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
         )}
         {currentView === 'myview' && (
-          <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} userPreferences={userPreferences} currentUser={currentUser}
+          <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} userPreferences={userPreferences}
             onSavePreferences={(prefs) => saveUserPreferences(currentUser?.id || currentUser?.username || 'default-user', prefs)} onUpdateLocations={saveLocations}
             onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }} onMoveBoat={onMoveBoat} />
         )}
         {currentView === 'inventory' && (
           <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} lastSync={lastInventorySync}
             onSyncNow={syncInventoryBoats} onSyncRiggingWOs={syncInternalWorkOrders} onUpdateInventoryBoats={saveInventoryBoats}
-            onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} currentUser={currentUser} />
+            onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
         )}
         {currentView === 'shows' && (
           <BoatShowPlanner inventoryBoats={inventoryBoats} />
@@ -389,7 +389,7 @@ export default function BoatsByGeorgeAssetManager({
           <ReportsView currentUser={currentUser} />
         )}
         {currentView === 'settings' && (
-          <SettingsView dockmasterConfig={dockmasterConfig} currentUser={currentUser} users={users}
+          <SettingsView dockmasterConfig={dockmasterConfig} users={users}
             onSaveConfig={onSaveDockmasterConfig} onUpdateUsers={() => console.log('User updates handled by auth system')} onReloadUsers={onReloadUsers} />
         )}
       </div>
