@@ -442,16 +442,27 @@ export function ReportsView({ currentUser }) {
           });
           if (notifyError) {
             console.error('Email notification error:', notifyError);
-            emailStatus = { success: false, message: notifyError.message || 'Failed to send notification' };
+            // Provide helpful message based on error type
+            let errorMessage = 'Failed to send notification';
+            if (notifyError.message?.includes('401') || notifyError.status === 401) {
+              errorMessage = 'Auth error - Edge Function needs redeployment (run: supabase functions deploy notify-report-submitted)';
+            } else if (notifyError.message) {
+              errorMessage = notifyError.message;
+            }
+            emailStatus = { success: false, message: errorMessage };
           } else if (notifyData && !notifyData.emailSent) {
             console.warn('Email not sent:', notifyData.message || 'Unknown reason');
             emailStatus = { success: false, message: notifyData.message || 'Email not sent (check API key or manager emails)' };
           } else if (notifyData?.emailSent) {
-            emailStatus = { success: true, message: `Email sent to ${notifyData.recipientCount || 0} manager(s)` };
+            emailStatus = { success: true, message: `Email sent to ${notifyData.recipients || 0} manager(s)` };
           }
         } catch (notifyErr) {
           console.error('Failed to send notification:', notifyErr);
-          emailStatus = { success: false, message: 'Failed to invoke notification function' };
+          let errorMessage = 'Failed to invoke notification function';
+          if (notifyErr.message?.includes('401')) {
+            errorMessage = 'Auth error - try logging out and back in, or redeploy Edge Function';
+          }
+          emailStatus = { success: false, message: errorMessage };
         }
         setNotificationStatus(emailStatus);
       }
