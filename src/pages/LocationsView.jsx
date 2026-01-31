@@ -31,7 +31,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [maximizedLocation, setMaximizedLocation] = useState(null);
-  const [expandedSites, setExpandedSites] = useState(new Set(sites.map(s => s.id)));
+  const [expandedSites, setExpandedSites] = useState(new Set()); // Start collapsed for faster initial render
   const mouseYRef = useRef(0);
 
   // Use unified remove boat hook
@@ -64,11 +64,11 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
     onMoveBoat: onMoveBoatFromContainer
   });
 
-  // Keep expandedSites in sync with sites (expand new sites by default)
+  // Clean up expandedSites when sites are deleted (remove stale IDs)
   useEffect(() => {
+    const siteIds = new Set(sites.map(s => s.id));
     setExpandedSites(prev => {
-      const newSet = new Set(prev);
-      sites.forEach(site => newSet.add(site.id));
+      const newSet = new Set([...prev].filter(id => siteIds.has(id)));
       return newSet;
     });
   }, [sites]);
