@@ -3,6 +3,7 @@ import { Edit2, Save, X, ChevronDown, ChevronRight, Plus, Maximize2, Minimize2, 
 import { useRemoveBoat } from '../hooks/useRemoveBoat';
 import { useAssignBoat } from '../hooks/useAssignBoat';
 import { useBoatDragDrop } from '../hooks/useBoatDragDrop';
+import { usePermissions } from '../hooks/usePermissions';
 import { BoatDetailsModal } from '../components/modals/BoatDetailsModal';
 import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDetailsModal';
 import { BoatAssignmentModal } from '../components/modals/BoatAssignmentModal';
@@ -31,6 +32,9 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
   const [viewingBoat, setViewingBoat] = useState(null);
   const [maximizedLocation, setMaximizedLocation] = useState(null);
   const mouseYRef = useRef(0);
+
+  // Get permissions from centralized hook
+  const { canManageLocations } = usePermissions();
 
   // Use unified remove boat hook
   const { removeBoat } = useRemoveBoat({
@@ -610,6 +614,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
                   onDragEnd={handleBoatDragEnd}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handlePoolDrop(location.id)}
+                  canManageLocations={canManageLocations}
                 />
               );
             }
@@ -645,6 +650,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
                   const liveLocation = locations.find(l => l.id === location.id);
                   setMaximizedLocation(liveLocation || location);
                 }}
+                canManageLocations={canManageLocations}
               />
             );
           })}
