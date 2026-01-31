@@ -3,9 +3,15 @@ import { Settings, Users, Save, X, Edit2, Trash2, Plus, Shield, RefreshCw, Eye, 
 import { useAuth } from '../AuthProvider';
 import { supabase } from '../supabaseClient';
 import { usersService } from '../services/supabaseService';
+import { usePermissions } from '../hooks/usePermissions';
 import { UserModal } from '../components/modals/UserModal';
 
-export function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, users, onUpdateUsers, onReloadUsers }) {
+export function SettingsView({ dockmasterConfig, onSaveConfig, users, onUpdateUsers, onReloadUsers }) {
+  // Get permissions from centralized hook
+  const { currentUser, isAdmin } = usePermissions();
+  // Still need useAuth for updatePassword function
+  const { updatePassword } = useAuth();
+
   const [formData, setFormData] = useState(dockmasterConfig || {
     username: '',
     password: ''
@@ -19,9 +25,6 @@ export function SettingsView({ dockmasterConfig, onSaveConfig, currentUser, user
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
-
-  const isAdmin = currentUser?.role === 'admin';
-  const { updatePassword } = useAuth();
 
   const handleSave = async () => {
     await onSaveConfig(formData);

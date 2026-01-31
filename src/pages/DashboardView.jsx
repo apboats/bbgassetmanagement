@@ -243,6 +243,7 @@ export function DashboardView({ boats, locations, sites = [], onNavigate, onUpda
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (

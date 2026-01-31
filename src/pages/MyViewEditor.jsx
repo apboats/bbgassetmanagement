@@ -704,6 +704,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
             setViewingBoat(updatedBoat);
           }}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (

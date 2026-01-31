@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, Edit2, Trash2, ChevronDown, ChevronRight, Building2, Settings, Grid, Map, Package } from 'lucide-react';
+import { usePermissions } from '../hooks/usePermissions';
 import { useRemoveBoat } from '../hooks/useRemoveBoat';
 import { useAssignBoat } from '../hooks/useAssignBoat';
 import { useBoatDragDrop } from '../hooks/useBoatDragDrop';
@@ -13,7 +14,10 @@ import { LocationGrid, MaximizedLocationModal } from '../components/locations/Lo
 import { LocationSection } from '../components/locations/LocationSection';
 import { boatLifecycleService } from '../services/supabaseService';
 
-export function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites, currentUser }) {
+export function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites }) {
+  // Get permissions from centralized hook
+  const { canManageLocations } = usePermissions();
+
   // Split boats into regular and inventory
   const regularBoats = boats.filter(b => !b.isInventory);
   const inventoryBoats = boats.filter(b => b.isInventory);
@@ -473,7 +477,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
         </div>
         <div className="flex items-center gap-2">
           {/* Only show to managers/admins */}
-          {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+          {canManageLocations && (
             <button
               onClick={() => setShowAddLocation(true)}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md"
@@ -484,7 +488,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           )}
 
           {/* Only show to managers/admins */}
-          {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+          {canManageLocations && (
             <button
               onClick={() => setShowSiteManagement(true)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-md"
@@ -555,8 +559,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     boats={boats}
                     onSlotClick={handleSlotClick}
                     onBoatClick={(boat) => setViewingBoat(boat)}
-                    onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                    onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                    onEdit={canManageLocations ? setEditingLocation : undefined}
+                    onDelete={canManageLocations ? handleDeleteLocation : undefined}
                     onDragStart={handleDragStart}
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
@@ -575,8 +579,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     boats={boats}
                     onSlotClick={handleSlotClick}
                     onBoatClick={(boat) => setViewingBoat(boat)}
-                    onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                    onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                    onEdit={canManageLocations ? setEditingLocation : undefined}
+                    onDelete={canManageLocations ? handleDeleteLocation : undefined}
                     onDragStart={handleDragStart}
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
@@ -595,8 +599,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     boats={boats}
                     onSlotClick={handleSlotClick}
                     onBoatClick={(boat) => setViewingBoat(boat)}
-                    onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                    onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                    onEdit={canManageLocations ? setEditingLocation : undefined}
+                    onDelete={canManageLocations ? handleDeleteLocation : undefined}
                     onDragStart={handleDragStart}
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
@@ -620,8 +624,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                           key={pool.id}
                           location={pool}
                           boats={boats}
-                          onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? () => setEditingLocation(pool) : undefined}
-                          onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? () => handleDeleteLocation(pool.id) : undefined}
+                          onEdit={canManageLocations ? () => setEditingLocation(pool) : undefined}
+                          onDelete={canManageLocations ? () => handleDeleteLocation(pool.id) : undefined}
                           onDragStart={handleDragStart}
                           onDrop={handlePoolDrop}
                           onDragEnd={handleDragEnd}
@@ -671,8 +675,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 boats={boats}
                 onSlotClick={handleSlotClick}
                 onBoatClick={(boat) => setViewingBoat(boat)}
-                onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                onEdit={canManageLocations ? setEditingLocation : undefined}
+                onDelete={canManageLocations ? handleDeleteLocation : undefined}
                 onDragStart={handleDragStart}
                 onDrop={handleGridDrop}
                 onDragEnd={handleDragEnd}
@@ -691,8 +695,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 boats={boats}
                 onSlotClick={handleSlotClick}
                 onBoatClick={(boat) => setViewingBoat(boat)}
-                onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                onEdit={canManageLocations ? setEditingLocation : undefined}
+                onDelete={canManageLocations ? handleDeleteLocation : undefined}
                 onDragStart={handleDragStart}
                 onDrop={handleGridDrop}
                 onDragEnd={handleDragEnd}
@@ -711,8 +715,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 boats={boats}
                 onSlotClick={handleSlotClick}
                 onBoatClick={(boat) => setViewingBoat(boat)}
-                onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? setEditingLocation : undefined}
-                onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? handleDeleteLocation : undefined}
+                onEdit={canManageLocations ? setEditingLocation : undefined}
+                onDelete={canManageLocations ? handleDeleteLocation : undefined}
                 onDragStart={handleDragStart}
                 onDrop={handleGridDrop}
                 onDragEnd={handleDragEnd}
@@ -736,8 +740,8 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                       key={pool.id}
                       location={pool}
                       boats={boats}
-                      onEdit={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? () => setEditingLocation(pool) : undefined}
-                      onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? () => handleDeleteLocation(pool.id) : undefined}
+                      onEdit={canManageLocations ? () => setEditingLocation(pool) : undefined}
+                      onDelete={canManageLocations ? () => handleDeleteLocation(pool.id) : undefined}
                       onDragStart={handleDragStart}
                       onDrop={handlePoolDrop}
                       onDragEnd={handleDragEnd}
@@ -815,6 +819,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
+          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (
