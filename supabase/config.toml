@@ -1,0 +1,10 @@
+# Supabase Configuration
+# Reference: https://supabase.com/docs/reference/cli/config
+
+[api]
+# Not overriding API defaults
+
+[functions.notify-report-submitted]
+# Disable JWT verification for this function since it uses the service role key
+# internally and handles its own data access
+verify_jwt = false
