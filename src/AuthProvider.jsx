@@ -223,11 +223,8 @@ export const AuthProvider = ({ children }) => {
       return user
     }
 
-    // Skip if user already loaded for this auth_id
-    if (user && user.auth_id === authId) {
-      console.log('Profile already loaded for this auth_id')
-      return user
-    }
+    // Note: Removed stale cache check here - always fetch fresh profile
+    // This ensures role changes are picked up on re-login
 
     console.log('Loading user profile for auth_id:', authId)
     loadingProfileRef.current = true
