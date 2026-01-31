@@ -3,32 +3,21 @@
 // ============================================================================
 // Centralized permission checking for role-based access control
 // Any component can use this hook to check user permissions consistently
+//
+// Performance: Permissions are memoized in AuthProvider and computed only
+// when user.role changes. This hook simply returns the pre-computed values.
 // ============================================================================
 
 import { useAuth } from '../AuthProvider';
 
 export function usePermissions() {
-  const { user } = useAuth();
-
-  const role = user?.role || 'user';
+  const { user, permissions } = useAuth();
 
   return {
     // The current user object
     currentUser: user,
-
-    // Role checks
-    isAdmin: role === 'admin',
-    isManager: role === 'manager',
-    isUser: role === 'user',
-
-    // Permission checks (admin OR manager)
-    canManageLocations: role === 'admin' || role === 'manager',
-    canEditUsers: role === 'admin',
-    canSeeCost: role === 'admin' || role === 'manager',
-    canDeleteBoats: role === 'admin' || role === 'manager',
-
-    // Helper to check if user has any of the specified roles
-    hasRole: (...roles) => roles.includes(role),
+    // Spread the memoized permissions from AuthProvider
+    ...permissions,
   };
 }
 
