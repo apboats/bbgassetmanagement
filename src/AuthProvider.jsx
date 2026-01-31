@@ -5,7 +5,7 @@
 // Handles login, logout, session management, and user state
 // ============================================================================
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from './supabaseClient'
 import { authService } from './services/supabaseService'
 
@@ -388,6 +388,22 @@ export const AuthProvider = ({ children }) => {
     return user?.role === 'admin' || user?.role === 'manager'
   }
 
+  // Memoized permissions object - computed once when user.role changes
+  // This prevents re-computation on every component that calls usePermissions()
+  const permissions = useMemo(() => {
+    const role = user?.role || 'user';
+    return {
+      isAdmin: role === 'admin',
+      isManager: role === 'manager',
+      isUser: role === 'user',
+      canManageLocations: role === 'admin' || role === 'manager',
+      canEditUsers: role === 'admin',
+      canSeeCost: role === 'admin' || role === 'manager',
+      canDeleteBoats: role === 'admin' || role === 'manager',
+      hasRole: (...roles) => roles.includes(role),
+    };
+  }, [user?.role]);
+
   // Request password reset
   const requestPasswordReset = async (email) => {
     try {
@@ -421,6 +437,7 @@ export const AuthProvider = ({ children }) => {
     user,
     session,
     loading,
+    permissions,
     signUp,
     signIn,
     signOut,
