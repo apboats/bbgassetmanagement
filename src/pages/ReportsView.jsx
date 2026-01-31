@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Calendar, DollarSign, Package, AlertCircle, Printer, Save, Send, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Calendar, DollarSign, Package, AlertCircle, Printer, Save, Send, CheckCircle, Clock, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { SummaryCard } from '../components/SharedComponents';
 import { WorkOrdersModal } from '../components/modals/WorkOrdersModal';
@@ -143,6 +143,7 @@ export function ReportsView({ currentUser }) {
   const [reportNotes, setReportNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [notificationStatus, setNotificationStatus] = useState(null); // { success: boolean, message: string }
 
   const currentWeekEnd = getSunday(currentWeekStart);
 
@@ -433,6 +434,7 @@ export function ReportsView({ currentUser }) {
       }
 
       // If submitting, send notification to managers
+      let emailStatus = null;
       if (status === 'submitted') {
         try {
           const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-report-submitted', {
@@ -440,16 +442,18 @@ export function ReportsView({ currentUser }) {
           });
           if (notifyError) {
             console.error('Email notification error:', notifyError);
-          } else {
-            console.log('Email notification response:', notifyData);
-            if (notifyData && !notifyData.emailSent) {
-              console.warn('Email not sent:', notifyData.message || 'Unknown reason');
-            }
+            emailStatus = { success: false, message: notifyError.message || 'Failed to send notification' };
+          } else if (notifyData && !notifyData.emailSent) {
+            console.warn('Email not sent:', notifyData.message || 'Unknown reason');
+            emailStatus = { success: false, message: notifyData.message || 'Email not sent (check API key or manager emails)' };
+          } else if (notifyData?.emailSent) {
+            emailStatus = { success: true, message: `Email sent to ${notifyData.recipientCount || 0} manager(s)` };
           }
         } catch (notifyErr) {
           console.error('Failed to send notification:', notifyErr);
-          // Don't fail the save if notification fails
+          emailStatus = { success: false, message: 'Failed to invoke notification function' };
         }
+        setNotificationStatus(emailStatus);
       }
 
       // Reload the report
@@ -459,6 +463,36 @@ export function ReportsView({ currentUser }) {
     } catch (err) {
       console.error('Error saving report:', err);
       setSaveMessage('Error saving report');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Undo submit - revert report back to draft status
+  const undoSubmit = async () => {
+    if (!weeklyReport?.id) return;
+
+    setIsSaving(true);
+    setSaveMessage('');
+    setNotificationStatus(null);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('weekly_reports')
+        .update({
+          status: 'draft',
+          submitted_at: null,
+        })
+        .eq('id', weeklyReport.id);
+
+      if (updateError) throw updateError;
+
+      await loadWeeklyReport();
+      setSaveMessage('Report reverted to draft - you can now edit and resubmit');
+      setTimeout(() => setSaveMessage(''), 4000);
+    } catch (err) {
+      console.error('Error reverting report:', err);
+      setSaveMessage('Error reverting report to draft');
     } finally {
       setIsSaving(false);
     }
@@ -578,6 +612,17 @@ export function ReportsView({ currentUser }) {
               <Send className="w-4 h-4" />
               Submit Report
             </button>
+            {weeklyReport?.status === 'submitted' && (
+              <button
+                onClick={undoSubmit}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Revert to draft to make changes and resubmit"
+              >
+                <Undo2 className="w-4 h-4" />
+                Undo Submit
+              </button>
+            )}
           </div>
         </div>
 
@@ -585,6 +630,18 @@ export function ReportsView({ currentUser }) {
         {saveMessage && (
           <div className={`mt-3 text-sm font-medium ${saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
             {saveMessage}
+          </div>
+        )}
+
+        {/* Email Notification Status */}
+        {notificationStatus && (
+          <div className={`mt-2 text-sm flex items-center gap-2 ${notificationStatus.success ? 'text-green-600' : 'text-amber-600'}`}>
+            {notificationStatus.success ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <AlertCircle className="w-4 h-4" />
+            )}
+            <span>{notificationStatus.message}</span>
           </div>
         )}
 
