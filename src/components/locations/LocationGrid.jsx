@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign, LayoutGrid, List } from 'lucide-react';
 import { getActiveSeason } from '../../utils/seasonHelpers';
+import { usePermissions } from '../../hooks/usePermissions';
 
 // ============================================================================
 // MAXIMIZED LOCATION MODAL
@@ -435,11 +436,11 @@ export function LocationGrid({
   onMaximize,
   onEdit,
   onDelete,
-  onRemove,
-  currentUser
+  onRemove
 }) {
   // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
   const [viewMode, setViewMode] = useState('layout');
+  const { canManageLocations } = usePermissions();
 
   // Combine boats and inventory boats
   const allBoats = [...(boats || []), ...(inventoryBoats || [])];
@@ -804,7 +805,7 @@ export function LocationGrid({
                 <Maximize2 className="w-4 h-4 text-slate-600" />
               </button>
             )}
-            {onEdit && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+            {onEdit && canManageLocations && (
               <button
                 onClick={onEdit}
                 className="p-1.5 hover:bg-white rounded-lg transition-colors"
@@ -813,7 +814,7 @@ export function LocationGrid({
                 <Edit2 className="w-4 h-4 text-slate-600" />
               </button>
             )}
-            {(onDelete || onRemove) && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+            {(onDelete || onRemove) && canManageLocations && (
               <button
                 onClick={onDelete || onRemove}
                 className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"

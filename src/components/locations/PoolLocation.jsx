@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { Search, Package, Trash2, Pencil } from 'lucide-react';
 import { BoatCard } from '../BoatComponents';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export function PoolLocation({
   location,
@@ -21,9 +22,9 @@ export function PoolLocation({
   onDragStart,
   onDragEnd,
   onDragOver,
-  onDrop,
-  currentUser
+  onDrop
 }) {
+  const { canManageLocations } = usePermissions();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Get boats in this pool
@@ -65,7 +66,7 @@ export function PoolLocation({
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-bold text-white text-lg">{location.name}</h4>
           <div className="flex items-center gap-2">
-            {onEdit && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+            {onEdit && canManageLocations && (
               <button
                 onClick={onEdit}
                 className="p-1.5 hover:bg-white/20 rounded transition-colors"
@@ -74,7 +75,7 @@ export function PoolLocation({
                 <Pencil className="w-4 h-4 text-white" />
               </button>
             )}
-            {(onDelete || onRemove) && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+            {(onDelete || onRemove) && canManageLocations && (
               <button
                 onClick={onDelete || onRemove}
                 className="p-1.5 hover:bg-white/20 rounded transition-colors"
