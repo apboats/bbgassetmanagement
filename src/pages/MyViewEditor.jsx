@@ -11,7 +11,7 @@ import { LocationGrid, MaximizedLocationModal } from '../components/locations/Lo
 import { LocationSection } from '../components/locations/LocationSection';
 import { boatLifecycleService } from '../services/supabaseService';
 
-export function MyViewEditor({ locations, sites = [], boats, userPreferences, currentUser, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
+export function MyViewEditor({ locations, sites = [], boats, userPreferences, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
   const [selectedLocations, setSelectedLocations] = useState(
     userPreferences.selectedLocations || locations.map(l => l.id)
   );
@@ -704,7 +704,6 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
             setViewingBoat(updatedBoat);
           }}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (
@@ -722,7 +721,6 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, cu
           }}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
 

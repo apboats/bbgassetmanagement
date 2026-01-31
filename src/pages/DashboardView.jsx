@@ -5,7 +5,7 @@ import { BoatDetailsModal } from '../components/modals/BoatDetailsModal';
 import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDetailsModal';
 import { SummaryCard, StatusCard, CustomerBoatCard } from '../components/SharedComponents';
 
-export function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer, currentUser }) {
+export function DashboardView({ boats, locations, sites = [], onNavigate, onUpdateBoats, onUpdateLocations, onMoveBoat: onMoveBoatFromContainer }) {
   const [viewingBoat, setViewingBoat] = useState(null);
 
   // Use unified remove boat hook
@@ -243,7 +243,6 @@ export function DashboardView({ boats, locations, sites = [], onNavigate, onUpda
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
       {viewingBoat && !viewingBoat.isInventory && (
@@ -257,7 +256,6 @@ export function DashboardView({ boats, locations, sites = [], onNavigate, onUpda
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
     </div>

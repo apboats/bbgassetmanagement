@@ -5,7 +5,7 @@ import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDet
 import { InventoryBoatCard } from '../components/InventoryBoatCard';
 import { findBoatLocationData, useBoatLocation } from '../components/BoatComponents';
 
-export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat, currentUser }) {
+export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -43,9 +43,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     const filtered = inventoryBoats.filter(b =>
       filterYear === 'all' || String(b.year) === filterYear
     );
-    const result = [...new Set(filtered.map(b => b.make).filter(Boolean))].sort();
-    console.log('[Cascading Filter] filterYear:', filterYear, '| makes available:', result.length, result);
-    return result;
+    return [...new Set(filtered.map(b => b.make).filter(Boolean))].sort();
   }, [inventoryBoats, filterYear]);
 
   // Models are filtered by selected year AND make
@@ -54,9 +52,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
       (filterYear === 'all' || String(b.year) === filterYear) &&
       (filterMake === 'all' || b.make === filterMake)
     );
-    const result = [...new Set(filtered.map(b => b.model).filter(Boolean))].sort();
-    console.log('[Cascading Filter] filterYear:', filterYear, '| filterMake:', filterMake, '| models available:', result.length);
-    return result;
+    return [...new Set(filtered.map(b => b.model).filter(Boolean))].sort();
   }, [inventoryBoats, filterYear, filterMake]);
 
   // Statuses are filtered by year, make, AND model
@@ -504,7 +500,6 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
-          currentUser={currentUser}
         />
       )}
     </div>
