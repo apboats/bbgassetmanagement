@@ -269,7 +269,7 @@ export function ReportsView({ currentUser }) {
           `)
           .in('id', batchIds)
           .eq('status', 'O')
-          .gt('total_charges', 0);
+          .gt('total_labor_cost', 0);
 
         if (woError) throw woError;
         if (batchWOs) allWorkOrders.push(...batchWOs);
@@ -437,8 +437,14 @@ export function ReportsView({ currentUser }) {
       let emailStatus = null;
       if (status === 'submitted') {
         try {
+          // Get current session to ensure auth header is included
+          const { data: { session } } = await supabase.auth.getSession();
+
           const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-report-submitted', {
-            body: { reportId }
+            body: { reportId },
+            headers: session?.access_token ? {
+              Authorization: `Bearer ${session.access_token}`
+            } : undefined
           });
           if (notifyError) {
             console.error('Email notification error:', notifyError);
