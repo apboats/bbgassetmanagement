@@ -376,8 +376,8 @@ export const boatsService = {
       const location = locations[0]
 
       if (location.type === 'pool') {
-        // Pool location - remove from pool_boats array
-        const updatedPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
+        // Pool location - remove from pool_boats array - use String() for consistent comparison
+        const updatedPoolBoats = (location.pool_boats || []).filter(id => String(id) !== String(boatId))
         await supabase
           .from('locations')
           .update({ pool_boats: updatedPoolBoats })
@@ -423,9 +423,9 @@ export const boatsService = {
         let needsUpdate = false
         let updatedLocation = { ...loc }
 
-        // Handle grid-type locations
+        // Handle grid-type locations - use String() for consistent comparison
         if (loc.boats) {
-          const slotKey = Object.keys(loc.boats).find(key => loc.boats[key] === boatId)
+          const slotKey = Object.keys(loc.boats).find(key => String(loc.boats[key]) === String(boatId))
           if (slotKey) {
             console.log('[Boats] Found boat in grid location:', loc.name, 'slot:', slotKey, '- removing it')
             updatedLocation.boats = { ...loc.boats }
@@ -434,10 +434,10 @@ export const boatsService = {
           }
         }
 
-        // Handle pool-type locations
-        if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.includes(boatId)) {
+        // Handle pool-type locations - use String() for consistent comparison
+        if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.some(id => String(id) === String(boatId))) {
           console.log('[Boats] Found boat in pool location:', loc.name, '- removing it')
-          updatedLocation.pool_boats = loc.pool_boats.filter(id => id !== boatId)
+          updatedLocation.pool_boats = loc.pool_boats.filter(id => String(id) !== String(boatId))
           needsUpdate = true
         }
 
@@ -1017,12 +1017,12 @@ export const inventoryBoatsService = {
       let foundInLocation = false
 
       if (location.type === 'pool') {
-        // Check pool_boats array
+        // Check pool_boats array - use String() for consistent comparison
         const poolBoats = location.pool_boats || []
-        if (poolBoats.includes(boatId)) {
+        if (poolBoats.some(id => String(id) === String(boatId))) {
           console.log('[removeFromSlot] Found boat in pool location:', location.name)
           foundInLocation = true
-          const updatedPoolBoats = poolBoats.filter(id => id !== boatId)
+          const updatedPoolBoats = poolBoats.filter(id => String(id) !== String(boatId))
           await supabase
             .from('locations')
             .update({ pool_boats: updatedPoolBoats })
@@ -1030,9 +1030,9 @@ export const inventoryBoatsService = {
           console.log('[removeFromSlot] Removed from pool_boats')
         }
       } else {
-        // Check boats object for grid locations
+        // Check boats object for grid locations - use String() for consistent comparison
         const boats = location.boats || {}
-        const slotWithBoat = Object.keys(boats).find(slot => boats[slot] === boatId)
+        const slotWithBoat = Object.keys(boats).find(slot => String(boats[slot]) === String(boatId))
         if (slotWithBoat) {
           console.log('[removeFromSlot] Found boat in grid location:', location.name, 'slot:', slotWithBoat)
           foundInLocation = true
@@ -1086,9 +1086,9 @@ export const inventoryBoatsService = {
         let needsUpdate = false
         let updatedLocation = { ...loc }
 
-        // Handle grid-type locations
+        // Handle grid-type locations - use String() for consistent comparison
         if (loc.boats) {
-          const slotKey = Object.keys(loc.boats).find(key => loc.boats[key] === boatId)
+          const slotKey = Object.keys(loc.boats).find(key => String(loc.boats[key]) === String(boatId))
           if (slotKey) {
             console.log('[Inventory] Found boat in grid location:', loc.name, 'slot:', slotKey, '- removing it')
             updatedLocation.boats = { ...loc.boats }
@@ -1097,10 +1097,10 @@ export const inventoryBoatsService = {
           }
         }
 
-        // Handle pool-type locations
-        if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.includes(boatId)) {
+        // Handle pool-type locations - use String() for consistent comparison
+        if (loc.type === 'pool' && loc.pool_boats && loc.pool_boats.some(id => String(id) === String(boatId))) {
           console.log('[Inventory] Found boat in pool location:', loc.name, '- removing it')
-          updatedLocation.pool_boats = loc.pool_boats.filter(id => id !== boatId)
+          updatedLocation.pool_boats = loc.pool_boats.filter(id => String(id) !== String(boatId))
           needsUpdate = true
         }
 
