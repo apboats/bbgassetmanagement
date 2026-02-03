@@ -913,72 +913,28 @@ function AppContainer() {
     console.log('[AppContainer.handleMoveBoat] Called with:', { boatOrBoatId, toLocationId, toSlotId, isInventory })
 
     // Handle both boat object and boatId string
-    const boat = typeof boatOrBoatId === 'object' ? boatOrBoatId : null;
-    const boatId = boat ? boat.id : boatOrBoatId;
+    const boatId = typeof boatOrBoatId === 'object' ? boatOrBoatId.id : boatOrBoatId;
 
     try {
-      // Find the boat if we only have the ID
-      let boatData = boat;
-      if (!boatData) {
-        const boatsList = isInventory ? inventoryBoats : boats;
-        boatData = boatsList.find(b => b.id === boatId);
-        if (!boatData) {
-          throw new Error('Boat not found');
-        }
-      }
+      // Use centralized service that reads from_location/from_slot from database
+      // This ensures movement history always has correct values regardless of React state
+      await supabaseService.moveBoatWithHistory(
+        boatId,
+        toLocationId,
+        toSlotId,
+        user?.id,
+        isInventory
+      )
+      console.log('[AppContainer.handleMoveBoat] Move and logging complete')
 
-      const fromLocation = boatData.location || null;
-      const fromSlot = boatData.slot || null;
-      const toLocation = toLocationId
-        ? locations.find(l => l.id === toLocationId)?.name
-        : null;
-
-      // If toLocationId is null, this is a removal
-      if (!toLocationId) {
-        console.log('[AppContainer.handleMoveBoat] Removing boat from location')
-        if (isInventory) {
-          console.log('[AppContainer.handleMoveBoat] Calling inventoryBoatsService.removeFromSlot')
-          await inventoryBoatsService.removeFromSlot(boatId)
-          console.log('[AppContainer.handleMoveBoat] Reloading inventory boats')
-          await loadInventoryBoats()
-        } else {
-          await boatsService.removeFromSlot(boatId)
-          await loadBoats()
-        }
+      // Reload data from database
+      if (isInventory) {
+        await loadInventoryBoats()
       } else {
-        // Normal move
-        console.log('[AppContainer.handleMoveBoat] Moving boat to new location')
-        if (isInventory) {
-          await inventoryBoatsService.moveToSlot(boatId, toLocationId, toSlotId)
-          await loadInventoryBoats()
-        } else {
-          await boatsService.moveToSlot(boatId, toLocationId, toSlotId)
-          await loadBoats()
-        }
+        await loadBoats()
       }
-
-      // Log the movement to boat_movements table
-      try {
-        const boatType = isInventory || boatData.isInventory ? 'inventory' : 'customer';
-        await supabaseService.boatMovements.logMovement({
-          boatId: boatId,
-          boatType: boatType,
-          fromLocation: fromLocation,
-          fromSlot: fromSlot,
-          toLocation: toLocation,
-          toSlot: toSlotId || null,
-          movedBy: user?.id,
-          notes: null
-        });
-        console.log('[AppContainer.handleMoveBoat] Movement logged successfully');
-      } catch (logError) {
-        // Don't fail the move if logging fails - just log the error
-        console.error('Failed to log movement:', logError);
-      }
-
-      console.log('[AppContainer.handleMoveBoat] Reloading locations')
       await loadLocations()
-      console.log('[AppContainer.handleMoveBoat] Complete')
+      console.log('[AppContainer.handleMoveBoat] Data reloaded')
     } catch (error) {
       console.error('Error moving boat:', error)
       throw error
