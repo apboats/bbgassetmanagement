@@ -412,9 +412,8 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
           boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
         };
         updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        const [row, col] = targetSlot.split('-').map(Number);
         updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = `${row + 1}-${col + 1}`;
+        updatedBoat.slot = targetSlot;  // Use 0-indexed slot directly (matches database)
       }
     } else {
       updatedBoat.location = null;
