@@ -230,29 +230,37 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           </div>
 
           {/* Pricing Info - List Price and Web Price */}
-          {(boat.listPrice || boat.list_price || boat.webPrice || boat.web_price) && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-              <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {(boat.listPrice || boat.list_price) && (
-                  <div>
-                    <p className="text-xs text-green-600">List Price</p>
-                    <p className="text-lg font-bold text-green-900">
-                      ${Number(boat.listPrice || boat.list_price).toLocaleString()}
-                    </p>
-                  </div>
-                )}
-                {(boat.webPrice || boat.web_price) && (
-                  <div>
-                    <p className="text-xs text-green-600">Web Price</p>
-                    <p className="text-lg font-bold text-green-900">
-                      ${Number(boat.webPrice || boat.web_price).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+          {(() => {
+            const rawData = boat.rawData || boat.raw_data || {};
+            const listPrice = boat.listPrice || boat.list_price || rawData.listPrice;
+            const webPrice = boat.webPrice || boat.web_price || rawData.price1;
+
+            if (!listPrice && !webPrice) return null;
+
+            return (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {listPrice && (
+                    <div>
+                      <p className="text-xs text-green-600">List Price</p>
+                      <p className="text-lg font-bold text-green-900">
+                        ${Number(listPrice).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {webPrice && (
+                    <div>
+                      <p className="text-xs text-green-600">Web Price</p>
+                      <p className="text-lg font-bold text-green-900">
+                        ${Number(webPrice).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Boat Specs - Compact inline display */}
           {(() => {
