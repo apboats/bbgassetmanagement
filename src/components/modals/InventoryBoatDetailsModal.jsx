@@ -229,15 +229,27 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             </div>
           </div>
 
-          {/* Pricing Info - List Price only (cost is shown via button below) */}
-          {(boat.listPrice || boat.list_price) && (
+          {/* Pricing Info - List Price and Web Price */}
+          {(boat.listPrice || boat.list_price || boat.webPrice || boat.web_price) && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
               <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
-              <div>
-                <p className="text-xs text-green-600">List Price</p>
-                <p className="text-lg font-bold text-green-900">
-                  ${Number(boat.listPrice || boat.list_price).toLocaleString()}
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                {(boat.listPrice || boat.list_price) && (
+                  <div>
+                    <p className="text-xs text-green-600">List Price</p>
+                    <p className="text-lg font-bold text-green-900">
+                      ${Number(boat.listPrice || boat.list_price).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {(boat.webPrice || boat.web_price) && (
+                  <div>
+                    <p className="text-xs text-green-600">Web Price</p>
+                    <p className="text-lg font-bold text-green-900">
+                      ${Number(boat.webPrice || boat.web_price).toLocaleString()}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -552,7 +564,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           </div>
 
           {/* Show Unit Cost Button - Only visible to users with cost permission */}
-          {canSeeCost && (boat.totalCost || boat.total_cost || boat.unitCost || boat.unit_cost) && (
+          {canSeeCost && (boat.totalCost || boat.total_cost || boat.unitCost || boat.unit_cost || boat.rawData?.totalCost || boat.raw_data?.totalCost) && (
             <button
               onClick={() => setShowCostBreakdown(true)}
               className="w-full p-4 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-colors text-left"
@@ -632,9 +644,11 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
 
             <div className="p-4 space-y-3">
               {(() => {
-                const unitCost = Number(boat.unitCost || boat.unit_cost || 0);
-                const optionCost = Number(boat.optionCost || boat.option_cost || 0);
-                const totalCost = Number(boat.totalCost || boat.total_cost || 0);
+                // Get cost values from boat object or rawData fallback
+                const rawData = boat.rawData || boat.raw_data || {};
+                const unitCost = Number(boat.unitCost || boat.unit_cost || rawData.unitCost || 0);
+                const optionCost = Number(boat.optionCost || boat.option_cost || rawData.optionCost || 0);
+                const totalCost = Number(boat.totalCost || boat.total_cost || rawData.totalCost || 0);
                 const adjustments = totalCost - (unitCost + optionCost);
 
                 return (
