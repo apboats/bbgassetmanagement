@@ -228,6 +228,9 @@ serve(async (req) => {
         color: item.color || null,
         listPrice: item.listPrice || null,
         totalCost: item.totalCost || null,
+        unitCost: item.unitCost || null,
+        optionCost: item.optionCost || null,
+        webPrice: item.price1 || null,  // price1 is the web/advertised price
         receivedDate: item.receivedDate || null,
         comments: item.comments || null,
 
