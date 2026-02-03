@@ -660,8 +660,10 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                 const rawData = boat.rawData || boat.raw_data || {};
                 const unitCost = Number(boat.unitCost || boat.unit_cost || rawData.unitCost || 0);
                 const optionCost = Number(boat.optionCost || boat.option_cost || rawData.optionCost || 0);
+                const prepCost = Number(rawData.prepCost || 0);
+                const freightCost = Number(rawData.freightCost || 0);
                 const totalCost = Number(boat.totalCost || boat.total_cost || rawData.totalCost || 0);
-                const adjustments = totalCost - (unitCost + optionCost);
+                const adjustments = totalCost - (unitCost + optionCost + prepCost + freightCost);
 
                 return (
                   <>
@@ -678,6 +680,24 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                         ${optionCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
+
+                    {prepCost > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600">Prep Cost</span>
+                        <span className="font-semibold text-slate-900">
+                          ${prepCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+
+                    {freightCost > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600">Freight Cost</span>
+                        <span className="font-semibold text-slate-900">
+                          ${freightCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center py-2 border-t border-slate-200">
                       <span className="text-slate-600">Adjustments & Rebates</span>
