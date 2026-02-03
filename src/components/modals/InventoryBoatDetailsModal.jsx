@@ -235,13 +235,17 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             const listPrice = boat.listPrice || boat.list_price || rawData.listPrice;
             const webPrice = boat.webPrice || boat.web_price || rawData.price1;
 
-            if (!listPrice && !webPrice) return null;
+            // Check for actual positive values (not just truthy, since 0 would render as "0")
+            const hasListPrice = listPrice && Number(listPrice) > 0;
+            const hasWebPrice = webPrice && Number(webPrice) > 0;
+
+            if (!hasListPrice && !hasWebPrice) return null;
 
             return (
               <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
                 <h4 className="text-sm font-medium text-green-800 mb-2">Pricing</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  {listPrice && (
+                  {hasListPrice && (
                     <div>
                       <p className="text-xs text-green-600">List Price</p>
                       <p className="text-lg font-bold text-green-900">
@@ -249,7 +253,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                       </p>
                     </div>
                   )}
-                  {webPrice && (
+                  {hasWebPrice && (
                     <div>
                       <p className="text-xs text-green-600">Web Price</p>
                       <p className="text-lg font-bold text-green-900">
