@@ -1892,6 +1892,67 @@ export const boatMovementsService = {
 }
 
 // ============================================================================
+// CENTRALIZED MOVE SERVICE
+// ============================================================================
+// Single source of truth for moving boats and logging movement history
+// Reads from database to ensure correct from_location/from_slot values
+
+export async function moveBoatWithHistory(boatId, toLocationId, toSlotId, userId, isInventory = false) {
+  // 1. Fetch current boat state from DATABASE (not React state)
+  const tableName = isInventory ? 'inventory_boats' : 'boats'
+  const { data: boat, error: fetchError } = await supabase
+    .from(tableName)
+    .select('id, location, slot')
+    .eq('id', boatId)
+    .single()
+
+  if (fetchError) throw fetchError
+
+  const fromLocation = boat.location || null
+  const fromSlot = boat.slot || null
+
+  // 2. Get toLocation name
+  let toLocation = null
+  if (toLocationId) {
+    const { data: loc } = await supabase
+      .from('locations')
+      .select('name')
+      .eq('id', toLocationId)
+      .single()
+    toLocation = loc?.name || null
+  }
+
+  // 3. Perform the move
+  if (toLocationId) {
+    if (isInventory) {
+      await inventoryBoatsService.moveToSlot(boatId, toLocationId, toSlotId)
+    } else {
+      await boatsService.moveToSlot(boatId, toLocationId, toSlotId)
+    }
+  } else {
+    if (isInventory) {
+      await inventoryBoatsService.removeFromSlot(boatId)
+    } else {
+      await boatsService.removeFromSlot(boatId)
+    }
+  }
+
+  // 4. Log movement with correct values from database
+  await boatMovementsService.logMovement({
+    boatId,
+    boatType: isInventory ? 'inventory' : 'customer',
+    fromLocation,
+    fromSlot,
+    toLocation,
+    toSlot: toSlotId || null,
+    movedBy: userId,
+    notes: null
+  })
+
+  return { fromLocation, fromSlot, toLocation, toSlot: toSlotId }
+}
+
+// ============================================================================
 // EXPORT ALL SERVICES
 // ============================================================================
 
@@ -1907,6 +1968,7 @@ export default {
   users: usersService,
   boatShows: boatShowsService,
   boatMovements: boatMovementsService,
+  moveBoatWithHistory,
   subscriptions,
   getAllBoatsCombined,
   toCamelCase,
