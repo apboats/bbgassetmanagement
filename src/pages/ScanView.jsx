@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Search, X, Package, Map, Users, Edit2 } from 'lucide-react';
+import { Camera, Search, X, Package, Map, Users, Edit2, ZoomIn, ZoomOut } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { boatsService, inventoryBoatsService, boatLifecycleService } from '../services/supabaseService';
 
@@ -24,6 +24,13 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomCapabilities, setZoomCapabilities] = useState(null); // { min, max, step }
+  const [supportsZoom, setSupportsZoom] = useState(false);
 
   // Refs for camera
   const videoRef = useRef(null);
@@ -32,6 +39,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
   const scanIntervalRef = useRef(null);
   const isProcessingRef = useRef(false); // Track processing state for interval
   const isCameraReadyRef = useRef(false); // Track camera ready state for interval
+  const trackRef = useRef(null); // Track reference for zoom control
 
   // Effect to initialize camera when isCameraActive becomes true
   useEffect(() => {
@@ -59,6 +67,29 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
         console.log('[Camera] Stream obtained:', stream);
         console.log('[Camera] Video tracks:', stream.getVideoTracks());
         streamRef.current = stream;
+
+        // Check for zoom capabilities
+        const videoTrack = stream.getVideoTracks()[0];
+        trackRef.current = videoTrack;
+
+        if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
+          const capabilities = videoTrack.getCapabilities();
+          console.log('[Camera] Track capabilities:', capabilities);
+
+          if (capabilities.zoom) {
+            console.log('[Camera] Zoom supported:', capabilities.zoom);
+            setSupportsZoom(true);
+            setZoomCapabilities({
+              min: capabilities.zoom.min,
+              max: capabilities.zoom.max,
+              step: capabilities.zoom.step || 0.1
+            });
+            setZoomLevel(capabilities.zoom.min);
+          } else {
+            console.log('[Camera] Zoom not supported on this device');
+            setSupportsZoom(false);
+          }
+        }
 
         if (videoRef.current) {
           console.log('[Camera] Setting video source...');
@@ -133,10 +164,31 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    trackRef.current = null;
     setIsCameraActive(false);
     isCameraReadyRef.current = false;
     setIsCameraReady(false);
     setScanStatus('');
+    setZoomLevel(1);
+    setSupportsZoom(false);
+    setZoomCapabilities(null);
+  };
+
+  // Apply zoom level to camera
+  const applyZoom = async (newZoom) => {
+    if (!trackRef.current || !supportsZoom || !zoomCapabilities) return;
+
+    const clampedZoom = Math.min(Math.max(newZoom, zoomCapabilities.min), zoomCapabilities.max);
+
+    try {
+      await trackRef.current.applyConstraints({
+        advanced: [{ zoom: clampedZoom }]
+      });
+      setZoomLevel(clampedZoom);
+      console.log('[Camera] Zoom applied:', clampedZoom);
+    } catch (err) {
+      console.error('[Camera] Failed to apply zoom:', err);
+    }
   };
 
   // Capture just the focus box region for better OCR accuracy
@@ -333,10 +385,11 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
           setOcrResult(`✓ Found: ${foundBoat.name}`);
         }
       } else {
-        // Not found - show manual search
-        alert(`No boat found with Hull ID: ${hullId}\nUse manual search below.`);
+        // Not found - show manual search with OCR result pre-filled
         setShowManualSearch(true);
         setSearchQuery(hullId);
+        // Auto-trigger search with the hull ID
+        performSearch(hullId);
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -346,35 +399,33 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
     }
   };
 
-  // Manual search - searches both customer and inventory boats from database
-  const searchBoatsManually = async () => {
-    const query = searchQuery.trim();
-
-    if (!query) {
-      alert('Please enter a search term');
+  // Live search - searches both customer and inventory boats from database
+  const performSearch = async (query) => {
+    if (!query || query.length < 2) {
+      setSearchResults([]);
       return;
     }
 
-    setIsLoading(true);
+    setIsSearching(true);
     try {
-      // Search customer boats from database
+      // Search customer boats from database - prioritize hull_id matches
       const { data: customerBoats, error: customerError } = await supabase
         .from('boats')
         .select('*')
-        .or(`name.ilike.%${query}%,owner.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%`)
+        .or(`name.ilike.%${query}%,owner.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,serial_number.ilike.%${query}%`)
         .neq('status', 'archived')
-        .limit(20);
+        .limit(15);
 
       if (customerError) {
         console.error('Customer boat search error:', customerError);
       }
 
       // Search inventory boats from database
-      const { data: inventoryBoats, error: inventoryError } = await supabase
+      const { data: inventoryBoatsData, error: inventoryError } = await supabase
         .from('inventory_boats')
         .select('*')
-        .or(`name.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,manufacturer.ilike.%${query}%`)
-        .limit(20);
+        .or(`name.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,manufacturer.ilike.%${query}%,stock_number.ilike.%${query}%`)
+        .limit(15);
 
       if (inventoryError) {
         console.error('Inventory boat search error:', inventoryError);
@@ -384,28 +435,56 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
       const combinedResults = [
         ...(customerBoats || []).map(b => ({
           ...b,
-          hullId: b.hull_id, // Normalize field name
+          hullId: b.hull_id,
+          serialNumber: b.serial_number,
           boatType: 'customer'
         })),
-        ...(inventoryBoats || []).map(b => ({
+        ...(inventoryBoatsData || []).map(b => ({
           ...b,
-          hullId: b.hull_id, // Normalize field name
+          hullId: b.hull_id,
+          stockNumber: b.stock_number,
           boatType: 'inventory'
         }))
       ];
 
-      setSearchResults(combinedResults);
+      // Sort results - exact hull ID matches first
+      const sortedResults = combinedResults.sort((a, b) => {
+        const aHullMatch = a.hullId?.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
+        const bHullMatch = b.hullId?.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
+        return aHullMatch - bHullMatch;
+      });
 
-      if (combinedResults.length === 0) {
-        alert(`No boats found matching "${query}"`);
-      }
+      setSearchResults(sortedResults.slice(0, 20));
     } catch (error) {
       console.error('Search error:', error);
-      alert('Error searching. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
   };
+
+  // Debounced search handler
+  const handleSearchInput = (value) => {
+    setSearchQuery(value);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Debounce search - wait 300ms after user stops typing
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(value.trim());
+    }, 300);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const selectBoatFromSearch = (boat) => {
     setSelectedBoat(boat);
@@ -621,6 +700,47 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
                 </div>
               </div>
 
+              {/* Zoom controls - only show if device supports zoom */}
+              {supportsZoom && zoomCapabilities && (
+                <div className="mt-4 bg-slate-100 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => applyZoom(zoomLevel - (zoomCapabilities.step || 0.5))}
+                      disabled={zoomLevel <= zoomCapabilities.min}
+                      className="p-2 bg-white rounded-lg shadow hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ZoomOut className="w-5 h-5 text-slate-700" />
+                    </button>
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min={zoomCapabilities.min}
+                        max={zoomCapabilities.max}
+                        step={zoomCapabilities.step || 0.1}
+                        value={zoomLevel}
+                        onChange={(e) => applyZoom(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <div className="flex justify-between text-xs text-slate-500 mt-1">
+                        <span>1x</span>
+                        <span className="font-medium text-blue-600">{zoomLevel.toFixed(1)}x</span>
+                        <span>{zoomCapabilities.max.toFixed(0)}x</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => applyZoom(zoomLevel + (zoomCapabilities.step || 0.5))}
+                      disabled={zoomLevel >= zoomCapabilities.max}
+                      className="p-2 bg-white rounded-lg shadow hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ZoomIn className="w-5 h-5 text-slate-700" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 text-center mt-2">
+                    Use zoom to scan Hull ID tags from a distance
+                  </p>
+                </div>
+              )}
+
               {/* Manual capture and cancel buttons */}
               <div className="mt-4 flex gap-2 justify-center">
                 <button
@@ -682,25 +802,37 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
           {/* Manual Search Fallback */}
           {showManualSearch && (
             <div className="mt-6 border-t border-slate-200 pt-6">
-              <h3 className="text-lg font-semibold mb-3">Manual Search</h3>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchBoatsManually()}
-                  placeholder="Search by name, owner, or Hull ID..."
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={searchBoatsManually}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Search
-                </button>
+              <h3 className="text-lg font-semibold mb-3">Search by Hull ID or Serial</h3>
+              <div className="relative mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearchInput(e.target.value)}
+                    placeholder="Type hull ID, serial, stock #, or name..."
+                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                    autoFocus
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                {searchQuery.length > 0 && searchQuery.length < 2 && (
+                  <p className="text-xs text-slate-500 mt-1">Type at least 2 characters to search</p>
+                )}
               </div>
+              {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+                <div className="text-center py-6 text-slate-500">
+                  <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No boats found matching "{searchQuery}"</p>
+                </div>
+              )}
               {searchResults.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <p className="text-xs text-slate-500 mb-2">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found</p>
                   {searchResults.map(boat => (
                     <button
                       key={`${boat.boatType}-${boat.id}`}
@@ -709,16 +841,30 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
                     >
                       <div className="flex items-center justify-between">
                         <p className="font-bold text-slate-900">{boat.name}</p>
-                        {boat.boatType === 'inventory' && (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Inventory</span>
-                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded ${boat.boatType === 'inventory' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {boat.boatType === 'inventory' ? 'Inventory' : 'Customer'}
+                        </span>
                       </div>
                       <p className="text-sm text-slate-600">
                         {boat.model} {boat.owner ? `• ${boat.owner}` : boat.manufacturer ? `• ${boat.manufacturer}` : ''}
                       </p>
-                      {boat.hullId && (
-                        <p className="text-xs text-slate-500 font-mono mt-1">Hull ID: {boat.hullId}</p>
-                      )}
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {boat.hullId && (
+                          <span className="text-xs bg-slate-100 text-slate-700 font-mono px-2 py-0.5 rounded">
+                            Hull: {boat.hullId}
+                          </span>
+                        )}
+                        {boat.serialNumber && (
+                          <span className="text-xs bg-slate-100 text-slate-700 font-mono px-2 py-0.5 rounded">
+                            Serial: {boat.serialNumber}
+                          </span>
+                        )}
+                        {boat.stockNumber && (
+                          <span className="text-xs bg-slate-100 text-slate-700 font-mono px-2 py-0.5 rounded">
+                            Stock: {boat.stockNumber}
+                          </span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>

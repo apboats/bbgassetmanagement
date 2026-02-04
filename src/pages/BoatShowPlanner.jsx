@@ -90,6 +90,19 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
     } catch (error) { console.error('Error deleting show:', error); alert('Failed to delete show'); }
   };
 
+  // Detect if boat is a pontoon based on hull type, model, or name
+  const isPontoonBoat = (boat) => {
+    const hullType = (boat.hull_type || boat.hullType || '').toLowerCase();
+    const model = (boat.model || '').toLowerCase();
+    const name = (boat.name || '').toLowerCase();
+    const make = (boat.make || '').toLowerCase();
+    // Check for pontoon, tritoon, tri-toon variations
+    const pontoonPatterns = ['pontoon', 'tritoon', 'tri-toon', 'tri toon'];
+    return pontoonPatterns.some(pattern =>
+      hullType.includes(pattern) || model.includes(pattern) || name.includes(pattern) || make.includes(pattern)
+    );
+  };
+
   const addBoatToShow = async (boat) => {
     if (!selectedShow) return;
     if (items.some(item => item.inventoryBoatId === boat.id)) { alert('This boat is already in the show layout'); return; }
@@ -98,7 +111,7 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
         itemType: 'boat', inventoryBoatId: boat.id, x: 10, y: 10, rotation: 0,
         widthFt: parseFloat(boat.beam) || 10, heightFt: parseFloat(boat.length) || 25,
         label: boat.name, zIndex: items.length,
-        boatType: boat.hullType?.toLowerCase().includes('pontoon') ? 'pontoon' : 'bowrider',
+        boatType: isPontoonBoat(boat) ? 'pontoon' : 'bowrider',
       });
       setItems([...items, newItem]);
       setSelectedItem(newItem);
@@ -131,11 +144,6 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
   const updateItemSize = async (itemId, widthFt, heightFt) => {
     try { const updated = await boatShowsService.updateItem(itemId, { widthFt, heightFt }); setItems(items.map(i => i.id === itemId ? updated : i)); if (selectedItem?.id === itemId) setSelectedItem(updated); }
     catch (error) { console.error('Error updating size:', error); }
-  };
-
-  const updateBoatType = async (itemId, boatType) => {
-    try { const updated = await boatShowsService.updateItem(itemId, { boatType }); setItems(items.map(i => i.id === itemId ? updated : i)); if (selectedItem?.id === itemId) setSelectedItem(updated); }
-    catch (error) { console.error('Error updating boat type:', error); }
   };
 
   const deleteItem = async (itemId) => {
@@ -424,26 +432,6 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
                         <p className="font-medium text-slate-900">{selectedItem.boat?.name || selectedItem.label || SHOW_ITEM_TYPES[selectedItem.itemType]?.label}</p>
                         <p className="text-xs text-slate-500 capitalize">{selectedItem.itemType}</p>
                       </div>
-                      {/* Boat Type Toggle - only for boats */}
-                      {selectedItem.itemType === 'boat' && (
-                        <div>
-                          <label className="text-xs font-medium text-slate-700 mb-1 block">Boat Type</label>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => updateBoatType(selectedItem.id, 'bowrider')}
-                              className={`flex-1 py-2 text-sm rounded-lg transition-colors ${(selectedItem.boatType || 'bowrider') === 'bowrider' ? 'bg-blue-100 text-blue-700 font-medium border-2 border-blue-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
-                            >
-                              Bowrider
-                            </button>
-                            <button
-                              onClick={() => updateBoatType(selectedItem.id, 'pontoon')}
-                              className={`flex-1 py-2 text-sm rounded-lg transition-colors ${selectedItem.boatType === 'pontoon' ? 'bg-blue-100 text-blue-700 font-medium border-2 border-blue-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
-                            >
-                              Pontoon
-                            </button>
-                          </div>
-                        </div>
-                      )}
                       <div>
                         <label className="text-xs font-medium text-slate-700 mb-1 block">Position</label>
                         <p className="text-xs text-slate-400 mb-2">Use arrow keys to nudge (Shift for 5ft)</p>
