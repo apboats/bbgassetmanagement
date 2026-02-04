@@ -424,7 +424,7 @@ export function ScanView({ boats, locations, onUpdateBoats, onUpdateLocations })
       const { data: inventoryBoatsData, error: inventoryError } = await supabase
         .from('inventory_boats')
         .select('*')
-        .or(`name.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,manufacturer.ilike.%${query}%,stock_number.ilike.%${query}%`)
+        .or(`name.ilike.%${query}%,hull_id.ilike.%${query}%,model.ilike.%${query}%,make.ilike.%${query}%,stock_number.ilike.%${query}%`)
         .limit(15);
 
       if (inventoryError) {
