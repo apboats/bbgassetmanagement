@@ -34,6 +34,8 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
   const [dragItem, setDragItem] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotatingItem, setRotatingItem] = useState(null);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const PIXELS_PER_FOOT = 10;
@@ -95,7 +97,8 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
       const newItem = await boatShowsService.addItem(selectedShow.id, {
         itemType: 'boat', inventoryBoatId: boat.id, x: 10, y: 10, rotation: 0,
         widthFt: parseFloat(boat.beam) || 10, heightFt: parseFloat(boat.length) || 25,
-        label: boat.name, zIndex: items.length, boatType: 'bowrider',
+        label: boat.name, zIndex: items.length,
+        boatType: boat.hullType?.toLowerCase().includes('pontoon') ? 'pontoon' : 'bowrider',
       });
       setItems([...items, newItem]);
       setSelectedItem(newItem);
@@ -183,8 +186,28 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
     setIsDragging(true);
   };
 
+  const handleRotationMouseDown = (e, item) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    setRotatingItem(item);
+    setIsRotating(true);
+  };
+
   const handleMouseMove = useCallback((e) => {
-    if (isDragging && dragItem && selectedShow) {
+    if (isRotating && rotatingItem && selectedShow) {
+      // Calculate angle from item center to mouse position
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const itemCenterX = (rotatingItem.x + (rotatingItem.widthFt || 10) / 2) * PIXELS_PER_FOOT * zoom + panOffset.x + rect.left;
+      const itemCenterY = (rotatingItem.y + (rotatingItem.heightFt || 10) / 2) * PIXELS_PER_FOOT * zoom + panOffset.y + rect.top;
+      const angle = Math.atan2(e.clientX - itemCenterX, -(e.clientY - itemCenterY)) * (180 / Math.PI);
+      const snappedAngle = Math.round(angle / 5) * 5; // Snap to 5 degree increments
+      const normalizedAngle = ((snappedAngle % 360) + 360) % 360;
+      setItems(items.map(i => i.id === rotatingItem.id ? { ...i, rotation: normalizedAngle } : i));
+      if (selectedItem?.id === rotatingItem.id) setSelectedItem({ ...selectedItem, rotation: normalizedAngle });
+    } else if (isDragging && dragItem && selectedShow) {
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
       let newX = Math.round(canvasPos.x - dragOffset.x);
       let newY = Math.round(canvasPos.y - dragOffset.y);
@@ -195,25 +218,31 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
     } else if (isPanning) {
       setPanOffset({ x: panOffset.x + e.movementX, y: panOffset.y + e.movementY });
     }
-  }, [isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow]);
+  }, [isRotating, rotatingItem, isDragging, dragItem, dragOffset, isPanning, panOffset, items, selectedItem, selectedShow, zoom]);
 
   const handleMouseUp = useCallback(async () => {
+    if (isRotating && rotatingItem) {
+      const item = items.find(i => i.id === rotatingItem.id);
+      if (item) await updateItemRotation(item.id, item.rotation || 0);
+    }
     if (isDragging && dragItem) {
       const item = items.find(i => i.id === dragItem.id);
       if (item) await updateItemPosition(item.id, item.x, item.y);
     }
+    setIsRotating(false);
+    setRotatingItem(null);
     setIsDragging(false);
     setDragItem(null);
     setIsPanning(false);
-  }, [isDragging, dragItem, items]);
+  }, [isRotating, rotatingItem, isDragging, dragItem, items]);
 
   useEffect(() => {
-    if (isDragging || isPanning) {
+    if (isDragging || isPanning || isRotating) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
     }
-  }, [isDragging, isPanning, handleMouseMove, handleMouseUp]);
+  }, [isDragging, isPanning, isRotating, handleMouseMove, handleMouseUp]);
 
   // Keyboard controls for fine-tuning position and rotation
   useEffect(() => {
@@ -324,9 +353,9 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
                     const displayName = boat ? `${boat.year || ''} ${boat.name}`.trim() : item.label;
                     const bgColor = item.itemType === 'boat' ? '#3b82f6' : (item.color || typeConfig.color);
                     const boatType = item.boatType || 'bowrider';
-                    // Bowrider: pointed bow at top, square stern at bottom
+                    // Bowrider: rounded bow at top, square stern at bottom (birds-eye view of pleasure boat)
                     // Pontoon: rectangle with rounded corners
-                    const bowriderPath = `M 0 ${height} L ${width} ${height} L ${width} ${height * 0.12} L ${width * 0.5} 0 L 0 ${height * 0.12} Z`;
+                    const bowriderPath = `M 0 ${height} L ${width} ${height} L ${width} ${height * 0.35} Q ${width * 0.85} 0, ${width * 0.5} 0 Q ${width * 0.15} 0, 0 ${height * 0.35} Z`;
                     const pontoonPath = `M 4 0 L ${width - 4} 0 Q ${width} 0 ${width} 4 L ${width} ${height - 4} Q ${width} ${height} ${width - 4} ${height} L 4 ${height} Q 0 ${height} 0 ${height - 4} L 0 4 Q 0 0 4 0 Z`;
                     return (
                       <g key={item.id} transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`} onMouseDown={(e) => handleItemMouseDown(e, item)} style={{ cursor: 'move' }}>
@@ -335,17 +364,24 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
                         ) : (
                           <rect width={width} height={height} fill={bgColor} stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'} strokeWidth={isSelected ? 3 : 1} rx={item.itemType === 'plant' ? width/2 : 4} ry={item.itemType === 'plant' ? height/2 : 4} />
                         )}
-                        <text x={width / 2} y={height / 2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.min(width, height) * 0.15} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>{displayName?.substring(0, 20)}</text>
-                        <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.2} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.8)" fontSize={Math.min(width, height) * 0.1} style={{ pointerEvents: 'none', userSelect: 'none' }}>{item.widthFt}'×{item.heightFt}'</text>
+                        <text x={width / 2} y={height / 2 + height * 0.1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.min(width, height) * 0.15} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>{displayName?.substring(0, 20)}</text>
+                        <text x={width / 2} y={height / 2 + height * 0.1 + Math.min(width, height) * 0.2} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.8)" fontSize={Math.min(width, height) * 0.1} style={{ pointerEvents: 'none', userSelect: 'none' }}>{item.widthFt}'×{item.heightFt}'</text>
                         {isSelected && (
                           <>
-                            <rect x={-4} y={-4} width={8} height={8} fill="#1d4ed8" />
-                            <rect x={width-4} y={-4} width={8} height={8} fill="#1d4ed8" />
                             <rect x={-4} y={height-4} width={8} height={8} fill="#1d4ed8" />
                             <rect x={width-4} y={height-4} width={8} height={8} fill="#1d4ed8" />
-                            {/* Rotation handle */}
+                            {/* Rotation handle - drag to rotate */}
                             <line x1={width/2} y1={-10} x2={width/2} y2={-25} stroke="#1d4ed8" strokeWidth={2} />
-                            <circle cx={width/2} cy={-30} r={6} fill="#1d4ed8" style={{ cursor: 'grab' }} />
+                            <circle
+                              cx={width/2}
+                              cy={-30}
+                              r={8}
+                              fill="#1d4ed8"
+                              stroke="white"
+                              strokeWidth={2}
+                              style={{ cursor: 'grab' }}
+                              onMouseDown={(e) => handleRotationMouseDown(e, item)}
+                            />
                           </>
                         )}
                       </g>
