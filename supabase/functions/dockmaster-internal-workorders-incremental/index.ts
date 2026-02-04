@@ -70,6 +70,9 @@ serve(async (req) => {
   const startTime = Date.now()
   let workOrdersUpdated = 0
   let timeEntriesProcessed = 0
+  let timeEntriesStored = 0
+  let workOrdersRefreshed = 0
+  const processedWorkOrderIds = new Set<string>()  // Track WOs processed in Step 1
 
   try {
     // Get Supabase client
@@ -222,6 +225,9 @@ serve(async (req) => {
           continue
         }
 
+        // Track this work order as processed
+        processedWorkOrderIds.add(String(wo.id))
+
         // Update operations if present in response
         if (wo.operations && wo.operations.length > 0) {
           // Preserve last_worked_at values before deleting operations
@@ -315,7 +321,7 @@ serve(async (req) => {
       console.error('Failed to fetch changed work orders:', changedResponse.status)
     }
 
-    // ========== STEP 2: Get time entries to track last_worked_at ==========
+    // ========== STEP 2: Get time entries - store them and track last_worked_at ==========
     const timeEntryUrl = `https://api.dmeapi.com/api/v1/Service/WorkOrders/ListTimeEntry?StartDate=${formatDateForApi(lookbackTime)}&EndDate=${formatDateForApi(now)}&Page=1&PageSize=100&Detail=true`
     console.log('Fetching time entries:', timeEntryUrl)
 
@@ -324,24 +330,66 @@ serve(async (req) => {
       headers: dmHeaders,
     })
 
+    const workOrdersFromTimeEntries = new Set<string>()  // Track WOs we see in time entries
+
     if (timeEntryResponse.ok) {
       const timeEntryData = await timeEntryResponse.json()
       const timeEntries = timeEntryData.content || []
       console.log('Time entries found:', timeEntries.length)
 
       // Time entries from Dockmaster have nested operations array
-      // Structure: { workOrderId, operations: [{ opcode, estStartDate, ... }] }
-      // We use estStartDate from the operation as the "worked at" timestamp
-      const latestWorkTime = new Map<string, { workOrderId: string, opCode: string, timestamp: string }>()
+      // Structure: { laborUID, workOrderId, techId, operations: [{ opcode, timeEntries: [...], totalLaborHours, ... }] }
+      const latestWorkTime = new Map<string, { workOrderId: string, opCode: string, timestamp: string, totalLaborHours: number }>()
 
       for (const entry of timeEntries) {
         const workOrderId = String(entry.workOrderId)
+        workOrdersFromTimeEntries.add(workOrderId)  // Track this WO
 
         // Each time entry can have multiple operations
         for (const op of (entry.operations || [])) {
           const opCode = op.opcode
-          // Use estStartDate as the timestamp (format: "01/26/2026")
-          // Convert MM/DD/YYYY to ISO format for storage
+
+          // Store individual time entries from nested timeEntries array
+          for (const te of (op.timeEntries || [])) {
+            // Parse date from MM/DD/YYYY format
+            let workDate = null
+            if (te.date) {
+              const [month, day, year] = te.date.split('/')
+              workDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+            }
+
+            const timeEntryRecord = {
+              labor_uid: entry.laborUID,
+              tech_id: te.techId || entry.techId,
+              work_order_id: workOrderId,
+              department_id: entry.departmentId || te.department,
+              opcode: te.opCode || opCode,
+              work_date: workDate,
+              hours: te.hours || 0,
+              eff_hours: te.effHours || 0,
+              start_time: te.startTime || null,
+              stop_time: te.stopTime || null,
+              price_rate: te.priceRate || 0,
+              cost_rate: te.costRate || 0,
+              extension: te.extension || 0,
+              cost_extension: te.costExtension || 0,
+              comments: te.comments || null,
+              synced_at: new Date().toISOString(),
+            }
+
+            // Upsert time entry to time_entries table
+            const { error: teError } = await supabase
+              .from('time_entries')
+              .upsert(timeEntryRecord, { onConflict: 'labor_uid,opcode' })
+
+            if (teError) {
+              console.error(`Failed to store time entry: laborUID=${entry.laborUID}, opcode=${opCode}:`, teError)
+            } else {
+              timeEntriesStored++
+            }
+          }
+
+          // Track latest work time for updating last_worked_at on operations
           const estStartDate = op.estStartDate
           if (estStartDate && opCode) {
             // Parse MM/DD/YYYY and convert to ISO timestamp
@@ -354,18 +402,20 @@ serve(async (req) => {
               latestWorkTime.set(key, {
                 workOrderId,
                 opCode,
-                timestamp: isoTimestamp
+                timestamp: isoTimestamp,
+                totalLaborHours: op.totalLaborHours || 0,
               })
             }
           }
         }
       }
 
+      console.log('Time entries stored:', timeEntriesStored)
       console.log('Unique work order/opcode combinations to update:', latestWorkTime.size)
 
-      // Update operations with last_worked_at timestamp
+      // Update operations with last_worked_at timestamp and total_labor_hours
       for (const [, data] of latestWorkTime) {
-        console.log(`Updating operation: WO=${data.workOrderId}, opcode=${data.opCode}, timestamp=${data.timestamp}`)
+        console.log(`Updating operation: WO=${data.workOrderId}, opcode=${data.opCode}, timestamp=${data.timestamp}, hours=${data.totalLaborHours}`)
 
         // First check if the operation exists
         const { data: existingOp, error: selectError } = await supabase
@@ -382,11 +432,12 @@ serve(async (req) => {
 
         console.log(`  Found operation: id=${existingOp.id}`)
 
-        // Update the operation's last_worked_at based on time entry timestamp
+        // Update the operation's last_worked_at and total_labor_hours
         const { error: updateError } = await supabase
           .from('work_order_operations')
           .update({
             last_worked_at: data.timestamp,
+            total_labor_hours: data.totalLaborHours,
           })
           .eq('work_order_id', data.workOrderId)
           .eq('opcode', data.opCode)
@@ -394,12 +445,128 @@ serve(async (req) => {
         if (updateError) {
           console.error(`Failed to update operation: WO=${data.workOrderId}, opcode=${data.opCode}:`, updateError)
         } else {
-          console.log(`  Successfully updated last_worked_at`)
+          console.log(`  Successfully updated last_worked_at and total_labor_hours`)
           timeEntriesProcessed++
         }
       }
     } else {
       console.error('Failed to fetch time entries:', timeEntryResponse.status)
+    }
+
+    // ========== STEP 3: Refresh work orders from time entries not in Step 1 ==========
+    const workOrdersToRefresh = [...workOrdersFromTimeEntries].filter(
+      woId => !processedWorkOrderIds.has(woId)
+    )
+
+    if (workOrdersToRefresh.length > 0) {
+      console.log(`Refreshing ${workOrdersToRefresh.length} work orders from time entries that weren't in ListNewOrChanged`)
+
+      // Use RetrieveList to batch fetch work order details
+      const retrieveUrl = 'https://api.dmeapi.com/api/v1/Service/WorkOrders/RetrieveList'
+      const retrieveResponse = await fetch(retrieveUrl, {
+        method: 'POST',
+        headers: dmHeaders,
+        body: JSON.stringify({
+          woIds: workOrdersToRefresh,
+          detail: true,
+        }),
+      })
+
+      if (retrieveResponse.ok) {
+        const retrieveData = await retrieveResponse.json()
+        const workOrdersWithDetails = Array.isArray(retrieveData)
+          ? retrieveData
+          : (retrieveData?.content || retrieveData?.data || retrieveData)
+
+        console.log(`Retrieved ${workOrdersWithDetails?.length || 0} work orders with details`)
+
+        for (const wo of (workOrdersWithDetails || [])) {
+          // Determine if this is internal
+          const isInternal = !!wo.riggingId || wo.customerID === INTERNAL_CUSTOMER_ID
+
+          // For customer work orders, try to find matching boat UUID
+          let boatUuid = null
+          if (!isInternal && !wo.riggingId && wo.boatId) {
+            const { data: matchingBoat } = await supabase
+              .from('boats')
+              .select('id')
+              .eq('dockmaster_id', wo.boatId)
+              .single()
+            boatUuid = matchingBoat?.id || null
+          }
+
+          const workOrderData = {
+            id: wo.id,
+            customer_id: wo.customerID,
+            customer_name: wo.customerName || '',
+            clerk_id: wo.clerkId || null,
+            boat_id: boatUuid,
+            dockmaster_boat_id: wo.boatId || null,
+            rigging_id: wo.riggingId || null,
+            rigging_type: wo.riggingType || null,
+            is_internal: isInternal,
+            type: wo.type || null,
+            tax_schema: wo.taxSchema || null,
+            location_code: wo.locationCode || null,
+            is_estimate: wo.isEstimate || false,
+            creation_date: wo.creationDate,
+            category: wo.category,
+            status: wo.status,
+            title: wo.title,
+            // Boat details
+            boat_name: wo.boatName || '',
+            boat_year: wo.boatYear || '',
+            boat_make: wo.boatMake || '',
+            boat_model: wo.boatModel || '',
+            boat_serial_number: wo.boatSerialNumber || '',
+            boat_registration: wo.boatRegistration || '',
+            boat_length: wo.boatLength || '',
+            // Financial totals - this is the key data we need refreshed!
+            total_charges: wo.totalWOCharges || 0,
+            total_parts: wo.totalParts || 0,
+            total_labor: wo.totalLabor || 0,
+            total_freight: wo.totalFreight || 0,
+            total_equipment: wo.totalEquipment || 0,
+            total_sublet: wo.totalSublet || 0,
+            total_mileage: wo.totalMileage || 0,
+            total_misc_supply: wo.totalMiscSupply || 0,
+            total_bill_codes: wo.totalBillCodes || 0,
+            // Cost totals
+            total_parts_cost: wo.totalPartsCost || 0,
+            total_labor_cost: wo.totalLaborCost || 0,
+            total_sublet_cost: wo.totalSubletCost || 0,
+            total_freight_cost: wo.totalFreightCost || 0,
+            // Forecasted totals
+            total_forecasted_parts: wo.totalForecastedParts || 0,
+            total_forecasted_labor: wo.totalForecastedLabor || 0,
+            total_forecasted_hours: wo.totalForecastedHours || 0,
+            // Dates
+            est_comp_date: wo.estCompDate || null,
+            est_start_date: wo.estStartDate || null,
+            promised_date: wo.promisedDate || null,
+            last_mod_date: wo.lastModDate || null,
+            last_mod_time: wo.lastModTime || null,
+            comments: wo.comments || '',
+            last_synced: new Date().toISOString(),
+          }
+
+          // Upsert work order with fresh totals
+          const { error: woError } = await supabase
+            .from('work_orders')
+            .upsert(workOrderData, { onConflict: 'id' })
+
+          if (woError) {
+            console.error('Error upserting refreshed work order:', wo.id, woError)
+          } else {
+            console.log(`Refreshed work order ${wo.id} with total_labor_cost=${wo.totalLaborCost}`)
+            workOrdersRefreshed++
+          }
+        }
+      } else {
+        console.error('Failed to retrieve work order details:', retrieveResponse.status)
+      }
+    } else {
+      console.log('No additional work orders to refresh from time entries')
     }
 
     // Update sync status
@@ -424,6 +591,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         workOrdersUpdated,
+        workOrdersRefreshed,
+        timeEntriesStored,
         timeEntriesProcessed,
         lookbackFrom: lookbackEST,
         lookbackFromUTC: lookbackTime.toISOString(),
