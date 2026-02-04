@@ -94,7 +94,8 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
     try {
       const newItem = await boatShowsService.addItem(selectedShow.id, {
         itemType: 'boat', inventoryBoatId: boat.id, x: 10, y: 10, rotation: 0,
-        widthFt: parseFloat(boat.beam) || 10, heightFt: parseFloat(boat.length) || 25, label: boat.name, zIndex: items.length,
+        widthFt: parseFloat(boat.beam) || 10, heightFt: parseFloat(boat.length) || 25,
+        label: boat.name, zIndex: items.length, boatType: 'bowrider',
       });
       setItems([...items, newItem]);
       setSelectedItem(newItem);
@@ -127,6 +128,11 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
   const updateItemSize = async (itemId, widthFt, heightFt) => {
     try { const updated = await boatShowsService.updateItem(itemId, { widthFt, heightFt }); setItems(items.map(i => i.id === itemId ? updated : i)); if (selectedItem?.id === itemId) setSelectedItem(updated); }
     catch (error) { console.error('Error updating size:', error); }
+  };
+
+  const updateBoatType = async (itemId, boatType) => {
+    try { const updated = await boatShowsService.updateItem(itemId, { boatType }); setItems(items.map(i => i.id === itemId ? updated : i)); if (selectedItem?.id === itemId) setSelectedItem(updated); }
+    catch (error) { console.error('Error updating boat type:', error); }
   };
 
   const deleteItem = async (itemId) => {
@@ -209,6 +215,52 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
     }
   }, [isDragging, isPanning, handleMouseMove, handleMouseUp]);
 
+  // Keyboard controls for fine-tuning position and rotation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedItem || !selectedShow) return;
+      // Don't interfere with input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      const moveStep = e.shiftKey ? 5 : 1;
+      const rotateStep = e.shiftKey ? 45 : 15;
+
+      switch(e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          updateItemPosition(selectedItem.id, selectedItem.x, Math.max(0, selectedItem.y - moveStep));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          updateItemPosition(selectedItem.id, selectedItem.x, Math.min(selectedShow.heightFt - (selectedItem.heightFt || 10), selectedItem.y + moveStep));
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          updateItemPosition(selectedItem.id, Math.max(0, selectedItem.x - moveStep), selectedItem.y);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          updateItemPosition(selectedItem.id, Math.min(selectedShow.widthFt - (selectedItem.widthFt || 10), selectedItem.x + moveStep), selectedItem.y);
+          break;
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          updateItemRotation(selectedItem.id, ((selectedItem.rotation || 0) + rotateStep) % 360);
+          break;
+        case 'Delete':
+        case 'Backspace':
+          if (e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            deleteItem(selectedItem.id);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedItem, selectedShow]);
+
   const handlePrint = () => {
     const printContent = canvasRef.current;
     if (!printContent) return;
@@ -271,12 +323,31 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
                     const boat = item.boat;
                     const displayName = boat ? `${boat.year || ''} ${boat.name}`.trim() : item.label;
                     const bgColor = item.itemType === 'boat' ? '#3b82f6' : (item.color || typeConfig.color);
+                    const boatType = item.boatType || 'bowrider';
+                    // Bowrider: pointed bow at top, square stern at bottom
+                    // Pontoon: rectangle with rounded corners
+                    const bowriderPath = `M 0 ${height} L ${width} ${height} L ${width} ${height * 0.12} L ${width * 0.5} 0 L 0 ${height * 0.12} Z`;
+                    const pontoonPath = `M 4 0 L ${width - 4} 0 Q ${width} 0 ${width} 4 L ${width} ${height - 4} Q ${width} ${height} ${width - 4} ${height} L 4 ${height} Q 0 ${height} 0 ${height - 4} L 0 4 Q 0 0 4 0 Z`;
                     return (
                       <g key={item.id} transform={`translate(${x + width/2}, ${y + height/2}) rotate(${item.rotation || 0}) translate(${-width/2}, ${-height/2})`} onMouseDown={(e) => handleItemMouseDown(e, item)} style={{ cursor: 'move' }}>
-                        {item.itemType === 'boat' ? <path d={`M ${width * 0.1} 0 L ${width * 0.9} 0 L ${width} ${height * 0.5} L ${width * 0.9} ${height} L ${width * 0.1} ${height} L 0 ${height * 0.5} Z`} fill={bgColor} stroke={isSelected ? '#1d4ed8' : '#2563eb'} strokeWidth={isSelected ? 3 : 1} /> : <rect width={width} height={height} fill={bgColor} stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'} strokeWidth={isSelected ? 3 : 1} rx={item.itemType === 'plant' ? width/2 : 4} ry={item.itemType === 'plant' ? height/2 : 4} />}
+                        {item.itemType === 'boat' ? (
+                          <path d={boatType === 'pontoon' ? pontoonPath : bowriderPath} fill={bgColor} stroke={isSelected ? '#1d4ed8' : '#2563eb'} strokeWidth={isSelected ? 3 : 1} />
+                        ) : (
+                          <rect width={width} height={height} fill={bgColor} stroke={isSelected ? '#1d4ed8' : 'rgba(0,0,0,0.2)'} strokeWidth={isSelected ? 3 : 1} rx={item.itemType === 'plant' ? width/2 : 4} ry={item.itemType === 'plant' ? height/2 : 4} />
+                        )}
                         <text x={width / 2} y={height / 2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={Math.min(width, height) * 0.15} fontWeight="bold" style={{ pointerEvents: 'none', userSelect: 'none' }}>{displayName?.substring(0, 20)}</text>
                         <text x={width / 2} y={height / 2 + Math.min(width, height) * 0.2} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.8)" fontSize={Math.min(width, height) * 0.1} style={{ pointerEvents: 'none', userSelect: 'none' }}>{item.widthFt}'×{item.heightFt}'</text>
-                        {isSelected && <><rect x={-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={-4} width={8} height={8} fill="#1d4ed8" /><rect x={-4} y={height-4} width={8} height={8} fill="#1d4ed8" /><rect x={width-4} y={height-4} width={8} height={8} fill="#1d4ed8" /></>}
+                        {isSelected && (
+                          <>
+                            <rect x={-4} y={-4} width={8} height={8} fill="#1d4ed8" />
+                            <rect x={width-4} y={-4} width={8} height={8} fill="#1d4ed8" />
+                            <rect x={-4} y={height-4} width={8} height={8} fill="#1d4ed8" />
+                            <rect x={width-4} y={height-4} width={8} height={8} fill="#1d4ed8" />
+                            {/* Rotation handle */}
+                            <line x1={width/2} y1={-10} x2={width/2} y2={-25} stroke="#1d4ed8" strokeWidth={2} />
+                            <circle cx={width/2} cy={-30} r={6} fill="#1d4ed8" style={{ cursor: 'grab' }} />
+                          </>
+                        )}
                       </g>
                     );
                   })}
@@ -313,14 +384,79 @@ export function BoatShowPlanner({ inventoryBoats = [] }) {
                 <div>
                   {selectedItem ? (
                     <div className="space-y-4">
-                      <div className="p-3 bg-slate-50 rounded-lg"><p className="font-medium text-slate-900">{selectedItem.boat?.name || selectedItem.label || SHOW_ITEM_TYPES[selectedItem.itemType]?.label}</p><p className="text-xs text-slate-500 capitalize">{selectedItem.itemType}</p></div>
-                      <div><label className="text-xs font-medium text-slate-700 mb-1 block">Position</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-slate-500">X (ft)</label><input type="number" value={Math.round(selectedItem.x)} onChange={(e) => updateItemPosition(selectedItem.id, parseFloat(e.target.value) || 0, selectedItem.y)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div><div><label className="text-xs text-slate-500">Y (ft)</label><input type="number" value={Math.round(selectedItem.y)} onChange={(e) => updateItemPosition(selectedItem.id, selectedItem.x, parseFloat(e.target.value) || 0)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div></div></div>
-                      <div><label className="text-xs font-medium text-slate-700 mb-1 block">Size</label><div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-slate-500">Width (ft)</label><input type="number" value={selectedItem.widthFt || ''} onChange={(e) => updateItemSize(selectedItem.id, parseFloat(e.target.value) || 1, selectedItem.heightFt)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div><div><label className="text-xs text-slate-500">Height (ft)</label><input type="number" value={selectedItem.heightFt || ''} onChange={(e) => updateItemSize(selectedItem.id, selectedItem.widthFt, parseFloat(e.target.value) || 1)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div></div></div>
-                      <div><label className="text-xs font-medium text-slate-700 mb-1 block">Rotation</label><div className="flex items-center gap-2"><button onClick={() => updateItemRotation(selectedItem.id, (selectedItem.rotation || 0) - 15)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg"><RotateCcw className="w-4 h-4" /></button><input type="number" value={selectedItem.rotation || 0} onChange={(e) => updateItemRotation(selectedItem.id, parseFloat(e.target.value) || 0)} className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm text-center" /><span className="text-sm text-slate-500">°</span><button onClick={() => updateItemRotation(selectedItem.id, (selectedItem.rotation || 0) + 15)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg"><RotateCw className="w-4 h-4" /></button></div><div className="flex gap-1 mt-2">{[0, 45, 90, 135, 180, 270].map(angle => (<button key={angle} onClick={() => updateItemRotation(selectedItem.id, angle)} className={`flex-1 py-1 text-xs rounded ${selectedItem.rotation === angle ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>{angle}°</button>))}</div></div>
-                      <div><label className="text-xs font-medium text-slate-700 mb-1 block">Layer</label><div className="flex gap-2"><button onClick={() => bringToFront(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm"><ArrowUp className="w-4 h-4" />Front</button><button onClick={() => sendToBack(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm"><ArrowDown className="w-4 h-4" />Back</button></div></div>
-                      <div className="flex gap-2 pt-2 border-t border-slate-200">{selectedItem.itemType !== 'boat' && <button onClick={() => duplicateItem(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm"><Copy className="w-4 h-4" />Duplicate</button>}<button onClick={() => deleteItem(selectedItem.id)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm"><Trash2 className="w-4 h-4" />Remove</button></div>
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        <p className="font-medium text-slate-900">{selectedItem.boat?.name || selectedItem.label || SHOW_ITEM_TYPES[selectedItem.itemType]?.label}</p>
+                        <p className="text-xs text-slate-500 capitalize">{selectedItem.itemType}</p>
+                      </div>
+                      {/* Boat Type Toggle - only for boats */}
+                      {selectedItem.itemType === 'boat' && (
+                        <div>
+                          <label className="text-xs font-medium text-slate-700 mb-1 block">Boat Type</label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => updateBoatType(selectedItem.id, 'bowrider')}
+                              className={`flex-1 py-2 text-sm rounded-lg transition-colors ${(selectedItem.boatType || 'bowrider') === 'bowrider' ? 'bg-blue-100 text-blue-700 font-medium border-2 border-blue-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                            >
+                              Bowrider
+                            </button>
+                            <button
+                              onClick={() => updateBoatType(selectedItem.id, 'pontoon')}
+                              className={`flex-1 py-2 text-sm rounded-lg transition-colors ${selectedItem.boatType === 'pontoon' ? 'bg-blue-100 text-blue-700 font-medium border-2 border-blue-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                            >
+                              Pontoon
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-xs font-medium text-slate-700 mb-1 block">Position</label>
+                        <p className="text-xs text-slate-400 mb-2">Use arrow keys to nudge (Shift for 5ft)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="text-xs text-slate-500">X (ft)</label><input type="number" value={Math.round(selectedItem.x)} onChange={(e) => updateItemPosition(selectedItem.id, parseFloat(e.target.value) || 0, selectedItem.y)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div>
+                          <div><label className="text-xs text-slate-500">Y (ft)</label><input type="number" value={Math.round(selectedItem.y)} onChange={(e) => updateItemPosition(selectedItem.id, selectedItem.x, parseFloat(e.target.value) || 0)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-700 mb-1 block">Size</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="text-xs text-slate-500">Beam (ft)</label><input type="number" value={selectedItem.widthFt || ''} onChange={(e) => updateItemSize(selectedItem.id, parseFloat(e.target.value) || 1, selectedItem.heightFt)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div>
+                          <div><label className="text-xs text-slate-500">Length (ft)</label><input type="number" value={selectedItem.heightFt || ''} onChange={(e) => updateItemSize(selectedItem.id, selectedItem.widthFt, parseFloat(e.target.value) || 1)} className="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-700 mb-1 block">Rotation</label>
+                        <p className="text-xs text-slate-400 mb-2">Press R to rotate (Shift for 45°)</p>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => updateItemRotation(selectedItem.id, (selectedItem.rotation || 0) - 15)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg"><RotateCcw className="w-4 h-4" /></button>
+                          <input type="number" value={selectedItem.rotation || 0} onChange={(e) => updateItemRotation(selectedItem.id, parseFloat(e.target.value) || 0)} className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm text-center" />
+                          <span className="text-sm text-slate-500">°</span>
+                          <button onClick={() => updateItemRotation(selectedItem.id, (selectedItem.rotation || 0) + 15)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg"><RotateCw className="w-4 h-4" /></button>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          {[0, 45, 90, 135, 180, 270].map(angle => (
+                            <button key={angle} onClick={() => updateItemRotation(selectedItem.id, angle)} className={`flex-1 py-1 text-xs rounded ${selectedItem.rotation === angle ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>{angle}°</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-700 mb-1 block">Layer</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => bringToFront(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm"><ArrowUp className="w-4 h-4" />Front</button>
+                          <button onClick={() => sendToBack(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm"><ArrowDown className="w-4 h-4" />Back</button>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-slate-200">
+                        {selectedItem.itemType !== 'boat' && <button onClick={() => duplicateItem(selectedItem)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm"><Copy className="w-4 h-4" />Duplicate</button>}
+                        <button onClick={() => deleteItem(selectedItem.id)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm"><Trash2 className="w-4 h-4" />Remove</button>
+                      </div>
                     </div>
-                  ) : <div className="text-center py-8 text-slate-500"><Move className="w-12 h-12 mx-auto mb-3 opacity-30" /><p className="text-sm">Click an item on the canvas to select it</p></div>}
+                  ) : (
+                    <div className="text-center py-8 text-slate-500">
+                      <Move className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">Click an item on the canvas to select it</p>
+                      <p className="text-xs text-slate-400 mt-2">Tip: Use arrow keys to move, R to rotate</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
