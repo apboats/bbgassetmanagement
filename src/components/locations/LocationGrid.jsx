@@ -628,7 +628,7 @@ export function LocationGrid({
                 onSlotClick(location, row, col);
               }
             }}
-            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all group ${
+            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors group ${
               boat
                 ? boat.storageBoat
                   ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
@@ -680,7 +680,7 @@ export function LocationGrid({
                 onSlotClick(location, row, col);
               }
             }}
-            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all group ${
+            className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors group ${
               boat
                 ? boat.storageBoat
                   ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
@@ -727,7 +727,7 @@ export function LocationGrid({
             onSlotClick(location, row, col);
           }
         }}
-        className={`location-slot border-2 rounded-lg flex flex-col items-center justify-center text-center transition-all overflow-hidden group ${
+        className={`location-slot border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors overflow-hidden group ${
           boat
             ? boat.storageBoat
               ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
@@ -769,7 +769,7 @@ export function LocationGrid({
       <div className="mb-3">
         <p className="text-xs font-semibold text-slate-500 mb-1.5 px-0.5">{title}</p>
         <div
-          className="grid gap-1.5"
+          className="grid gap-3"
           style={{ gridTemplateColumns: 'repeat(auto-fill, 100px)' }}
         >
           {slots.map(({ row, col }) => renderConciseSlot(row, col))}
@@ -864,14 +864,14 @@ export function LocationGrid({
       <div className="p-4 bg-slate-50">
         {/* Concise view for U-shaped layouts */}
         {isUShape && viewMode === 'concise' ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
             {renderConciseView()}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
             <div className="inline-block min-w-full">
               <div
-                className="grid gap-1.5"
+                className="grid gap-3"
                 style={{
                   gridTemplateColumns: `repeat(${location.columns}, minmax(100px, 100px))`
                 }}
