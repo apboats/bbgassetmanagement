@@ -211,6 +211,7 @@ export function ReportsView({ currentUser }) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysBack);
       cutoffDate.setHours(0, 0, 0, 0);
+      const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format for work_date
 
       const { data: locations } = await supabase
         .from('locations')
@@ -220,30 +221,33 @@ export function ReportsView({ currentUser }) {
         .from('inventory_boats')
         .select('id, dockmaster_id, location');
 
-      let allRecentOps = [];
+      // Query time_entries table directly for work performed within the date range
+      let allTimeEntries = [];
       let offset = 0;
       const PAGE_SIZE = 1000;
 
       while (true) {
-        const { data: pageOps, error: opsError } = await supabase
-          .from('work_order_operations')
-          .select('work_order_id, last_worked_at')
-          .gte('last_worked_at', cutoffDate.toISOString())
+        const { data: pageEntries, error: teError } = await supabase
+          .from('time_entries')
+          .select('work_order_id, work_date, hours')
+          .gte('work_date', cutoffDateStr)
+          .gt('hours', 0)  // Only entries with actual hours worked
           .range(offset, offset + PAGE_SIZE - 1);
 
-        if (opsError) throw opsError;
-        if (!pageOps || pageOps.length === 0) break;
+        if (teError) throw teError;
+        if (!pageEntries || pageEntries.length === 0) break;
 
-        allRecentOps.push(...pageOps);
-        if (pageOps.length < PAGE_SIZE) break;
+        allTimeEntries.push(...pageEntries);
+        if (pageEntries.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
 
+      // Build map of work order IDs with their latest work date
       const woLastWorkedMap = new Map();
-      for (const op of allRecentOps) {
-        const existing = woLastWorkedMap.get(op.work_order_id);
-        if (!existing || new Date(op.last_worked_at) > new Date(existing)) {
-          woLastWorkedMap.set(op.work_order_id, op.last_worked_at);
+      for (const te of allTimeEntries) {
+        const existing = woLastWorkedMap.get(te.work_order_id);
+        if (!existing || te.work_date > existing) {
+          woLastWorkedMap.set(te.work_order_id, te.work_date);
         }
       }
 
@@ -261,6 +265,8 @@ export function ReportsView({ currentUser }) {
       for (let i = 0; i < workOrderIds.length; i += BATCH_SIZE) {
         const batchIds = workOrderIds.slice(i, i + BATCH_SIZE);
 
+        // Only filter by status = Open, no longer require total_labor_cost > 0
+        // since we're using time_entries as the source of truth
         const { data: batchWOs, error: woError } = await supabase
           .from('work_orders')
           .select(`
@@ -268,8 +274,7 @@ export function ReportsView({ currentUser }) {
             boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
           `)
           .in('id', batchIds)
-          .eq('status', 'O')
-          .gt('total_labor_cost', 0);
+          .eq('status', 'O');
 
         if (woError) throw woError;
         if (batchWOs) allWorkOrders.push(...batchWOs);
