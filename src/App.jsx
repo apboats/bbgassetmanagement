@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText } from 'lucide-react';
 
 // Import pages
@@ -108,8 +109,19 @@ export default function BoatsByGeorgeAssetManager({
 }) {
   // UI State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [currentView, setCurrentView] = useState('dashboard');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Router hooks
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Helper to determine current view from path
+  const getCurrentView = () => {
+    const path = location.pathname;
+    if (path === '/' || path === '/dashboard') return 'dashboard';
+    return path.slice(1); // Remove leading slash
+  };
+  const currentView = getCurrentView();
 
   // Wrapper functions for array-based updates
   const saveBoats = async (newBoats) => {
@@ -232,13 +244,13 @@ export default function BoatsByGeorgeAssetManager({
 
   const handleLogin = (user) => {
     setIsAuthenticated(true);
-    setCurrentView('dashboard');
+    navigate('/');
   };
 
   const handleLogout = async () => {
     setIsAuthenticated(false);
     await onSignOut();
-    setCurrentView('dashboard');
+    navigate('/');
     setShowMobileMenu(false);
   };
 
@@ -303,15 +315,15 @@ export default function BoatsByGeorgeAssetManager({
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-2">
-              <NavButton icon={Home} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
-              <NavButton icon={User} label="My View" active={currentView === 'myview'} onClick={() => setCurrentView('myview')} />
-              <NavButton icon={Map} label="Locations" active={currentView === 'locations'} onClick={() => setCurrentView('locations')} />
-              <NavButton icon={Package} label="Boats" active={currentView === 'boats'} onClick={() => setCurrentView('boats')} />
-              <NavButton icon={Package} label="Inventory" active={currentView === 'inventory'} onClick={() => setCurrentView('inventory')} />
-              <NavButton icon={Anchor} label="Shows" active={currentView === 'shows'} onClick={() => setCurrentView('shows')} />
-              <NavButton icon={FileText} label="Reports" active={currentView === 'reports'} onClick={() => setCurrentView('reports')} />
-              <NavButton icon={Camera} label="Scan" active={currentView === 'scan'} onClick={() => setCurrentView('scan')} />
-              <NavButton icon={Settings} label="Settings" active={currentView === 'settings'} onClick={() => setCurrentView('settings')} />
+              <NavButton icon={Home} label="Dashboard" active={currentView === 'dashboard'} onClick={() => navigate('/')} />
+              <NavButton icon={User} label="My View" active={currentView === 'myview'} onClick={() => navigate('/myview')} />
+              <NavButton icon={Map} label="Locations" active={currentView === 'locations'} onClick={() => navigate('/locations')} />
+              <NavButton icon={Package} label="Boats" active={currentView === 'boats'} onClick={() => navigate('/boats')} />
+              <NavButton icon={Package} label="Inventory" active={currentView === 'inventory'} onClick={() => navigate('/inventory')} />
+              <NavButton icon={Anchor} label="Shows" active={currentView === 'shows'} onClick={() => navigate('/shows')} />
+              <NavButton icon={FileText} label="Reports" active={currentView === 'reports'} onClick={() => navigate('/reports')} />
+              <NavButton icon={Camera} label="Scan" active={currentView === 'scan'} onClick={() => navigate('/scan')} />
+              <NavButton icon={Settings} label="Settings" active={currentView === 'settings'} onClick={() => navigate('/settings')} />
               <div className="flex items-center ml-2 pl-2 border-l border-slate-200">
                 <button onClick={handleLogout} className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Logout">
                   <LogOut className="w-5 h-5 text-slate-600" />
@@ -335,17 +347,17 @@ export default function BoatsByGeorgeAssetManager({
             <div className="lg:hidden border-t border-slate-200 py-2 bg-white">
               <div className="flex flex-col gap-1">
                 {[
-                  { view: 'dashboard', icon: Home, label: 'Dashboard' },
-                  { view: 'myview', icon: User, label: 'My View' },
-                  { view: 'locations', icon: Map, label: 'Locations' },
-                  { view: 'boats', icon: Package, label: 'Boats' },
-                  { view: 'inventory', icon: Package, label: 'Inventory' },
-                  { view: 'shows', icon: Anchor, label: 'Shows' },
-                  { view: 'reports', icon: FileText, label: 'Reports' },
-                  { view: 'scan', icon: Camera, label: 'Scan' },
-                  { view: 'settings', icon: Settings, label: 'Settings' },
-                ].map(({ view, icon: Icon, label }) => (
-                  <button key={view} onClick={() => { setCurrentView(view); setShowMobileMenu(false); }}
+                  { view: 'dashboard', path: '/', icon: Home, label: 'Dashboard' },
+                  { view: 'myview', path: '/myview', icon: User, label: 'My View' },
+                  { view: 'locations', path: '/locations', icon: Map, label: 'Locations' },
+                  { view: 'boats', path: '/boats', icon: Package, label: 'Boats' },
+                  { view: 'inventory', path: '/inventory', icon: Package, label: 'Inventory' },
+                  { view: 'shows', path: '/shows', icon: Anchor, label: 'Shows' },
+                  { view: 'reports', path: '/reports', icon: FileText, label: 'Reports' },
+                  { view: 'scan', path: '/scan', icon: Camera, label: 'Scan' },
+                  { view: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
+                ].map(({ view, path, icon: Icon, label }) => (
+                  <button key={view} onClick={() => { navigate(path); setShowMobileMenu(false); }}
                     className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${currentView === view ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
                     <Icon className="w-5 h-5" /><span>{label}</span>
                   </button>
@@ -358,40 +370,45 @@ export default function BoatsByGeorgeAssetManager({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentView === 'dashboard' && (
-          <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={setCurrentView} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
-        )}
-        {currentView === 'locations' && (
-          <LocationsView locations={locations} sites={sites} boats={getCombinedBoats()} onUpdateLocations={saveLocations}
-            onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }}
-            onMoveBoat={onMoveBoat} onAddSite={onAddSite} onUpdateSite={onUpdateSite} onDeleteSite={onDeleteSite} onReorderSites={onReorderSites} />
-        )}
-        {currentView === 'boats' && (
-          <BoatsView boats={boats} locations={locations} sites={sites} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
-        )}
-        {currentView === 'scan' && (
-          <ScanView boats={boats} locations={locations} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
-        )}
-        {currentView === 'myview' && (
-          <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} userPreferences={userPreferences}
-            onSavePreferences={(prefs) => saveUserPreferences(currentUser?.id || currentUser?.username || 'default-user', prefs)} onUpdateLocations={saveLocations}
-            onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }} onMoveBoat={onMoveBoat} />
-        )}
-        {currentView === 'inventory' && (
-          <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} lastSync={lastInventorySync}
-            onSyncNow={syncInventoryBoats} onSyncRiggingWOs={syncInternalWorkOrders} onUpdateInventoryBoats={saveInventoryBoats}
-            onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
-        )}
-        {currentView === 'shows' && (
-          <BoatShowPlanner inventoryBoats={inventoryBoats} />
-        )}
-        {currentView === 'reports' && (
-          <ReportsView currentUser={currentUser} />
-        )}
-        {currentView === 'settings' && (
-          <SettingsView dockmasterConfig={dockmasterConfig} users={users}
-            onSaveConfig={onSaveDockmasterConfig} onUpdateUsers={() => console.log('User updates handled by auth system')} onReloadUsers={onReloadUsers} />
-        )}
+        <Routes>
+          <Route path="/" element={
+            <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={(view) => navigate(view === 'dashboard' ? '/' : `/${view}`)} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
+          } />
+          <Route path="/dashboard" element={<Navigate to="/" replace />} />
+          <Route path="/locations" element={
+            <LocationsView locations={locations} sites={sites} boats={getCombinedBoats()} onUpdateLocations={saveLocations}
+              onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }}
+              onMoveBoat={onMoveBoat} onAddSite={onAddSite} onUpdateSite={onUpdateSite} onDeleteSite={onDeleteSite} onReorderSites={onReorderSites} />
+          } />
+          <Route path="/boats" element={
+            <BoatsView boats={boats} locations={locations} sites={sites} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
+          } />
+          <Route path="/scan" element={
+            <ScanView boats={boats} locations={locations} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
+          } />
+          <Route path="/myview" element={
+            <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} userPreferences={userPreferences}
+              onSavePreferences={(prefs) => saveUserPreferences(currentUser?.id || currentUser?.username || 'default-user', prefs)} onUpdateLocations={saveLocations}
+              onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }} onMoveBoat={onMoveBoat} />
+          } />
+          <Route path="/inventory" element={
+            <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} lastSync={lastInventorySync}
+              onSyncNow={syncInventoryBoats} onSyncRiggingWOs={syncInternalWorkOrders} onUpdateInventoryBoats={saveInventoryBoats}
+              onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
+          } />
+          <Route path="/shows" element={
+            <BoatShowPlanner inventoryBoats={inventoryBoats} />
+          } />
+          <Route path="/reports" element={
+            <ReportsView currentUser={currentUser} />
+          } />
+          <Route path="/settings" element={
+            <SettingsView dockmasterConfig={dockmasterConfig} users={users}
+              onSaveConfig={onSaveDockmasterConfig} onUpdateUsers={() => console.log('User updates handled by auth system')} onReloadUsers={onReloadUsers} />
+          } />
+          {/* Catch-all redirect to dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
     </div>
   );
