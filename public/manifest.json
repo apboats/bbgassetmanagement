@@ -1,0 +1,18 @@
+{
+  "name": "Boats by George",
+  "short_name": "BBG",
+  "description": "Professional boat asset management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/favicon.png",
+      "sizes": "114x114",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
