@@ -126,6 +126,7 @@ const isBoatInShop = (wo, locations, inventoryBoats) => {
 
 export function ReportsView({ currentUser }) {
   const [unbilledData, setUnbilledData] = useState({ workOrders: [] });
+  const [inventoryBoatsData, setInventoryBoatsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [daysBack, setDaysBack] = useState(7);
@@ -219,7 +220,10 @@ export function ReportsView({ currentUser }) {
 
       const { data: inventoryBoats } = await supabase
         .from('inventory_boats')
-        .select('id, dockmaster_id, location');
+        .select('id, dockmaster_id, location, name, year, make, model');
+
+      // Store inventory boats for use in render (for rigging work order display)
+      setInventoryBoatsData(inventoryBoats || []);
 
       // Query time_entries table directly for work performed within the date range
       let allTimeEntries = [];
@@ -818,9 +822,33 @@ export function ReportsView({ currentUser }) {
             <tbody className="divide-y divide-slate-200">
               {unbilledData.workOrders.map((wo) => {
                 const isExpanded = expandedWOs.has(wo.id);
-                const boat = wo.boat || {};
                 const operations = wo.operations || [];
                 const item = reportItems[wo.id] || {};
+
+                // Determine boat name with proper fallbacks for customer vs inventory boats
+                let boatName = 'Unknown Boat';
+                let ownerName = 'Unknown Owner';
+
+                if (wo.boat?.name) {
+                  // Customer boat from joined table
+                  boatName = wo.boat.name;
+                  ownerName = wo.boat.owner || wo.customer_name || 'Unknown Owner';
+                } else if (wo.rigging_id) {
+                  // Inventory/rigging boat - lookup by rigging_id
+                  const invBoat = inventoryBoatsData.find(b => b.dockmaster_id === wo.rigging_id);
+                  if (invBoat?.name) {
+                    boatName = invBoat.name;
+                    ownerName = 'BBG Inventory';
+                  } else {
+                    // Fallback to work order fields
+                    boatName = wo.boat_name || 'Unknown Boat';
+                    ownerName = 'BBG Inventory';
+                  }
+                } else {
+                  // No boat join and no rigging_id - use work order fields
+                  boatName = wo.boat_name || 'Unknown Boat';
+                  ownerName = wo.customer_name || 'Unknown Owner';
+                }
 
                 return (
                   <React.Fragment key={wo.id}>
@@ -858,8 +886,8 @@ export function ReportsView({ currentUser }) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{boat.name || 'Unknown Boat'}</p>
-                        <p className="text-sm text-slate-600">{boat.owner || 'Unknown Owner'}</p>
+                        <p className="font-medium text-slate-900">{boatName}</p>
+                        <p className="text-sm text-slate-600">{ownerName}</p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-semibold text-slate-900">
@@ -981,8 +1009,16 @@ export function ReportsView({ currentUser }) {
               flagLaborFinished: op.flag_labor_finished,
             }))
           }]}
-          boatName={selectedWorkOrder.boat?.name || 'Unknown Boat'}
-          boatOwner={selectedWorkOrder.boat?.owner || ''}
+          boatName={selectedWorkOrder.boat?.name ||
+            (selectedWorkOrder.rigging_id
+              ? inventoryBoatsData.find(b => b.dockmaster_id === selectedWorkOrder.rigging_id)?.name
+              : null) ||
+            selectedWorkOrder.boat_name ||
+            'Unknown Boat'}
+          boatOwner={selectedWorkOrder.boat?.owner ||
+            (selectedWorkOrder.rigging_id ? 'BBG Inventory' : null) ||
+            selectedWorkOrder.customer_name ||
+            ''}
           onClose={() => setSelectedWorkOrder(null)}
           variant="customer"
         />
