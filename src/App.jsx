@@ -242,6 +242,37 @@ export default function BoatsByGeorgeAssetManager({
     };
   }, [dockmasterConfig]);
 
+  // Auto-refresh for kiosk/whiteboard displays
+  useEffect(() => {
+    const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+    const STALE_THRESHOLD = 5 * 60 * 1000;   // 5 minutes
+    let lastActiveTime = Date.now();
+
+    // Timer-based refresh every 30 minutes
+    const refreshTimer = setInterval(() => {
+      window.location.reload();
+    }, REFRESH_INTERVAL);
+
+    // Visibility-based refresh when returning after 5+ minutes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const timeAway = Date.now() - lastActiveTime;
+        if (timeAway > STALE_THRESHOLD) {
+          window.location.reload();
+        }
+      } else {
+        lastActiveTime = Date.now();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(refreshTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const handleLogin = (user) => {
     setIsAuthenticated(true);
     navigate('/');
@@ -309,7 +340,6 @@ export default function BoatsByGeorgeAssetManager({
               </div>
               <div className="hidden lg:block">
                 <h1 className="text-xl font-bold text-slate-900">Boats By George</h1>
-                <p className="text-xs text-slate-500">Asset Management System</p>
               </div>
             </div>
 
