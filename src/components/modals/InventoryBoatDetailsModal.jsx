@@ -119,9 +119,27 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   const inventoryType = getInventoryType(boat);
   const workTypes = WORK_TYPES[inventoryType] || WORK_TYPES.NEW;
 
+  // Initialize local workflow state from boat prop (for immediate UI updates)
+  const initWorkflowState = () => {
+    const state = {};
+    ['prep', 'rigging'].forEach(workType => {
+      // Initialize phases
+      WORK_PHASES.forEach(phase => {
+        const snakeKey = `${workType}_${phase}_complete`;
+        state[snakeKey] = boat[snakeKey] || false;
+      });
+      // Initialize status
+      state[`${workType}_status`] = boat[`${workType}_status`] || 'on-deck';
+      state[`${workType}_completed_by`] = boat[`${workType}_completed_by`] || null;
+      state[`${workType}_completed_at`] = boat[`${workType}_completed_at`] || null;
+    });
+    return state;
+  };
+  const [workflowState, setWorkflowState] = useState(initWorkflowState);
+
   // Determine initial active tab - if first tab is complete, show second tab
   const getInitialWorkType = () => {
-    const firstTabStatus = boat[`${workTypes[0]}_status`] || boat[`${workTypes[0]}Status`];
+    const firstTabStatus = workflowState[`${workTypes[0]}_status`];
     if (firstTabStatus === 'all-work-complete') {
       return workTypes[1];
     }
@@ -129,18 +147,15 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   };
   const [activeWorkType, setActiveWorkType] = useState(getInitialWorkType);
 
-  // Helper to get phase complete key (handles both camelCase and snake_case)
+  // Helper to get phase complete value from local state
   const getPhaseValue = (workType, phase) => {
-    const camelKey = `${workType}${phase.charAt(0).toUpperCase() + phase.slice(1)}Complete`;
-    const snakeKey = `${toSnakeCase(workType)}_${phase}_complete`;
-    return boat[camelKey] || boat[snakeKey] || false;
+    const snakeKey = `${workType}_${phase}_complete`;
+    return workflowState[snakeKey] || false;
   };
 
-  // Helper to get status value
+  // Helper to get status value from local state
   const getStatusValue = (workType) => {
-    const camelKey = `${workType}Status`;
-    const snakeKey = `${toSnakeCase(workType)}_status`;
-    return boat[camelKey] || boat[snakeKey] || 'on-deck';
+    return workflowState[`${workType}_status`] || 'on-deck';
   };
 
   // Check if all phases are complete for a work type
@@ -178,14 +193,14 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
       updates[statusKey] = 'on-deck';
     }
 
+    // Update local state immediately for responsive UI
+    setWorkflowState(prev => ({ ...prev, ...updates }));
+
     try {
       await supabaseService.inventoryBoats.update(boat.id, updates);
       if (onUpdateBoat) {
         // Pass updated boat back to parent
-        const updatedBoat = { ...boat };
-        Object.entries(updates).forEach(([key, value]) => {
-          updatedBoat[key] = value;
-        });
+        const updatedBoat = { ...boat, ...updates };
         onUpdateBoat(updatedBoat);
       }
     } catch (error) {
@@ -218,13 +233,13 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
       updates[`${snakeWorkType}_completed_at`] = null;
     }
 
+    // Update local state immediately for responsive UI
+    setWorkflowState(prev => ({ ...prev, ...updates }));
+
     try {
       await supabaseService.inventoryBoats.update(boat.id, updates);
       if (onUpdateBoat) {
-        const updatedBoat = { ...boat };
-        Object.entries(updates).forEach(([key, value]) => {
-          updatedBoat[key] = value;
-        });
+        const updatedBoat = { ...boat, ...updates };
         onUpdateBoat(updatedBoat);
       }
 
@@ -498,8 +513,8 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
               {/* Completed By Info */}
               {getStatusValue(activeWorkType) === 'all-work-complete' && (() => {
                 const snakeWorkType = toSnakeCase(activeWorkType);
-                const completedBy = boat[`${snakeWorkType}_completed_by`] || boat[`${activeWorkType}CompletedBy`];
-                const completedAt = boat[`${snakeWorkType}_completed_at`] || boat[`${activeWorkType}CompletedAt`];
+                const completedBy = workflowState[`${snakeWorkType}_completed_by`];
+                const completedAt = workflowState[`${snakeWorkType}_completed_at`];
                 if (completedBy && completedAt) {
                   return (
                     <p className="text-xs text-green-600 mt-2">
