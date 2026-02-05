@@ -1502,6 +1502,155 @@ export const usersService = {
 }
 
 // ============================================================================
+// SERVICE REQUESTS (Sales-to-Service Collaboration)
+// ============================================================================
+
+export const requestsService = {
+  // Get all requests with related data
+  async getAll() {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(`
+        *,
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        creator:users!service_requests_created_by_fkey(id, name),
+        service_completer:users!service_requests_service_completed_by_fkey(id, name),
+        confirmer:users!service_requests_confirmed_by_fkey(id, name),
+        messages:request_messages(*, user:users(id, name))
+      `)
+      .is('archived_at', null)  // Exclude archived by default
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Get all including archived
+  async getAllIncludingArchived() {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(`
+        *,
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        creator:users!service_requests_created_by_fkey(id, name),
+        service_completer:users!service_requests_service_completed_by_fkey(id, name),
+        confirmer:users!service_requests_confirmed_by_fkey(id, name),
+        messages:request_messages(*, user:users(id, name))
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Get single request by ID
+  async getById(id) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(`
+        *,
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        creator:users!service_requests_created_by_fkey(id, name),
+        service_completer:users!service_requests_service_completed_by_fkey(id, name),
+        confirmer:users!service_requests_confirmed_by_fkey(id, name),
+        messages:request_messages(*, user:users(id, name))
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  // Create new request
+  async create(requestData) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .insert([requestData])
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Update request
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .update(updates)
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Mark service complete
+  async markServiceComplete(id, userId) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .update({
+        status: 'service-complete',
+        service_completed_by: userId,
+        service_completed_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Confirm complete (by original requester)
+  async confirmComplete(id, userId) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .update({
+        status: 'closed',
+        confirmed_by: userId,
+        confirmed_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Add message to request
+  async addMessage(requestId, userId, message) {
+    const { data, error } = await supabase
+      .from('request_messages')
+      .insert([{
+        request_id: requestId,
+        user_id: userId,
+        message
+      }])
+      .select(`*, user:users(id, name)`)
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Archive old closed requests (call periodically or via cron)
+  async archiveOldRequests() {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const { data, error } = await supabase
+      .from('service_requests')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('status', 'closed')
+      .is('archived_at', null)
+      .lt('confirmed_at', thirtyDaysAgo.toISOString())
+      .select()
+
+    if (error) throw error
+    return data || []
+  },
+}
+
+// ============================================================================
 // REAL-TIME SUBSCRIPTIONS (Optional - for live updates)
 // ============================================================================
 
@@ -1537,6 +1686,23 @@ export const subscriptions = {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inventory_boats' },
+        callback
+      )
+      .subscribe()
+  },
+
+  // Subscribe to service requests changes
+  subscribeToRequests(callback) {
+    return supabase
+      .channel('service-requests-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'service_requests' },
+        callback
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'request_messages' },
         callback
       )
       .subscribe()
@@ -1717,6 +1883,7 @@ export const boatShowsService = {
       label: item.label || null,
       color: item.color || null,
       z_index: item.zIndex || 0,
+      boat_type: item.boatType || null,
     }
 
     const { data, error } = await supabase
@@ -1749,6 +1916,7 @@ export const boatShowsService = {
     if (updates.label !== undefined) dbUpdates.label = updates.label
     if (updates.color !== undefined) dbUpdates.color = updates.color
     if (updates.zIndex !== undefined) dbUpdates.z_index = updates.zIndex
+    if (updates.boatType !== undefined) dbUpdates.boat_type = updates.boatType
 
     const { data, error } = await supabase
       .from('boat_show_items')
