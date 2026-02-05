@@ -1,12 +1,65 @@
 // ============================================================================
 // INVENTORY BOAT DETAILS MODAL
 // ============================================================================
-// Simplified modal for inventory boats - read-only info from Dockmaster
-// with location assignment capability
+// Modal for inventory boats with workflow tracking by type (NEW, USED, BROKERAGE)
+// Includes work phases, status updates, location management, and work orders
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Wrench, ChevronRight, History, FileText, DollarSign } from 'lucide-react';
+import { X, Wrench, History, FileText, DollarSign } from 'lucide-react';
+
+// Work type configuration by inventory type
+const WORK_TYPES = {
+  USED: ['prep', 'rigging'],
+  NEW: ['preRig', 'rigging'],
+  BROKERAGE: ['preRig', 'rigging']
+};
+
+const WORK_TYPE_LABELS = {
+  prep: 'PREP',
+  preRig: 'PRE-RIG',
+  rigging: 'RIGGING'
+};
+
+// Work phases (same for all types and tabs)
+const WORK_PHASES = ['mechanicals', 'clean', 'fiberglass', 'warranty', 'invoiced', 'photographed'];
+
+// Status labels (same as customer boats)
+const STATUS_LABELS = {
+  'needs-approval': 'Needs Approval',
+  'needs-parts': 'Needs Parts',
+  'parts-kit-pulled': 'Parts Kit Pulled',
+  'on-deck': 'On Deck',
+  'all-work-complete': 'All Work Complete'
+};
+
+// Get inventory type from raw_data (NEW, USED, BROKERAGE)
+const getInventoryType = (boat) => {
+  const rawData = boat.rawData || boat.raw_data || {};
+  return rawData.type || 'NEW'; // Default to NEW if not specified
+};
+
+// Convert camelCase to snake_case for database
+const toSnakeCase = (str) => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+// Status Button Component
+function StatusButton({ status, label, active, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`p-3 rounded-lg border-2 transition-all text-sm ${
+        active
+          ? `status-${status} border-transparent text-white font-semibold shadow-md`
+          : disabled
+            ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+            : 'border-slate-300 bg-white hover:border-slate-400 text-slate-700'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 import supabaseService from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -32,7 +85,7 @@ function getTimeAgo(date) {
 
 export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose }) {
   // Get permissions from centralized hook - ensures consistent access across the app
-  const { canSeeCost } = usePermissions();
+  const { canSeeCost, currentUser } = usePermissions();
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('layout');
@@ -58,6 +111,129 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
 
   // Cost breakdown modal state
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
+
+  // Workflow state - determine work types based on inventory type
+  const inventoryType = getInventoryType(boat);
+  const workTypes = WORK_TYPES[inventoryType] || WORK_TYPES.NEW;
+
+  // Determine initial active tab - if first tab is complete, show second tab
+  const getInitialWorkType = () => {
+    const firstTabStatus = boat[`${workTypes[0]}_status`] || boat[`${workTypes[0]}Status`];
+    if (firstTabStatus === 'all-work-complete') {
+      return workTypes[1];
+    }
+    return workTypes[0];
+  };
+  const [activeWorkType, setActiveWorkType] = useState(getInitialWorkType);
+
+  // Helper to get phase complete key (handles both camelCase and snake_case)
+  const getPhaseValue = (workType, phase) => {
+    const camelKey = `${workType}${phase.charAt(0).toUpperCase() + phase.slice(1)}Complete`;
+    const snakeKey = `${toSnakeCase(workType)}_${phase}_complete`;
+    return boat[camelKey] || boat[snakeKey] || false;
+  };
+
+  // Helper to get status value
+  const getStatusValue = (workType) => {
+    const camelKey = `${workType}Status`;
+    const snakeKey = `${toSnakeCase(workType)}_status`;
+    return boat[camelKey] || boat[snakeKey] || 'on-deck';
+  };
+
+  // Check if all phases are complete for a work type
+  const checkAllPhasesComplete = (workType) => {
+    return WORK_PHASES.every(phase => getPhaseValue(workType, phase));
+  };
+
+  // Get readiness status based on work type completion
+  const getReadinessStatus = () => {
+    const tab1Complete = getStatusValue(workTypes[0]) === 'all-work-complete';
+    const tab2Complete = getStatusValue(workTypes[1]) === 'all-work-complete';
+
+    if (tab1Complete && tab2Complete) {
+      return 'delivery-ready';
+    }
+    if (tab1Complete) {
+      return 'sales-ready';
+    }
+    return null;
+  };
+
+  // Handle work phase toggle
+  const handleWorkPhaseToggle = async (phase) => {
+    const snakeWorkType = toSnakeCase(activeWorkType);
+    const snakeKey = `${snakeWorkType}_${phase}_complete`;
+    const currentValue = getPhaseValue(activeWorkType, phase);
+
+    const updates = {
+      [snakeKey]: !currentValue
+    };
+
+    // Auto-clear status if unchecking a phase and status was complete
+    const statusKey = `${snakeWorkType}_status`;
+    if (currentValue && getStatusValue(activeWorkType) === 'all-work-complete') {
+      updates[statusKey] = 'on-deck';
+    }
+
+    try {
+      await supabaseService.inventoryBoats.update(boat.id, updates);
+      if (onUpdateBoat) {
+        // Pass updated boat back to parent
+        const updatedBoat = { ...boat };
+        Object.entries(updates).forEach(([key, value]) => {
+          updatedBoat[key] = value;
+        });
+        onUpdateBoat(updatedBoat);
+      }
+    } catch (error) {
+      console.error('Error updating work phase:', error);
+      alert('Failed to update work phase. Please try again.');
+    }
+  };
+
+  // Handle status update
+  const handleStatusUpdate = async (newStatus) => {
+    const allPhasesComplete = checkAllPhasesComplete(activeWorkType);
+
+    if (newStatus === 'all-work-complete' && !allPhasesComplete) {
+      alert('All work phases must be completed first.');
+      return;
+    }
+
+    const snakeWorkType = toSnakeCase(activeWorkType);
+    const updates = {
+      [`${snakeWorkType}_status`]: newStatus
+    };
+
+    // Record who marked complete and when
+    if (newStatus === 'all-work-complete') {
+      updates[`${snakeWorkType}_completed_by`] = currentUser?.name || 'Unknown';
+      updates[`${snakeWorkType}_completed_at`] = new Date().toISOString();
+    } else {
+      // Clear completed info if status changed away from complete
+      updates[`${snakeWorkType}_completed_by`] = null;
+      updates[`${snakeWorkType}_completed_at`] = null;
+    }
+
+    try {
+      await supabaseService.inventoryBoats.update(boat.id, updates);
+      if (onUpdateBoat) {
+        const updatedBoat = { ...boat };
+        Object.entries(updates).forEach(([key, value]) => {
+          updatedBoat[key] = value;
+        });
+        onUpdateBoat(updatedBoat);
+      }
+
+      // Auto-switch to RIGGING tab when first tab completes
+      if (newStatus === 'all-work-complete' && activeWorkType === workTypes[0]) {
+        setActiveWorkType(workTypes[1]);
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update status. Please try again.');
+    }
+  };
 
   // Extract movement history loading to reusable function
   const loadMovementHistory = useCallback(async () => {
@@ -181,6 +357,17 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2 py-0.5 bg-blue-500 rounded text-xs font-medium">INVENTORY</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  inventoryType === 'USED' ? 'bg-amber-500' :
+                  inventoryType === 'BROKERAGE' ? 'bg-purple-500' : 'bg-emerald-500'
+                }`}>{inventoryType}</span>
+                {/* Readiness Badge */}
+                {getReadinessStatus() === 'delivery-ready' && (
+                  <span className="px-2 py-0.5 bg-green-500 rounded text-xs font-medium">DELIVERY READY</span>
+                )}
+                {getReadinessStatus() === 'sales-ready' && (
+                  <span className="px-2 py-0.5 bg-yellow-400 text-yellow-900 rounded text-xs font-medium">SALES READY</span>
+                )}
               </div>
               <h3 className="text-xl font-bold truncate">{boat.name}</h3>
               <p className="text-blue-100 text-sm truncate">{boat.year} {boat.make} {boat.model}</p>
@@ -208,6 +395,119 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
               <p className="text-xs text-blue-600 mt-1">Code: {boat.salesStatus}</p>
             </div>
           )}
+
+          {/* Work Type Tabs and Phases */}
+          <div className="border-2 border-slate-200 rounded-xl overflow-hidden">
+            {/* Work Type Tabs */}
+            <div className="flex border-b border-slate-200">
+              {workTypes.map((workType) => {
+                const isActive = activeWorkType === workType;
+                const isComplete = getStatusValue(workType) === 'all-work-complete';
+                return (
+                  <button
+                    key={workType}
+                    onClick={() => setActiveWorkType(workType)}
+                    className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : isComplete
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      {WORK_TYPE_LABELS[workType]}
+                      {isComplete && (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Work Phases */}
+            <div className="p-4 bg-slate-50">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">
+                Work Phases ({WORK_TYPE_LABELS[activeWorkType]})
+              </h4>
+              <div className="space-y-2">
+                {WORK_PHASES.map(phase => {
+                  const isComplete = getPhaseValue(activeWorkType, phase);
+                  return (
+                    <button
+                      key={phase}
+                      onClick={() => handleWorkPhaseToggle(phase)}
+                      className="w-full flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-lg transition-colors cursor-pointer border border-slate-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                          isComplete ? 'bg-green-500' : 'bg-slate-200'
+                        }`}>
+                          {isComplete && (
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-slate-900 capitalize">{phase}</span>
+                      </div>
+                      <span className={`text-xs font-medium ${isComplete ? 'text-green-600' : 'text-slate-400'}`}>
+                        {isComplete ? 'Complete' : 'Pending'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Status Update Section */}
+            <div className="p-4 border-t border-slate-200">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">
+                Update Status ({WORK_TYPE_LABELS[activeWorkType]})
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {Object.entries(STATUS_LABELS).map(([status, label]) => {
+                  const currentStatus = getStatusValue(activeWorkType);
+                  const isActive = currentStatus === status;
+                  const allPhasesComplete = checkAllPhasesComplete(activeWorkType);
+                  const isDisabled = status === 'all-work-complete' && !allPhasesComplete;
+
+                  return (
+                    <StatusButton
+                      key={status}
+                      status={status}
+                      label={label}
+                      active={isActive}
+                      disabled={isDisabled}
+                      onClick={() => handleStatusUpdate(status)}
+                    />
+                  );
+                })}
+              </div>
+              {!checkAllPhasesComplete(activeWorkType) && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Complete all work phases to mark as "All Work Complete"
+                </p>
+              )}
+              {/* Completed By Info */}
+              {getStatusValue(activeWorkType) === 'all-work-complete' && (() => {
+                const snakeWorkType = toSnakeCase(activeWorkType);
+                const completedBy = boat[`${snakeWorkType}_completed_by`] || boat[`${activeWorkType}CompletedBy`];
+                const completedAt = boat[`${snakeWorkType}_completed_at`] || boat[`${activeWorkType}CompletedAt`];
+                if (completedBy && completedAt) {
+                  return (
+                    <p className="text-xs text-green-600 mt-2">
+                      Marked complete by {completedBy} on {new Date(completedAt).toLocaleDateString()}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          </div>
 
           {/* Boat Info Grid - Core Identifiers */}
           <div className="grid grid-cols-2 gap-3">
