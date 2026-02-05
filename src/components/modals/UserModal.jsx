@@ -159,6 +159,7 @@ export function UserModal({ user, onSave, onCancel }) {
             >
               <option value="user">User</option>
               <option value="manager">Manager</option>
+              <option value="sales-manager">Sales Manager</option>
               <option value="admin">Admin</option>
             </select>
           </div>
