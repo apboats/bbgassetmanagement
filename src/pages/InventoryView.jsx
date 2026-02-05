@@ -13,6 +13,25 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
   const [filterMake, setFilterMake] = useState('all');
   const [filterModel, setFilterModel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriceRange, setFilterPriceRange] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+
+  // Price range options for filtering
+  const PRICE_RANGES = [
+    { value: 'all', label: 'All Prices' },
+    { value: '0-50000', label: 'Under $50K', min: 0, max: 50000 },
+    { value: '50000-100000', label: '$50K - $100K', min: 50000, max: 100000 },
+    { value: '100000-200000', label: '$100K - $200K', min: 100000, max: 200000 },
+    { value: '200000-500000', label: '$200K - $500K', min: 200000, max: 500000 },
+    { value: '500000+', label: '$500K+', min: 500000, max: Infinity },
+  ];
+
+  // Type options (New vs Used/Brokerage combined)
+  const TYPE_OPTIONS = [
+    { value: 'all', label: 'All Types' },
+    { value: 'NEW', label: 'New' },
+    { value: 'USED_BROKERAGE', label: 'Used/Brokerage' },
+  ];
 
   // Use unified remove boat hook
   const { removeBoat } = useRemoveBoat({
@@ -98,7 +117,22 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     const matchesModel = filterModel === 'all' || boat.model === filterModel;
     const matchesStatus = filterStatus === 'all' || boat.salesStatus === filterStatus;
 
-    return matchesSearch && matchesYear && matchesMake && matchesModel && matchesStatus;
+    // Price range filter
+    const price = boat.list_price || boat.listPrice || 0;
+    const priceNum = typeof price === 'string' ? parseFloat(price) : price;
+    const matchesPriceRange = filterPriceRange === 'all' || (() => {
+      const range = PRICE_RANGES.find(r => r.value === filterPriceRange);
+      if (!range) return true;
+      return priceNum >= range.min && priceNum < range.max;
+    })();
+
+    // Type filter (New vs Used/Brokerage)
+    const boatType = (boat.raw_data?.inventory_type || boat.inventoryType || '').toUpperCase();
+    const matchesType = filterType === 'all' ||
+      (filterType === 'NEW' && boatType === 'NEW') ||
+      (filterType === 'USED_BROKERAGE' && (boatType === 'USED' || boatType === 'BROKERAGE'));
+
+    return matchesSearch && matchesYear && matchesMake && matchesModel && matchesStatus && matchesPriceRange && matchesType;
   });
 
   const handleSyncNow = async () => {
@@ -265,7 +299,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
             </div>
 
             {/* Filter Dropdowns */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Year</label>
                 <select
@@ -321,10 +355,36 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Price Range</label>
+                <select
+                  value={filterPriceRange}
+                  onChange={(e) => setFilterPriceRange(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  {PRICE_RANGES.map(range => (
+                    <option key={range.value} value={range.value}>{range.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  {TYPE_OPTIONS.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Active Filters Display */}
-            {(filterYear !== 'all' || filterMake !== 'all' || filterModel !== 'all' || filterStatus !== 'all' || searchQuery) && (
+            {(filterYear !== 'all' || filterMake !== 'all' || filterModel !== 'all' || filterStatus !== 'all' || filterPriceRange !== 'all' || filterType !== 'all' || searchQuery) && (
               <div className="flex items-center justify-between pt-2 border-t border-slate-200">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-slate-600">
@@ -337,6 +397,8 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
                     setFilterMake('all');
                     setFilterModel('all');
                     setFilterStatus('all');
+                    setFilterPriceRange('all');
+                    setFilterType('all');
                     setSearchQuery('');
                   }}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium"
