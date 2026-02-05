@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText } from 'lucide-react';
+import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText, MessageSquare } from 'lucide-react';
 
 // Import pages
 import { LoginScreen } from './pages/LoginScreen';
@@ -13,6 +13,7 @@ import { InventoryView } from './pages/InventoryView';
 import { SettingsView } from './pages/SettingsView';
 import { BoatShowPlanner } from './pages/BoatShowPlanner';
 import { ReportsView } from './pages/ReportsView';
+import { RequestsView } from './pages/RequestsView';
 
 // Import shared components
 import { NavButton } from './components/SharedComponents';
@@ -106,6 +107,14 @@ export default function BoatsByGeorgeAssetManager({
   // Dockmaster Config
   dockmasterConfig,
   onSaveDockmasterConfig,
+
+  // Service Requests
+  requests = [],
+  onCreateRequest,
+  onUpdateRequest,
+  onAddRequestMessage,
+  onMarkServiceComplete,
+  onConfirmRequestComplete,
 }) {
   // UI State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
@@ -352,6 +361,7 @@ export default function BoatsByGeorgeAssetManager({
               <NavButton icon={Package} label="Inventory" active={currentView === 'inventory'} onClick={() => navigate('/inventory')} />
               <NavButton icon={Anchor} label="Shows" active={currentView === 'shows'} onClick={() => navigate('/shows')} />
               <NavButton icon={FileText} label="Reports" active={currentView === 'reports'} onClick={() => navigate('/reports')} />
+              <NavButton icon={MessageSquare} label="Requests" active={currentView === 'requests'} onClick={() => navigate('/requests')} />
               <NavButton icon={Camera} label="Scan" active={currentView === 'scan'} onClick={() => navigate('/scan')} />
               <NavButton icon={Settings} label="Settings" active={currentView === 'settings'} onClick={() => navigate('/settings')} />
               <div className="flex items-center ml-2 pl-2 border-l border-slate-200">
@@ -384,6 +394,7 @@ export default function BoatsByGeorgeAssetManager({
                   { view: 'inventory', path: '/inventory', icon: Package, label: 'Inventory' },
                   { view: 'shows', path: '/shows', icon: Anchor, label: 'Shows' },
                   { view: 'reports', path: '/reports', icon: FileText, label: 'Reports' },
+                  { view: 'requests', path: '/requests', icon: MessageSquare, label: 'Requests' },
                   { view: 'scan', path: '/scan', icon: Camera, label: 'Scan' },
                   { view: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
                 ].map(({ view, path, icon: Icon, label }) => (
@@ -435,6 +446,18 @@ export default function BoatsByGeorgeAssetManager({
           <Route path="/settings" element={
             <SettingsView dockmasterConfig={dockmasterConfig} users={users}
               onSaveConfig={onSaveDockmasterConfig} onUpdateUsers={() => console.log('User updates handled by auth system')} onReloadUsers={onReloadUsers} />
+          } />
+          <Route path="/requests" element={
+            <RequestsView
+              requests={requests}
+              inventoryBoats={inventoryBoats}
+              currentUser={currentUser}
+              onCreateRequest={onCreateRequest}
+              onUpdateRequest={onUpdateRequest}
+              onAddMessage={onAddRequestMessage}
+              onMarkServiceComplete={onMarkServiceComplete}
+              onConfirmComplete={onConfirmRequestComplete}
+            />
           } />
           {/* Catch-all redirect to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />

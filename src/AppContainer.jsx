@@ -37,6 +37,7 @@ const {
   preferences: preferencesService,
   dockmaster: dockmasterService,
   users: usersService,
+  requests: requestsService,
 } = supabaseService
 
 function AppContainer() {
@@ -51,6 +52,7 @@ function AppContainer() {
   const [users, setUsers] = useState([])
   const [dockmasterConfig, setDockmasterConfig] = useState(null)
   const [lastInventorySync, setLastInventorySync] = useState(null)
+  const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Ref to track if a sync is in progress - prevents real-time callbacks from
@@ -153,6 +155,12 @@ function AppContainer() {
         inventoryChannelRef.current = subscribeToInventory()
       }
 
+      // Subscribe to service requests changes
+      const requestsChannel = supabaseService.subscriptions.subscribeToRequests(() => {
+        console.log('Real-time update: requests changed')
+        loadRequests()
+      })
+
       console.log('Real-time subscriptions active')
 
       return () => {
@@ -162,6 +170,7 @@ function AppContainer() {
         if (inventoryChannelRef.current) {
           supabaseService.subscriptions.unsubscribe(inventoryChannelRef.current)
         }
+        supabaseService.subscriptions.unsubscribe(requestsChannel)
       }
     } catch (error) {
       console.error('Error setting up real-time subscriptions:', error)
@@ -186,6 +195,7 @@ function AppContainer() {
           loadUserPreferences().then(() => console.log('✓ User preferences loaded')),
           loadUsers().then(() => console.log('✓ Users loaded')),
           loadDockmasterConfig().then(() => console.log('✓ Dockmaster config loaded')),
+          loadRequests().then(() => console.log('✓ Requests loaded')),
         ]),
         timeoutPromise
       ])
@@ -363,6 +373,16 @@ function AppContainer() {
       }
     } catch (error) {
       console.error('Error loading dockmaster config:', error)
+    }
+  }
+
+  // Load service requests
+  const loadRequests = async () => {
+    try {
+      const data = await requestsService.getAll()
+      setRequests(data || [])
+    } catch (error) {
+      console.error('Error loading requests:', error)
     }
   }
 
@@ -1018,6 +1038,60 @@ function AppContainer() {
   }
 
   // ============================================================================
+  // SERVICE REQUESTS OPERATIONS
+  // ============================================================================
+
+  const handleCreateRequest = async (requestData) => {
+    try {
+      await requestsService.create(requestData)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error creating request:', error)
+      throw error
+    }
+  }
+
+  const handleUpdateRequest = async (requestId, updates) => {
+    try {
+      await requestsService.update(requestId, updates)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error updating request:', error)
+      throw error
+    }
+  }
+
+  const handleAddRequestMessage = async (requestId, userId, message) => {
+    try {
+      await requestsService.addMessage(requestId, userId, message)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error adding request message:', error)
+      throw error
+    }
+  }
+
+  const handleMarkServiceComplete = async (requestId, userId) => {
+    try {
+      await requestsService.markServiceComplete(requestId, userId)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error marking service complete:', error)
+      throw error
+    }
+  }
+
+  const handleConfirmRequestComplete = async (requestId, userId) => {
+    try {
+      await requestsService.confirmComplete(requestId, userId)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error confirming request complete:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
   // RENDER
   // ============================================================================
 
@@ -1080,6 +1154,14 @@ function AppContainer() {
       // Dockmaster Config
       dockmasterConfig={dockmasterConfig}
       onSaveDockmasterConfig={handleSaveDockmasterConfig}
+
+      // Service Requests
+      requests={requests}
+      onCreateRequest={handleCreateRequest}
+      onUpdateRequest={handleUpdateRequest}
+      onAddRequestMessage={handleAddRequestMessage}
+      onMarkServiceComplete={handleMarkServiceComplete}
+      onConfirmRequestComplete={handleConfirmRequestComplete}
     />
   )
 }

@@ -385,7 +385,7 @@ export const AuthProvider = ({ children }) => {
 
   // Check if user is manager or admin
   const isManagerOrAdmin = () => {
-    return user?.role === 'admin' || user?.role === 'manager'
+    return user?.role === 'admin' || user?.role === 'manager' || user?.role === 'sales-manager'
   }
 
   // Memoized permissions object - computed once when user.role changes
@@ -395,11 +395,15 @@ export const AuthProvider = ({ children }) => {
     return {
       isAdmin: role === 'admin',
       isManager: role === 'manager',
+      isSalesManager: role === 'sales-manager',
       isUser: role === 'user',
-      canManageLocations: role === 'admin' || role === 'manager',
+      // Sales Manager has same permissions as Manager
+      canManageLocations: role === 'admin' || role === 'manager' || role === 'sales-manager',
       canEditUsers: role === 'admin',
-      canSeeCost: role === 'admin' || role === 'manager',
-      canDeleteBoats: role === 'admin' || role === 'manager',
+      canSeeCost: role === 'admin' || role === 'manager' || role === 'sales-manager',
+      canDeleteBoats: role === 'admin' || role === 'manager' || role === 'sales-manager',
+      // Only Sales Managers and Admins can create service requests
+      canCreateRequests: role === 'admin' || role === 'sales-manager',
       hasRole: (...roles) => roles.includes(role),
     };
   }, [user?.role]);
