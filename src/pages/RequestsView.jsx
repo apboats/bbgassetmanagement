@@ -4,28 +4,33 @@
 // Page for viewing and managing service requests between sales and service teams
 // Sales Managers can create rigging/prep requests linked to inventory boats
 // Service team can mark complete, sales confirms completion
+// Supports drag-and-drop between status columns
 // ============================================================================
 
-import { useState, useMemo } from 'react';
-import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive, Calendar } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { RequestModal } from '../components/modals/RequestModal';
 import { RequestDetailModal } from '../components/modals/RequestDetailModal';
 
-// Status configuration
+// Status configuration - order matters for the kanban board
 const STATUS_CONFIG = {
-  'open': { label: 'Open', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
-  'service-complete': { label: 'Service Complete', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: Wrench },
-  'closed': { label: 'Closed', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle },
+  'open': { label: 'Open', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', borderColor: 'border-yellow-400', icon: Clock, iconColor: 'text-yellow-600', bgHover: 'bg-yellow-50' },
+  'scheduled': { label: 'Scheduled', color: 'bg-cyan-100 text-cyan-800 border-cyan-300', borderColor: 'border-cyan-400', icon: Calendar, iconColor: 'text-cyan-600', bgHover: 'bg-cyan-50' },
+  'service-complete': { label: 'Service Complete', color: 'bg-blue-100 text-blue-800 border-blue-300', borderColor: 'border-blue-400', icon: Wrench, iconColor: 'text-blue-600', bgHover: 'bg-blue-50' },
+  'closed': { label: 'Closed', color: 'bg-green-100 text-green-800 border-green-300', borderColor: 'border-green-400', icon: CheckCircle, iconColor: 'text-green-600', bgHover: 'bg-green-50' },
 };
+
+// Ordered list of statuses for the kanban columns
+const STATUS_ORDER = ['open', 'scheduled', 'service-complete', 'closed'];
 
 const TYPE_CONFIG = {
   'rigging': { label: 'Rigging', color: 'bg-purple-100 text-purple-800' },
   'prep': { label: 'Prep', color: 'bg-orange-100 text-orange-800' },
 };
 
-// Request Card Component
-function RequestCard({ request, onClick }) {
+// Request Card Component with drag support
+function RequestCard({ request, onClick, onDragStart, onDragEnd }) {
   const statusConfig = STATUS_CONFIG[request.status] || STATUS_CONFIG['open'];
   const typeConfig = TYPE_CONFIG[request.type] || TYPE_CONFIG['rigging'];
   const StatusIcon = statusConfig.icon;
@@ -34,10 +39,23 @@ function RequestCard({ request, onClick }) {
     ? `${request.inventory_boat.year || ''} ${request.inventory_boat.make || ''} ${request.inventory_boat.model || ''}`.trim()
     : 'No boat linked';
 
+  const handleDragStart = (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', request.id);
+    if (onDragStart) onDragStart(request);
+  };
+
+  const handleDragEnd = () => {
+    if (onDragEnd) onDragEnd();
+  };
+
   return (
-    <button
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={onClick}
-      className="w-full p-4 bg-white rounded-xl border-2 border-slate-200 hover:border-blue-300 hover:shadow-md transition-all text-left"
+      className="w-full p-4 bg-white rounded-xl border-2 border-slate-200 hover:border-blue-300 hover:shadow-md transition-all text-left cursor-grab active:cursor-grabbing"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -78,7 +96,60 @@ function RequestCard({ request, onClick }) {
           </div>
         </div>
       </div>
-    </button>
+    </div>
+  );
+}
+
+// Kanban Column Component with drop support
+function KanbanColumn({ status, requests, onSelectRequest, onDragStart, onDragEnd, onDrop, isDragOver }) {
+  const config = STATUS_CONFIG[status];
+  const StatusIcon = config.icon;
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const requestId = e.dataTransfer.getData('text/plain');
+    if (onDrop) onDrop(requestId, status);
+  };
+
+  return (
+    <div
+      className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${isDragOver ? config.bgHover : ''}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <div className={`flex items-center gap-2 pb-2 border-b-2 ${config.borderColor}`}>
+        <StatusIcon className={`w-5 h-5 ${config.iconColor}`} />
+        <h2 className="font-semibold text-slate-900">{config.label}</h2>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+          {requests.length}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {requests.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-8">
+            {status === 'open' ? 'No open requests' :
+             status === 'scheduled' ? 'Nothing scheduled' :
+             status === 'service-complete' ? 'None awaiting confirmation' :
+             'No closed requests'}
+          </p>
+        ) : (
+          requests.map(request => (
+            <RequestCard
+              key={request.id}
+              request={request}
+              onClick={() => onSelectRequest(request)}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+            />
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -96,10 +167,17 @@ export function RequestsView({
 
   // State
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [filterType, setFilterType] = useState('all'); // all, rigging, prep
   const [filterStatus, setFilterStatus] = useState('active'); // active, closed, all
   const [showArchived, setShowArchived] = useState(false);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
+
+  // Get the selected request from the requests array (ensures fresh data)
+  const selectedRequest = useMemo(() => {
+    if (!selectedRequestId) return null;
+    return requests.find(r => r.id === selectedRequestId) || null;
+  }, [requests, selectedRequestId]);
 
   // Filter requests
   const filteredRequests = useMemo(() => {
@@ -120,11 +198,11 @@ export function RequestsView({
 
   // Group by status for kanban-style view
   const groupedRequests = useMemo(() => {
-    return {
-      open: filteredRequests.filter(r => r.status === 'open'),
-      'service-complete': filteredRequests.filter(r => r.status === 'service-complete'),
-      closed: filteredRequests.filter(r => r.status === 'closed'),
-    };
+    const groups = {};
+    STATUS_ORDER.forEach(status => {
+      groups[status] = filteredRequests.filter(r => r.status === status);
+    });
+    return groups;
   }, [filteredRequests]);
 
   // Handlers
@@ -139,11 +217,11 @@ export function RequestsView({
   };
 
   const handleSelectRequest = (request) => {
-    setSelectedRequest(request);
+    setSelectedRequestId(request.id);
   };
 
   const handleCloseDetail = () => {
-    setSelectedRequest(null);
+    setSelectedRequestId(null);
   };
 
   const handleAddMessage = async (requestId, message) => {
@@ -163,6 +241,34 @@ export function RequestsView({
       await onConfirmComplete(requestId, currentUser?.id);
     }
   };
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback(() => {
+    // Could add visual feedback here if needed
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDragOverStatus(null);
+  }, []);
+
+  const handleDrop = useCallback(async (requestId, newStatus) => {
+    const request = requests.find(r => r.id === requestId);
+    if (!request || request.status === newStatus) {
+      setDragOverStatus(null);
+      return;
+    }
+
+    // Update the request status
+    if (onUpdateRequest) {
+      try {
+        await onUpdateRequest(requestId, { status: newStatus });
+      } catch (error) {
+        console.error('Error updating request status:', error);
+      }
+    }
+
+    setDragOverStatus(null);
+  }, [requests, onUpdateRequest]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -230,79 +336,20 @@ export function RequestsView({
         </span>
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Open Column */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b-2 border-yellow-400">
-            <Clock className="w-5 h-5 text-yellow-600" />
-            <h2 className="font-semibold text-slate-900">Open</h2>
-            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-              {groupedRequests.open.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {groupedRequests.open.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-8">No open requests</p>
-            ) : (
-              groupedRequests.open.map(request => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  onClick={() => handleSelectRequest(request)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Service Complete Column */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b-2 border-blue-400">
-            <Wrench className="w-5 h-5 text-blue-600" />
-            <h2 className="font-semibold text-slate-900">Service Complete</h2>
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-              {groupedRequests['service-complete'].length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {groupedRequests['service-complete'].length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-8">None awaiting confirmation</p>
-            ) : (
-              groupedRequests['service-complete'].map(request => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  onClick={() => handleSelectRequest(request)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Closed Column */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b-2 border-green-400">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <h2 className="font-semibold text-slate-900">Closed</h2>
-            <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-              {groupedRequests.closed.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {groupedRequests.closed.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-8">No closed requests</p>
-            ) : (
-              groupedRequests.closed.map(request => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  onClick={() => handleSelectRequest(request)}
-                />
-              ))
-            )}
-          </div>
-        </div>
+      {/* Kanban Board - 4 columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {STATUS_ORDER.map(status => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            requests={groupedRequests[status]}
+            onSelectRequest={handleSelectRequest}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDrop={handleDrop}
+            isDragOver={dragOverStatus === status}
+          />
+        ))}
       </div>
 
       {/* Create Request Modal */}
