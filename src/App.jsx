@@ -347,7 +347,7 @@ export default function BoatsByGeorgeAssetManager({
               <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center flex-shrink-0" style={{display: 'none'}}>
                 <Package className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
               </div>
-              <div className="hidden lg:block">
+              <div className="hidden xl:block">
                 <h1 className="text-xl font-bold text-slate-900">Boats By George</h1>
               </div>
             </div>
