@@ -8,6 +8,19 @@
 import { useState, useMemo } from 'react';
 import { X, Search, Ship } from 'lucide-react';
 
+// Sales status labels and colors (matches InventoryBoatCard)
+const salesStatusLabels = {
+  'HA': { label: 'On Hand Available', color: 'bg-green-500' },
+  'HS': { label: 'On Hand Sold', color: 'bg-emerald-600' },
+  'OA': { label: 'On Order Available', color: 'bg-blue-500' },
+  'OS': { label: 'On Order Sold', color: 'bg-blue-600' },
+  'FA': { label: 'Future Available', color: 'bg-amber-500' },
+  'FS': { label: 'Future Sold', color: 'bg-amber-600' },
+  'S': { label: 'Sold', color: 'bg-purple-500' },
+  'R': { label: 'Reserved', color: 'bg-indigo-500' },
+  'FP': { label: 'Floor Planned', color: 'bg-slate-500' }
+};
+
 export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
   const [type, setType] = useState('rigging');
   const [selectedBoatId, setSelectedBoatId] = useState('');
@@ -124,26 +137,45 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
 
             {/* Selected boat display */}
             {selectedBoat && (
-              <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Ship className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {selectedBoat.year} {selectedBoat.make} {selectedBoat.model}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {selectedBoat.stock_number && `Stock #${selectedBoat.stock_number}`}
-                      {selectedBoat.hull_id && ` | HIN: ${selectedBoat.hull_id}`}
-                    </p>
+              <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <Ship className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">
+                        {selectedBoat.year} {selectedBoat.make} {selectedBoat.model}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {selectedBoat.stock_number && `Stock #${selectedBoat.stock_number}`}
+                        {selectedBoat.hull_id && ` | HIN: ${selectedBoat.hull_id}`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {selectedBoat.salesStatus && (
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded text-white ${
+                            salesStatusLabels[selectedBoat.salesStatus]?.color || 'bg-slate-400'
+                          }`}>
+                            {salesStatusLabels[selectedBoat.salesStatus]?.label || selectedBoat.salesStatus}
+                          </span>
+                        )}
+                        {selectedBoat.dockmasterId && (
+                          <span className="px-2 py-0.5 text-xs font-mono bg-slate-200 text-slate-600 rounded">
+                            DM: {selectedBoat.dockmasterId}
+                          </span>
+                        )}
+                        {selectedBoat.length && (
+                          <span className="text-xs text-slate-500">{selectedBoat.length}'</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBoatId('')}
+                    className="p-1 text-slate-400 hover:text-slate-600 flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedBoatId('')}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             )}
 
@@ -160,7 +192,7 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
             </div>
 
             {/* Boat list */}
-            <div className="mt-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+            <div className="mt-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
               {filteredBoats.length === 0 ? (
                 <p className="p-4 text-sm text-slate-500 text-center">No boats found</p>
               ) : (
@@ -179,10 +211,27 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
                     <p className="font-medium text-slate-900 text-sm">
                       {boat.year} {boat.make} {boat.model}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {boat.stock_number && `Stock #${boat.stock_number}`}
-                      {boat.hull_id && ` | HIN: ${boat.hull_id}`}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                      {boat.stock_number && <span>Stock #{boat.stock_number}</span>}
+                      {boat.hull_id && <span>HIN: {boat.hull_id}</span>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {boat.salesStatus && (
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded text-white ${
+                          salesStatusLabels[boat.salesStatus]?.color || 'bg-slate-400'
+                        }`}>
+                          {salesStatusLabels[boat.salesStatus]?.label || boat.salesStatus}
+                        </span>
+                      )}
+                      {boat.dockmasterId && (
+                        <span className="px-2 py-0.5 text-xs font-mono bg-slate-100 text-slate-600 rounded">
+                          DM: {boat.dockmasterId}
+                        </span>
+                      )}
+                      {boat.length && (
+                        <span className="text-xs text-slate-500">{boat.length}'</span>
+                      )}
+                    </div>
                   </button>
                 ))
               )}
