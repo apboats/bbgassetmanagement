@@ -9,16 +9,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, History, FileText, DollarSign } from 'lucide-react';
 
 // Work type configuration by inventory type
+// All types use 'prep' and 'rigging' as database keys, only the labels differ
 const WORK_TYPES = {
   USED: ['prep', 'rigging'],
-  NEW: ['preRig', 'rigging'],
-  BROKERAGE: ['preRig', 'rigging']
+  NEW: ['prep', 'rigging'],       // Uses 'prep' column, displays as "PRE-RIG"
+  BROKERAGE: ['prep', 'rigging']  // Uses 'prep' column, displays as "PRE-RIG"
 };
 
-const WORK_TYPE_LABELS = {
-  prep: 'PREP',
-  preRig: 'PRE-RIG',
-  rigging: 'RIGGING'
+// Labels depend on inventory type - USED shows "PREP", others show "PRE-RIG"
+const getWorkTypeLabel = (workType, inventoryType) => {
+  if (workType === 'prep') {
+    return inventoryType === 'USED' ? 'PREP' : 'PRE-RIG';
+  }
+  return 'RIGGING';
 };
 
 // Work phases (same for all types and tabs)
@@ -416,7 +419,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                     }`}
                   >
                     <span className="flex items-center justify-center gap-2">
-                      {WORK_TYPE_LABELS[workType]}
+                      {getWorkTypeLabel(workType, inventoryType)}
                       {isComplete && (
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -431,7 +434,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             {/* Work Phases */}
             <div className="p-4 bg-slate-50">
               <h4 className="text-sm font-semibold text-slate-700 mb-3">
-                Work Phases ({WORK_TYPE_LABELS[activeWorkType]})
+                Work Phases ({getWorkTypeLabel(activeWorkType, inventoryType)})
               </h4>
               <div className="space-y-2">
                 {WORK_PHASES.map(phase => {
@@ -466,7 +469,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             {/* Status Update Section */}
             <div className="p-4 border-t border-slate-200">
               <h4 className="text-sm font-semibold text-slate-700 mb-3">
-                Update Status ({WORK_TYPE_LABELS[activeWorkType]})
+                Update Status ({getWorkTypeLabel(activeWorkType, inventoryType)})
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {Object.entries(STATUS_LABELS).map(([status, label]) => {
