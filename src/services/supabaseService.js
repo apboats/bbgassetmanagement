@@ -2136,6 +2136,7 @@ export default {
   users: usersService,
   boatShows: boatShowsService,
   boatMovements: boatMovementsService,
+  requests: requestsService,
   moveBoatWithHistory,
   subscriptions,
   getAllBoatsCombined,
