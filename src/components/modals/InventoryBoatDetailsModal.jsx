@@ -893,8 +893,12 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             )}
           </div>
 
-          {/* Show Unit Cost Button - Only visible to users with cost permission */}
-          {canSeeCost && (boat.totalCost || boat.total_cost || boat.unitCost || boat.unit_cost || boat.rawData?.totalCost || boat.raw_data?.totalCost) && (
+          {/* Show Unit Cost Button - Only visible to users with cost permission and actual costs > 0 */}
+          {canSeeCost && (
+            Number(boat.totalCost || boat.total_cost || 0) > 0 ||
+            Number(boat.unitCost || boat.unit_cost || 0) > 0 ||
+            Number(boat.rawData?.totalCost || boat.raw_data?.totalCost || 0) > 0
+          ) && (
             <button
               onClick={() => setShowCostBreakdown(true)}
               className="w-full p-4 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-colors text-left"
