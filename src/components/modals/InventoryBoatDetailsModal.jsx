@@ -129,7 +129,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
         state[snakeKey] = boat[snakeKey] || false;
       });
       // Initialize status
-      state[`${workType}_status`] = boat[`${workType}_status`] || 'on-deck';
+      state[`${workType}_status`] = boat[`${workType}_status`] || 'needs-approval';
       state[`${workType}_completed_by`] = boat[`${workType}_completed_by`] || null;
       state[`${workType}_completed_at`] = boat[`${workType}_completed_at`] || null;
     });
@@ -155,7 +155,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
 
   // Helper to get status value from local state
   const getStatusValue = (workType) => {
-    return workflowState[`${workType}_status`] || 'on-deck';
+    return workflowState[`${workType}_status`] || 'needs-approval';
   };
 
   // Check if all phases are complete for a work type
@@ -294,8 +294,8 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           operations:work_order_operations(*)
         `)
         .eq('rigging_id', boat.dockmasterId)  // Match rigging_id to inventory boat's dockmaster_id
-        .eq('status', 'O')  // Only open work orders
-        .order('id', { ascending: true });  // Sort by WO number ascending
+        // No status filter - get ALL work orders (open and closed)
+        .order('id', { ascending: false });  // Most recent first
 
       if (error) throw error;
 
@@ -874,7 +874,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                   </div>
                   <div>
                     <p className="font-semibold text-purple-900">Work Orders</p>
-                    <p className="text-xs text-purple-600">Rigging & prep</p>
+                    <p className="text-xs text-purple-600">Open & closed history</p>
                   </div>
                 </div>
               </button>
