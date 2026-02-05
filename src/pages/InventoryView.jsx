@@ -127,7 +127,26 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     })();
 
     // Type filter (New vs Used/Brokerage)
-    const boatType = (boat.raw_data?.inventory_type || boat.inventoryType || '').toUpperCase();
+    // Try multiple possible field names from Dockmaster API, default to 'NEW'
+    const rawData = boat.rawData || boat.raw_data || {};
+    const boatType = (
+      rawData.type ||
+      rawData.inventoryType ||
+      rawData.unitType ||
+      rawData.condition ||
+      'NEW'
+    ).toUpperCase();
+    // Debug: log first boat's type fields to help diagnose
+    if (filterType !== 'all' && inventoryBoats.indexOf(boat) === 0) {
+      console.log('[Type Filter Debug] First boat raw_data fields:', {
+        type: rawData.type,
+        inventoryType: rawData.inventoryType,
+        unitType: rawData.unitType,
+        condition: rawData.condition,
+        resolvedBoatType: boatType,
+        rawDataKeys: Object.keys(rawData).slice(0, 20)
+      });
+    }
     const matchesType = filterType === 'all' ||
       (filterType === 'NEW' && boatType === 'NEW') ||
       (filterType === 'USED_BROKERAGE' && (boatType === 'USED' || boatType === 'BROKERAGE'));
