@@ -6,7 +6,8 @@
 // ============================================================================
 
 import React, { useState } from 'react';
-import { Maximize2, Edit2, Trash2, Wrench, Sparkles, Layers, Shield, X, DollarSign, LayoutGrid, List } from 'lucide-react';
+import { Maximize2, Edit2, Trash2, X, LayoutGrid, List, Wrench, Sparkles, Layers, Shield } from 'lucide-react';
+import { getBoatSlotStyle, SlotCardContent } from '../BoatComponents';
 import { getActiveSeason } from '../../utils/seasonHelpers';
 
 // ============================================================================
@@ -49,29 +50,7 @@ export function MaximizedLocationModal({
     e.dataTransfer.dropEffect = 'move';
   };
 
-  // Get slot styling based on boat type
-  const getSlotStyle = (boat) => {
-    if (!boat) return '';
-
-    if (boat.isInventory) {
-      const salesStatusColors = {
-        'HA': 'bg-gradient-to-br from-green-500 to-green-600',
-        'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700',
-        'OA': 'bg-gradient-to-br from-blue-500 to-blue-600',
-        'OS': 'bg-gradient-to-br from-blue-600 to-blue-700',
-        'FA': 'bg-gradient-to-br from-amber-500 to-amber-600',
-        'FS': 'bg-gradient-to-br from-amber-600 to-amber-700',
-        'S': 'bg-gradient-to-br from-purple-500 to-purple-600',
-        'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600',
-        'FP': 'bg-gradient-to-br from-slate-500 to-slate-600',
-      };
-      return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
-    }
-
-    return `status-${boat.status}`;
-  };
-
-  // Render slot content
+  // Render slot content - uses shared SlotCardContent for boats, local empty slot rendering
   const renderSlotContent = (boat, row, col) => {
     if (!boat) {
       return (
@@ -82,91 +61,8 @@ export function MaximizedLocationModal({
       );
     }
 
-    if (boat.isInventory) {
-      const salesStatusShort = {
-        'HA': 'AVAIL', 'HS': 'SOLD', 'OA': 'ORDER', 'OS': 'ORD-S',
-        'FA': 'FUTURE', 'FS': 'FUT-S', 'S': 'SOLD', 'R': 'RSVD', 'FP': 'FP'
-      };
-      return (
-        <>
-          <p className="text-white font-bold text-base leading-tight pointer-events-none truncate w-full px-1">
-            {boat.name}
-          </p>
-          <p className="text-white/80 text-sm pointer-events-none truncate w-full">
-            {boat.year} {boat.model}
-          </p>
-          <div className="flex items-center gap-1 mt-1 pointer-events-none">
-            <span className="px-2 py-0.5 bg-white/20 rounded text-xs text-white font-bold">
-              {salesStatusShort[boat.salesStatus] || boat.salesStatus || 'INV'}
-            </span>
-          </div>
-        </>
-      );
-    }
-
-    // Storage boat - 3 vertical background stripes with dynamic widths based on active season
-    if (boat.storageBoat) {
-      const activeSeason = getActiveSeason(boat);
-      const allComplete = boat.fallStatus === 'all-work-complete' &&
-                         boat.winterStatus === 'all-work-complete' &&
-                         boat.springStatus === 'all-work-complete';
-
-      // Determine width classes based on active season
-      const fallWidth = allComplete ? 'flex-[1]' : (activeSeason === 'fall' ? 'flex-[2]' : 'flex-[1]');
-      const winterWidth = allComplete ? 'flex-[1]' : (activeSeason === 'winter' ? 'flex-[2]' : 'flex-[1]');
-      const springWidth = allComplete ? 'flex-[1]' : (activeSeason === 'spring' ? 'flex-[2]' : 'flex-[1]');
-
-      // Add opacity to inactive seasons
-      const fallOpacity = (activeSeason !== 'fall' && !allComplete) ? 'opacity-70' : '';
-      const winterOpacity = (activeSeason !== 'winter' && !allComplete) ? 'opacity-70' : '';
-      const springOpacity = (activeSeason !== 'spring' && !allComplete) ? 'opacity-70' : '';
-
-      return (
-        <>
-          {/* Background: 3 colored vertical stripes with dynamic widths */}
-          <div className="absolute inset-0 flex rounded-xl overflow-hidden pointer-events-none">
-            <div className={`${fallWidth} h-full status-${boat.fallStatus} ${fallOpacity} border-r border-white/20`}></div>
-            <div className={`${winterWidth} h-full status-${boat.winterStatus} ${winterOpacity} border-r border-white/20`}></div>
-            <div className={`${springWidth} h-full status-${boat.springStatus} ${springOpacity}`}></div>
-          </div>
-
-          {/* Foreground: Regular boat card content */}
-          <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full px-1 relative z-10">{boat.owner}</p>
-          {boat.workOrderNumber && (
-            <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full relative z-10">
-              WO: {boat.workOrderNumber}
-            </p>
-          )}
-          <div className="flex gap-1.5 mt-1 pointer-events-none relative z-10">
-            <Wrench className={`w-5 h-5 ${boat[`${activeSeason}MechanicalsComplete`] ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-            <Sparkles className={`w-5 h-5 ${boat[`${activeSeason}CleanComplete`] ? 'text-white' : 'text-white/30'}`} title="Clean" />
-            <Layers className={`w-5 h-5 ${boat[`${activeSeason}FiberglassComplete`] ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
-            <Shield className={`w-5 h-5 ${boat[`${activeSeason}WarrantyComplete`] ? 'text-white' : 'text-white/30'}`} title="Warranty" />
-            <DollarSign className={`w-5 h-5 ${boat[`${activeSeason}InvoicedComplete`] ? 'text-white' : 'text-white/30'}`} title="Invoiced" />
-          </div>
-          <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1 relative z-10">{boat.name}</p>
-        </>
-      );
-    }
-
-    return (
-      <>
-        <p className="text-white font-bold text-lg leading-tight pointer-events-none truncate w-full px-1">{boat.owner}</p>
-        {boat.workOrderNumber && (
-          <p className="text-white text-sm font-mono font-semibold pointer-events-none truncate w-full">
-            WO: {boat.workOrderNumber}
-          </p>
-        )}
-        <div className="flex gap-1.5 mt-1 pointer-events-none">
-          <Wrench className={`w-5 h-5 ${boat.mechanicalsComplete ? 'text-white' : 'text-white/30'}`} title="Mechanicals" />
-          <Sparkles className={`w-5 h-5 ${boat.cleanComplete ? 'text-white' : 'text-white/30'}`} title="Clean" />
-          <Layers className={`w-5 h-5 ${boat.fiberglassComplete ? 'text-white' : 'text-white/30'}`} title="Fiberglass" />
-          <Shield className={`w-5 h-5 ${boat.warrantyComplete ? 'text-white' : 'text-white/30'}`} title="Warranty" />
-          <DollarSign className={`w-5 h-5 ${boat.invoicedComplete ? 'text-white' : 'text-white/30'}`} title="Invoiced" />
-        </div>
-        <p className="text-white text-xs opacity-75 pointer-events-none truncate w-full mt-1">{boat.name}</p>
-      </>
-    );
+    // Use shared SlotCardContent component for consistent rendering with DragPreview
+    return <SlotCardContent boat={boat} />;
   };
 
   // Render grid slot (for layout view)
@@ -214,7 +110,7 @@ export function MaximizedLocationModal({
           boat
             ? boat.storageBoat
               ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-3`
+              : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-3`
             : isDragging
               ? 'border-blue-400 bg-blue-50 cursor-pointer p-3'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-3'
@@ -266,7 +162,7 @@ export function MaximizedLocationModal({
           boat
             ? boat.storageBoat
               ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+              : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-2`
             : isDragging
               ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
@@ -478,30 +374,6 @@ export function LocationGrid({
     e.dataTransfer.dropEffect = 'move';
   };
 
-  // Get slot styling based on boat type
-  const getSlotStyle = (boat) => {
-    if (!boat) return '';
-
-    if (boat.isInventory) {
-      // Inventory boats - gradient based on sales status
-      const salesStatusColors = {
-        'HA': 'bg-gradient-to-br from-green-500 to-green-600',
-        'HS': 'bg-gradient-to-br from-emerald-600 to-emerald-700',
-        'OA': 'bg-gradient-to-br from-blue-500 to-blue-600',
-        'OS': 'bg-gradient-to-br from-blue-600 to-blue-700',
-        'FA': 'bg-gradient-to-br from-amber-500 to-amber-600',
-        'FS': 'bg-gradient-to-br from-amber-600 to-amber-700',
-        'S': 'bg-gradient-to-br from-purple-500 to-purple-600',
-        'R': 'bg-gradient-to-br from-indigo-500 to-indigo-600',
-        'FP': 'bg-gradient-to-br from-slate-500 to-slate-600',
-      };
-      return salesStatusColors[boat.salesStatus] || 'bg-gradient-to-br from-blue-500 to-blue-600';
-    }
-
-    // Regular boats - use status classes
-    return `status-${boat.status}`;
-  };
-
   // Render slot content based on boat type
   const renderSlotContent = (boat, row, col) => {
     if (!boat) {
@@ -661,7 +533,7 @@ export function LocationGrid({
               boat
                 ? boat.storageBoat
                   ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-                  : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+                  : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
                 : isDragging
                   ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
                   : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
@@ -720,7 +592,7 @@ export function LocationGrid({
               boat
                 ? boat.storageBoat
                   ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-                  : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+                  : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
                 : isDragging
                   ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
                   : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
@@ -774,7 +646,7 @@ export function LocationGrid({
           boat
             ? boat.storageBoat
               ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-1.5`
+              : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-1.5`
             : isDragging
               ? 'border-blue-400 bg-blue-50 cursor-pointer p-1.5'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1.5'
