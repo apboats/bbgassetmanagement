@@ -64,3 +64,31 @@ select:focus-visible {
     display: none !important;
   }
 }
+
+/* ============================================================================
+   DRAG AND DROP - LIFT ORIGINAL STYLES
+   ============================================================================ */
+
+/* Placeholder shown in the slot while its content is being dragged */
+.slot-placeholder {
+  background: repeating-linear-gradient(
+    45deg,
+    #e2e8f0,
+    #e2e8f0 10px,
+    #f1f5f9 10px,
+    #f1f5f9 20px
+  ) !important;
+  border: 2px dashed #94a3b8 !important;
+}
+
+/* Hide the content inside the placeholder slot */
+.slot-placeholder > * {
+  visibility: hidden;
+}
+
+/* The lifted element during drag */
+.dragging-lifted {
+  pointer-events: none;
+  will-change: transform;
+  cursor: grabbing;
+}
