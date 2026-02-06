@@ -929,11 +929,23 @@ function AppContainer() {
     }
   }
 
-  const handleMoveBoat = async (boatOrBoatId, toLocationId, toSlotId, isInventory = false) => {
-    console.log('[AppContainer.handleMoveBoat] Called with:', { boatOrBoatId, toLocationId, toSlotId, isInventory })
-
+  const handleMoveBoat = async (boatOrBoatId, toLocationOrId, toSlotId, isInventory = false) => {
     // Handle both boat object and boatId string
     const boatId = typeof boatOrBoatId === 'object' ? boatOrBoatId.id : boatOrBoatId;
+
+    // Handle both location object and locationId string
+    const toLocationId = typeof toLocationOrId === 'object'
+      ? toLocationOrId?.id
+      : toLocationOrId;
+
+    // Detect isInventory from boat object if not explicitly passed
+    const isInventoryBoat = typeof boatOrBoatId === 'object' && boatOrBoatId.isInventory === true
+      ? true
+      : isInventory;
+
+    console.log('[AppContainer.handleMoveBoat] Called with:', {
+      boatId, toLocationId, toSlotId, isInventoryBoat
+    })
 
     try {
       // Use centralized service that reads from_location/from_slot from database
@@ -943,12 +955,12 @@ function AppContainer() {
         toLocationId,
         toSlotId,
         user?.id,
-        isInventory
+        isInventoryBoat
       )
       console.log('[AppContainer.handleMoveBoat] Move and logging complete')
 
       // Reload data from database
-      if (isInventory) {
+      if (isInventoryBoat) {
         await loadInventoryBoats()
       } else {
         await loadBoats()
