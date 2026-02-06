@@ -12,6 +12,7 @@ import { SiteManagementModal } from '../components/modals/SiteManagementModal';
 import { PoolLocation } from '../components/locations/PoolLocation';
 import { LocationGrid, MaximizedLocationModal } from '../components/locations/LocationGrid';
 import { LocationSection } from '../components/locations/LocationSection';
+import { DragPreview } from '../components/BoatComponents';
 import { boatLifecycleService } from '../services/supabaseService';
 
 export function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites }) {
@@ -428,29 +429,12 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
         </div>
       )}
 
-      {/* Floating drag preview for touch devices - follows finger */}
-      {isDraggingActive && draggingBoat && dragPreviewPos.x > 0 && (
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{
-            left: dragPreviewPos.x,
-            top: dragPreviewPos.y,
-            transform: 'translate(-50%, -50%)'
-          }}
-        >
-          <div className="bg-blue-600 text-white px-4 py-3 rounded-lg shadow-2xl border-2 border-blue-400 opacity-90">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-              <span className="font-medium text-sm whitespace-nowrap">
-                {draggingBoat.isInventory
-                  ? (draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || draggingBoat.hullId || draggingBoat.hull_id || 'Inventory Boat')
-                  : (draggingBoat.owner || draggingBoat.name || draggingBoat.workOrderNumber || 'Customer Boat')
-                }
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating drag preview for touch devices - ghosted boat card */}
+      <DragPreview
+        boat={draggingBoat}
+        position={dragPreviewPos}
+        isVisible={isDraggingActive}
+      />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
