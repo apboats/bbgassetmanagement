@@ -935,32 +935,39 @@ function AppContainer() {
     // Update locations state - remove from old location, add to new location
     setLocations(prevLocations => {
       return prevLocations.map(location => {
+        let updatedLocation = location
+        const isSourceLocation = location.id === fromLocationId
+        const isTargetLocation = location.id === toLocationId
+
         // Remove boat from source location (either from boats object or pool_boats array)
-        if (location.id === fromLocationId) {
+        if (isSourceLocation) {
           if (fromSlotId === 'pool') {
             // Remove from pool_boats array
-            const newPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
-            return { ...location, pool_boats: newPoolBoats }
-          } else if (location.boats) {
+            const newPoolBoats = (updatedLocation.pool_boats || []).filter(id => id !== boatId)
+            updatedLocation = { ...updatedLocation, pool_boats: newPoolBoats }
+          } else if (updatedLocation.boats) {
             // Remove from boats object
-            const newBoats = { ...location.boats }
+            const newBoats = { ...updatedLocation.boats }
             delete newBoats[fromSlotId]
-            return { ...location, boats: newBoats }
+            updatedLocation = { ...updatedLocation, boats: newBoats }
           }
         }
+
         // Add boat to target location (either to boats object or pool_boats array)
-        if (location.id === toLocationId) {
+        // This can be the same location as source (moving within same location)
+        if (isTargetLocation) {
           if (toSlotId === 'pool') {
             // Add to pool_boats array
-            const newPoolBoats = [...(location.pool_boats || []), boatId]
-            return { ...location, pool_boats: newPoolBoats }
+            const newPoolBoats = [...(updatedLocation.pool_boats || []), boatId]
+            updatedLocation = { ...updatedLocation, pool_boats: newPoolBoats }
           } else {
             // Add to boats object
-            const newBoats = { ...(location.boats || {}), [toSlotId]: boatId }
-            return { ...location, boats: newBoats }
+            const newBoats = { ...(updatedLocation.boats || {}), [toSlotId]: boatId }
+            updatedLocation = { ...updatedLocation, boats: newBoats }
           }
         }
-        return location
+
+        return updatedLocation
       })
     })
 
