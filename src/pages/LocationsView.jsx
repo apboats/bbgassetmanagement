@@ -62,15 +62,29 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
     handlePoolDrop,
     // Touch handlers for touch devices
     handleTouchStart,
-    handleTouchMove,
+    handleTouchMove: handleTouchMoveFromHook,
     handleTouchEnd: handleTouchEndFromHook
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
 
+  // State for drag preview position (for touch devices)
+  const [dragPreviewPos, setDragPreviewPos] = useState({ x: 0, y: 0 });
+
+  // Wrap handleTouchMove to also update drag preview position
+  const handleTouchMove = (e) => {
+    handleTouchMoveFromHook(e);
+    // Update drag preview position if dragging
+    if (e.touches && e.touches[0]) {
+      setDragPreviewPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  };
+
   // Wrap handleTouchEnd to pass locations array for drop target detection
   const handleTouchEnd = (e) => {
     handleTouchEndFromHook(e, locations);
+    // Clear drag preview position
+    setDragPreviewPos({ x: 0, y: 0 });
   };
 
   // Clean up expandedSites when sites are deleted (remove stale IDs)
@@ -414,13 +428,24 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
         </div>
       )}
 
-      {/* Floating drag indicator for touch devices */}
-      {isDraggingActive && draggingBoat && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
-          <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
-          <span className="font-medium">
-            Moving: {draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || 'Boat'}
-          </span>
+      {/* Floating drag preview for touch devices - follows finger */}
+      {isDraggingActive && draggingBoat && dragPreviewPos.x > 0 && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: dragPreviewPos.x,
+            top: dragPreviewPos.y,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-lg shadow-2xl border-2 border-blue-400 opacity-90">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+              <span className="font-medium text-sm whitespace-nowrap">
+                {draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || 'Boat'}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
