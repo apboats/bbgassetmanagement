@@ -145,6 +145,9 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   // ============================================================================
 
   const handleTouchStart = useCallback((e, boat, location, slotId) => {
+    // Prevent iOS text selection behavior during drag
+    e.preventDefault();
+
     // Get initial touch position
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
