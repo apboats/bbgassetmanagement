@@ -254,6 +254,50 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     }
   }, []);
 
+  // Animate the drag clone to the target position before removing (smooth drop)
+  const animateDragCloneToTarget = useCallback((targetElement) => {
+    const clone = dragCloneRef.current;
+    if (!clone || !targetElement) {
+      removeDragClone();
+      return;
+    }
+
+    // Get target position
+    const targetRect = targetElement.getBoundingClientRect();
+    const cloneRect = originalRectRef.current;
+
+    if (!cloneRect) {
+      removeDragClone();
+      return;
+    }
+
+    // Calculate center of target slot
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+
+    // Enable transition for smooth animation
+    clone.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
+
+    // Animate to target position with scale down and fade
+    clone.style.transform = `translate(${targetCenterX - cloneRect.width / 2}px, ${targetCenterY - cloneRect.height / 2}px) scale(0.9)`;
+    clone.style.opacity = '0';
+
+    // Remove clone after animation completes
+    const handleTransitionEnd = () => {
+      clone.removeEventListener('transitionend', handleTransitionEnd);
+      removeDragClone();
+    };
+
+    clone.addEventListener('transitionend', handleTransitionEnd);
+
+    // Fallback timeout in case transitionend doesn't fire
+    setTimeout(() => {
+      if (dragCloneRef.current === clone) {
+        removeDragClone();
+      }
+    }, 250);
+  }, [removeDragClone]);
+
   // ============================================================================
   // AUTO-SCROLL HELPERS
   // ============================================================================
@@ -405,9 +449,9 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
 
       if (targetLocation) {
         console.log('[useBoatDragDrop] Touch drop on grid:', { slotId, locationId, row, col });
-        // Remove clone before drop processing
-        removeDragClone();
-        // Create a synthetic event object for handleGridDrop
+        // Animate clone to target slot for smooth drop effect
+        animateDragCloneToTarget(slotElement);
+        // Process drop (optimistic update happens during animation)
         await handleGridDrop(null, targetLocation, row, col);
         return;
       }
@@ -418,19 +462,19 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     if (poolElement) {
       const poolId = poolElement.dataset.poolId;
       console.log('[useBoatDragDrop] Touch drop on pool:', { poolId });
-      // Remove clone before drop processing
-      removeDragClone();
+      // Animate clone to pool for smooth drop effect
+      animateDragCloneToTarget(poolElement);
       await handlePoolDrop(poolId);
       return;
     }
 
-    // No valid drop target - cancel the drag
+    // No valid drop target - cancel the drag (instant removal, no animation)
     console.log('[useBoatDragDrop] Touch ended outside drop target - canceling');
     removeDragClone();
     setDraggingBoat(null);
     setDraggingFrom(null);
     setIsDragging(false);
-  }, [draggingBoat, isProcessing, handleGridDrop, handlePoolDrop, removeDragClone]);
+  }, [draggingBoat, isProcessing, handleGridDrop, handlePoolDrop, removeDragClone, animateDragCloneToTarget]);
 
   return {
     draggingBoat,
