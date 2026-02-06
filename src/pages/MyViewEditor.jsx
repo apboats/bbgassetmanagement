@@ -498,7 +498,10 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
               <span className="font-medium text-sm whitespace-nowrap">
-                {draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || 'Boat'}
+                {draggingBoat.isInventory
+                  ? (draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || draggingBoat.hullId || draggingBoat.hull_id || 'Inventory Boat')
+                  : (draggingBoat.owner || draggingBoat.name || draggingBoat.workOrderNumber || 'Customer Boat')
+                }
               </span>
             </div>
           </div>
