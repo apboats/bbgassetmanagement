@@ -12,7 +12,6 @@ import { SiteManagementModal } from '../components/modals/SiteManagementModal';
 import { PoolLocation } from '../components/locations/PoolLocation';
 import { LocationGrid, MaximizedLocationModal } from '../components/locations/LocationGrid';
 import { LocationSection } from '../components/locations/LocationSection';
-import { DragPreview } from '../components/BoatComponents';
 import { boatLifecycleService } from '../services/supabaseService';
 
 export function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites }) {
@@ -52,7 +51,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
     }
   });
 
-  // Use unified drag-and-drop hook
+  // Use unified drag-and-drop hook (lift original approach for touch)
   const {
     draggingBoat,
     draggingFrom,
@@ -63,29 +62,15 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
     handlePoolDrop,
     // Touch handlers for touch devices
     handleTouchStart,
-    handleTouchMove: handleTouchMoveFromHook,
+    handleTouchMove,
     handleTouchEnd: handleTouchEndFromHook
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
 
-  // State for drag preview position (for touch devices)
-  const [dragPreviewPos, setDragPreviewPos] = useState({ x: 0, y: 0 });
-
-  // Wrap handleTouchMove to also update drag preview position
-  const handleTouchMove = (e) => {
-    handleTouchMoveFromHook(e);
-    // Update drag preview position if dragging
-    if (e.touches && e.touches[0]) {
-      setDragPreviewPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    }
-  };
-
   // Wrap handleTouchEnd to pass locations array for drop target detection
   const handleTouchEnd = (e) => {
     handleTouchEndFromHook(e, locations);
-    // Clear drag preview position
-    setDragPreviewPos({ x: 0, y: 0 });
   };
 
   // Clean up expandedSites when sites are deleted (remove stale IDs)
@@ -429,12 +414,6 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
         </div>
       )}
 
-      {/* Floating drag preview for touch devices - ghosted boat card */}
-      <DragPreview
-        boat={draggingBoat}
-        position={dragPreviewPos}
-        isVisible={isDraggingActive}
-      />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -531,6 +510,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
+                    draggingFrom={draggingFrom}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
                     onTouchStart={handleTouchStart}
@@ -554,6 +534,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
+                    draggingFrom={draggingFrom}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
                     onTouchStart={handleTouchStart}
@@ -577,6 +558,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     onDrop={handleGridDrop}
                     onDragEnd={handleDragEnd}
                     draggingBoat={draggingBoat}
+                    draggingFrom={draggingFrom}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
                     onTouchStart={handleTouchStart}
@@ -837,6 +819,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onDrop={handleGridDrop}
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
+          draggingFrom={draggingFrom}
           onClose={() => setMaximizedLocation(null)}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}

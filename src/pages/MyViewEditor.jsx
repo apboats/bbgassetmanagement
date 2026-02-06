@@ -10,7 +10,6 @@ import { BoatAssignmentModal } from '../components/modals/BoatAssignmentModal';
 import { PoolLocation } from '../components/locations/PoolLocation';
 import { LocationGrid, MaximizedLocationModal } from '../components/locations/LocationGrid';
 import { LocationSection } from '../components/locations/LocationSection';
-import { DragPreview } from '../components/BoatComponents';
 import { boatLifecycleService } from '../services/supabaseService';
 
 export function MyViewEditor({ locations, sites = [], boats, userPreferences, onSavePreferences, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer }) {
@@ -54,7 +53,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
     }
   });
 
-  // Use unified drag-and-drop hook
+  // Use unified drag-and-drop hook (lift original approach for touch)
   const {
     draggingBoat,
     draggingFrom,
@@ -65,29 +64,15 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
     handlePoolDrop,
     // Touch handlers for touch devices
     handleTouchStart,
-    handleTouchMove: handleTouchMoveFromHook,
+    handleTouchMove: handleBoatTouchMove,
     handleTouchEnd: handleTouchEndFromHook
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
 
-  // State for drag preview position (for touch devices)
-  const [dragPreviewPos, setDragPreviewPos] = useState({ x: 0, y: 0 });
-
-  // Wrap handleTouchMove to also update drag preview position
-  const handleBoatTouchMove = (e) => {
-    handleTouchMoveFromHook(e);
-    // Update drag preview position if dragging
-    if (e.touches && e.touches[0]) {
-      setDragPreviewPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    }
-  };
-
   // Wrap handleTouchEnd to pass locations array for drop target detection
   const handleBoatTouchEnd = (e) => {
     handleTouchEndFromHook(e, locations);
-    // Clear drag preview position
-    setDragPreviewPos({ x: 0, y: 0 });
   };
 
   // Sync viewingBoat with boats array when it updates (real-time changes)
@@ -485,12 +470,6 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
 
   return (
     <div className="space-y-6 animate-slide-in">
-      {/* Floating drag preview for touch devices - ghosted boat card */}
-      <DragPreview
-        boat={draggingBoat}
-        position={dragPreviewPos}
-        isVisible={isDragging}
-      />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -675,6 +654,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
                   });
                 }}
                 draggingBoat={draggingBoat}
+                draggingFrom={draggingFrom}
                 onDragStart={(e, boat, loc, slotId) => handleBoatDragStart(e, boat, location, slotId)}
                 onDragEnd={handleBoatDragEnd}
                 onDrop={(e, loc, row, col) => handleBoatDrop(e, location, row, col)}
@@ -778,6 +758,7 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
           onDrop={handleBoatDrop}
           onDragEnd={handleBoatDragEnd}
           draggingBoat={draggingBoat}
+          draggingFrom={draggingFrom}
           onClose={() => setMaximizedLocation(null)}
           onTouchStart={handleTouchStart}
           onTouchMove={handleBoatTouchMove}
