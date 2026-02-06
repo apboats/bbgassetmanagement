@@ -929,6 +929,53 @@ function AppContainer() {
     }
   }
 
+  // Optimistic update helper - updates UI immediately before database call
+  // This makes drag-and-drop feel instant instead of waiting for DB round-trip
+  const applyOptimisticMove = (boatId, fromLocationId, fromSlotId, toLocationId, toSlotId, isInventory) => {
+    // Update locations state - remove from old location, add to new location
+    setLocations(prevLocations => {
+      return prevLocations.map(location => {
+        // Remove boat from source location (either from boats object or pool_boats array)
+        if (location.id === fromLocationId) {
+          if (fromSlotId === 'pool') {
+            // Remove from pool_boats array
+            const newPoolBoats = (location.pool_boats || []).filter(id => id !== boatId)
+            return { ...location, pool_boats: newPoolBoats }
+          } else if (location.boats) {
+            // Remove from boats object
+            const newBoats = { ...location.boats }
+            delete newBoats[fromSlotId]
+            return { ...location, boats: newBoats }
+          }
+        }
+        // Add boat to target location (either to boats object or pool_boats array)
+        if (location.id === toLocationId) {
+          if (toSlotId === 'pool') {
+            // Add to pool_boats array
+            const newPoolBoats = [...(location.pool_boats || []), boatId]
+            return { ...location, pool_boats: newPoolBoats }
+          } else {
+            // Add to boats object
+            const newBoats = { ...(location.boats || {}), [toSlotId]: boatId }
+            return { ...location, boats: newBoats }
+          }
+        }
+        return location
+      })
+    })
+
+    // Update boats state - change location and slot on the boat record
+    const setBoatsFunc = isInventory ? setInventoryBoats : setBoats
+    setBoatsFunc(prevBoats => {
+      return prevBoats.map(boat => {
+        if (boat.id === boatId) {
+          return { ...boat, location: toLocationId, slot: toSlotId }
+        }
+        return boat
+      })
+    })
+  }
+
   const handleMoveBoat = async (boatOrBoatId, toLocationOrId, toSlotId, isInventory = false) => {
     // Handle both boat object and boatId string
     const boatId = typeof boatOrBoatId === 'object' ? boatOrBoatId.id : boatOrBoatId;
@@ -943,13 +990,22 @@ function AppContainer() {
       ? true
       : isInventory;
 
+    // Find current boat location before move (for optimistic update)
+    const boat = isInventoryBoat
+      ? inventoryBoats.find(b => b.id === boatId)
+      : boats.find(b => b.id === boatId)
+    const fromLocationId = boat?.location
+    const fromSlotId = boat?.slot
+
     console.log('[AppContainer.handleMoveBoat] Called with:', {
-      boatId, toLocationId, toSlotId, isInventoryBoat
+      boatId, toLocationId, toSlotId, isInventoryBoat, fromLocationId, fromSlotId
     })
 
+    // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
+    applyOptimisticMove(boatId, fromLocationId, fromSlotId, toLocationId, toSlotId, isInventoryBoat)
+
     try {
-      // Use centralized service that reads from_location/from_slot from database
-      // This ensures movement history always has correct values regardless of React state
+      // Database call runs in background - UI already updated
       await supabaseService.moveBoatWithHistory(
         boatId,
         toLocationId,
@@ -959,16 +1015,19 @@ function AppContainer() {
       )
       console.log('[AppContainer.handleMoveBoat] Move and logging complete')
 
-      // Reload data from database
+      // Success! No need to reload - optimistic update was correct
+      // Real-time subscriptions will sync any changes from other users
+    } catch (error) {
+      console.error('Error moving boat, reverting optimistic update:', error)
+
+      // REVERT: Reload from database to get correct state
       if (isInventoryBoat) {
         await loadInventoryBoats()
       } else {
         await loadBoats()
       }
       await loadLocations()
-      console.log('[AppContainer.handleMoveBoat] Data reloaded')
-    } catch (error) {
-      console.error('Error moving boat:', error)
+
       throw error
     }
   }
