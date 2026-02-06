@@ -998,11 +998,27 @@ function AppContainer() {
       : isInventory;
 
     // Find current boat location before move (for optimistic update)
-    const boat = isInventoryBoat
-      ? inventoryBoats.find(b => b.id === boatId)
-      : boats.find(b => b.id === boatId)
-    const fromLocationId = boat?.location
-    const fromSlotId = boat?.slot
+    // We need to search locations to find the actual slot, since boat.slot may be stale
+    let fromLocationId = null
+    let fromSlotId = null
+
+    for (const location of locations) {
+      // Check grid slots (location.boats is an object: { "0-1": boatId, ... })
+      if (location.boats) {
+        const slotEntry = Object.entries(location.boats).find(([slot, id]) => id === boatId)
+        if (slotEntry) {
+          fromLocationId = location.id
+          fromSlotId = slotEntry[0]
+          break
+        }
+      }
+      // Check pool (location.pool_boats is an array of boat IDs)
+      if (location.pool_boats?.includes(boatId)) {
+        fromLocationId = location.id
+        fromSlotId = 'pool'
+        break
+      }
+    }
 
     console.log('[AppContainer.handleMoveBoat] Called with:', {
       boatId, toLocationId, toSlotId, isInventoryBoat, fromLocationId, fromSlotId
