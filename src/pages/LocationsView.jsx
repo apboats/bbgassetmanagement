@@ -340,98 +340,34 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
 
   const handleMoveBoat = async (boat, targetLocation, targetSlot) => {
     setIsProcessing(true);
-    
-    // For inventory boats, use AppContainer's handleMoveBoat directly
-    if (boat.isInventory && onMoveBoatFromContainer) {
-      try {
-        await onMoveBoatFromContainer(boat.id, targetLocation?.id || null, targetSlot || null, true);
-        
-        // Update viewing boat state
-        if (targetLocation) {
-          setViewingBoat({
-            ...boat,
-            location: targetLocation.name,
-            slot: targetSlot,
-            currentLocation: targetLocation,
-            currentSlot: targetSlot
-          });
-        } else {
-          setViewingBoat(null);
-        }
-      } catch (error) {
-        console.error('Error moving inventory boat:', error);
-        alert('Failed to move boat. Please try again.');
-      }
-      setIsProcessing(false);
-      return;
-    }
-    
-    // For regular boats, use the existing logic
-    let updatedLocations = [...locations];
-    
-    // Remove from current location
-    if (boat.location) {
-      const currentLoc = locations.find(l => l.name === boat.location);
-      if (currentLoc) {
-        if (currentLoc.type === 'pool') {
-          const poolBoats = currentLoc.pool_boats || currentLoc.poolBoats || [];
-          const updatedLoc = {
-            ...currentLoc,
-            pool_boats: poolBoats.filter(id => id !== boat.id),
-          };
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        } else {
-          const updatedLoc = { ...currentLoc, boats: { ...currentLoc.boats } };
-          const slotKey = Object.keys(updatedLoc.boats).find(k => updatedLoc.boats[k] === boat.id);
-          if (slotKey) delete updatedLoc.boats[slotKey];
-          updatedLocations = updatedLocations.map(l => l.id === currentLoc.id ? updatedLoc : l);
-        }
-      }
-    }
-    
-    // Add to new location
-    let updatedBoat = { ...boat };
-    if (targetLocation) {
-      if (targetLocation.type === 'pool') {
-        const poolBoats = targetLocation.pool_boats || targetLocation.poolBoats || [];
-        const updatedLoc = {
-          ...targetLocation,
-          pool_boats: [...poolBoats, boat.id],
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = 'pool';
-      } else {
-        const currentTargetLoc = updatedLocations.find(l => l.id === targetLocation.id);
-        const updatedLoc = {
-          ...currentTargetLoc,
-          boats: { ...currentTargetLoc.boats, [targetSlot]: boat.id }
-        };
-        updatedLocations = updatedLocations.map(l => l.id === targetLocation.id ? updatedLoc : l);
-        updatedBoat.location = targetLocation.name;
-        updatedBoat.slot = targetSlot;  // Use 0-indexed slot directly (matches database)
-      }
-    } else {
-      updatedBoat.location = null;
-      updatedBoat.slot = null;
-    }
-    
+
     try {
-      await onUpdateLocations(updatedLocations);
-      await onUpdateBoats(boats.map(b => b.id === boat.id ? updatedBoat : b));
-      
-      // Update viewing boat with new location info
-      const newLocation = targetLocation ? updatedLocations.find(l => l.id === targetLocation.id) : null;
-      setViewingBoat({
-        ...updatedBoat,
-        currentLocation: newLocation,
-        currentSlot: targetSlot
-      });
+      // Use AppContainer's handleMoveBoat for BOTH inventory and regular boats
+      // This ensures history is logged via moveBoatWithHistory
+      await onMoveBoatFromContainer(
+        boat.id,
+        targetLocation?.id || null,
+        targetSlot || null,
+        boat.isInventory || false
+      );
+
+      // Update viewing boat state
+      if (targetLocation) {
+        setViewingBoat({
+          ...boat,
+          location: targetLocation.name,
+          slot: targetSlot,
+          currentLocation: targetLocation,
+          currentSlot: targetSlot
+        });
+      } else {
+        setViewingBoat(null);
+      }
     } catch (error) {
       console.error('Error moving boat:', error);
       alert('Failed to move boat. Please try again.');
     }
-    
+
     setIsProcessing(false);
   };
 
@@ -477,7 +413,17 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           </div>
         </div>
       )}
-      
+
+      {/* Floating drag indicator for touch devices */}
+      {isDraggingActive && draggingBoat && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+          <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
+          <span className="font-medium">
+            Moving: {draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || 'Boat'}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">Storage Locations</h2>
