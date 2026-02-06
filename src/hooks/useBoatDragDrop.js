@@ -26,6 +26,14 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   const DRAG_THRESHOLD = 10; // pixels - must move this far to start a drag
 
   const handleDragStart = useCallback((e, boat, location, slotId) => {
+    // If touch handlers are managing this interaction, don't interfere
+    // On touch devices, both touchStart and dragStart can fire - we want touch to win
+    if (pendingDragRef.current) {
+      console.log('[useBoatDragDrop] Drag started but touch is pending - deferring to touch handlers');
+      e.preventDefault();
+      return;
+    }
+
     // Guard against touch devices where dataTransfer may not exist
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
