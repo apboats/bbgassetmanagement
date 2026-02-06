@@ -20,6 +20,11 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   // Track touch position for drop target detection on touch devices
   const touchPositionRef = useRef({ x: 0, y: 0 });
 
+  // Gesture differentiation: track start position and pending drag
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const pendingDragRef = useRef(null);
+  const DRAG_THRESHOLD = 10; // pixels - must move this far to start a drag
+
   const handleDragStart = useCallback((e, boat, location, slotId) => {
     // Guard against touch devices where dataTransfer may not exist
     if (e.dataTransfer) {
@@ -134,23 +139,52 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   const handleTouchStart = useCallback((e, boat, location, slotId) => {
     // Get initial touch position
     const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
 
-    setDraggingBoat(boat);
-    setDraggingFrom({ location, slotId });
-    setIsDragging(true);
-    console.log('[useBoatDragDrop] Touch drag started:', { boatId: boat.id, location: location?.name, slotId });
+    // DON'T start dragging yet - store pending drag info
+    // Drag will only start if finger moves beyond threshold
+    pendingDragRef.current = { boat, location, slotId };
+    console.log('[useBoatDragDrop] Touch started (pending):', { boatId: boat.id });
   }, []);
 
   const handleTouchMove = useCallback((e) => {
-    if (!draggingBoat) return;
+    // Nothing to do if no pending drag and not already dragging
+    if (!pendingDragRef.current && !draggingBoat) return;
+
     // Track touch position continuously
     const touch = e.touches[0];
     touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
+
+    // Check if we should start dragging (threshold exceeded)
+    if (pendingDragRef.current && !draggingBoat) {
+      const dx = touch.clientX - touchStartPosRef.current.x;
+      const dy = touch.clientY - touchStartPosRef.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > DRAG_THRESHOLD) {
+        // Threshold exceeded - now actually start the drag
+        const { boat, location, slotId } = pendingDragRef.current;
+        setDraggingBoat(boat);
+        setDraggingFrom({ location, slotId });
+        setIsDragging(true);
+        console.log('[useBoatDragDrop] Touch drag started (threshold exceeded):', { boatId: boat.id });
+      }
+    }
   }, [draggingBoat]);
 
   const handleTouchEnd = useCallback(async (e, locations) => {
-    if (!draggingBoat || isProcessing) {
+    // Clear pending drag info
+    pendingDragRef.current = null;
+
+    // If drag never started (was a tap, not a drag), let click handler work
+    if (!draggingBoat) {
+      console.log('[useBoatDragDrop] Touch ended - was tap, letting click handler work');
+      return;
+    }
+
+    // If already processing, clean up and exit
+    if (isProcessing) {
       setDraggingBoat(null);
       setDraggingFrom(null);
       setIsDragging(false);
