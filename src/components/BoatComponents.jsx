@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Wrench, Sparkles, Layers, Shield } from 'lucide-react';
+import { getActiveSeason } from '../utils/seasonHelpers';
 
 // ============================================================================
 // UTILITY: findBoatLocationData
@@ -124,10 +125,42 @@ export function LocationBadge({ location, slot, className = '' }) {
 // BOAT STATUS ICONS
 // ============================================================================
 // Shows completion status icons for customer boats
+// For storage boats, shows active season's work phases
 export function BoatStatusIcons({ boat, size = 'w-3 h-3', className = '' }) {
   // Only show for customer boats (not inventory)
   if (boat.isInventory) return null;
 
+  // For storage boats, use active season's work phases
+  if (boat.storageBoat) {
+    const activeSeason = getActiveSeason(boat);
+    const mechanicalsComplete = boat[`${activeSeason}MechanicalsComplete`];
+    const cleanComplete = boat[`${activeSeason}CleanComplete`];
+    const fiberglassComplete = boat[`${activeSeason}FiberglassComplete`];
+    const warrantyComplete = boat[`${activeSeason}WarrantyComplete`];
+
+    return (
+      <div className={`flex gap-1 ${className}`}>
+        <Wrench
+          className={`${size} ${mechanicalsComplete ? 'text-green-500' : 'text-slate-300'}`}
+          strokeWidth={mechanicalsComplete ? 2.5 : 1.5}
+        />
+        <Sparkles
+          className={`${size} ${cleanComplete ? 'text-green-500' : 'text-slate-300'}`}
+          strokeWidth={cleanComplete ? 2.5 : 1.5}
+        />
+        <Layers
+          className={`${size} ${fiberglassComplete ? 'text-green-500' : 'text-slate-300'}`}
+          strokeWidth={fiberglassComplete ? 2.5 : 1.5}
+        />
+        <Shield
+          className={`${size} ${warrantyComplete ? 'text-green-500' : 'text-slate-300'}`}
+          strokeWidth={warrantyComplete ? 2.5 : 1.5}
+        />
+      </div>
+    );
+  }
+
+  // Regular boat - use regular work phases
   return (
     <div className={`flex gap-1 ${className}`}>
       <Wrench
@@ -223,6 +256,9 @@ export function BoatCard({
   draggable = false,
   onDragStart,
   onDragEnd,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
   className = '',
 }) {
   return (
@@ -230,6 +266,9 @@ export function BoatCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       onClick={() => onClick && onClick(boat)}
       className={`p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all ${className}`}
     >
