@@ -17,8 +17,11 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleDragStart = useCallback((e, boat, location, slotId) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', boat.id);
+    // Guard against touch devices where dataTransfer may not exist
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', boat.id);
+    }
     setDraggingBoat(boat);
     setDraggingFrom({ location, slotId });
     setIsDragging(true);
@@ -33,7 +36,10 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   }, []);
 
   const handleGridDrop = useCallback(async (e, targetLocation, row, col) => {
-    e.preventDefault();
+    // Guard against touch devices where preventDefault may not exist
+    if (e?.preventDefault) {
+      e.preventDefault();
+    }
     if (!draggingBoat || isProcessing) return;
 
     setIsProcessing(true);
