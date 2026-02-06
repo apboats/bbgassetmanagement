@@ -57,6 +57,11 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       dragImage.style.left = '-9999px';
       dragImage.style.width = `${slotElement.offsetWidth}px`;
       dragImage.style.height = `${slotElement.offsetHeight}px`;
+      // Constrain the clone so flex children (like storage boat stripes) don't expand
+      dragImage.style.maxWidth = `${slotElement.offsetWidth}px`;
+      dragImage.style.maxHeight = `${slotElement.offsetHeight}px`;
+      dragImage.style.overflow = 'hidden';
+      dragImage.style.boxSizing = 'border-box';
       dragImage.style.opacity = '0.9';
       dragImage.style.transform = 'scale(0.95)';
       dragImage.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
