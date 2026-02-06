@@ -23,6 +23,7 @@ export function MaximizedLocationModal({
   onSlotClick,
   onBoatClick,
   draggingBoat,
+  draggingFrom,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -75,6 +76,8 @@ export function MaximizedLocationModal({
     const boatId = location.boats?.[slotId];
     const boat = allBoats.find(b => b.id === boatId);
     const isDragging = draggingBoat !== null;
+    // Check if THIS slot is the one being dragged (for placeholder styling)
+    const isBeingDragged = draggingFrom?.slotId === slotId && draggingFrom?.location?.id === location.id;
 
     return (
       <div
@@ -107,13 +110,15 @@ export function MaximizedLocationModal({
           }
         }}
         className={`aspect-square border-2 rounded-xl flex flex-col items-center justify-center text-center transition-all min-w-[140px] min-h-[140px] group ${
-          boat
-            ? boat.storageBoat
-              ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-3`
-            : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer p-3'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-3'
+          isBeingDragged
+            ? 'slot-placeholder'
+            : boat
+              ? boat.storageBoat
+                ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-3`
+              : isDragging
+                ? 'border-blue-400 bg-blue-50 cursor-pointer p-3'
+                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-3'
         }`}
       >
         {renderSlotContent(boat, row, col)}
@@ -127,6 +132,8 @@ export function MaximizedLocationModal({
     const boatId = location.boats?.[slotId];
     const boat = allBoats.find(b => b.id === boatId);
     const isDragging = draggingBoat !== null;
+    // Check if THIS slot is the one being dragged (for placeholder styling)
+    const isBeingDragged = draggingFrom?.slotId === slotId && draggingFrom?.location?.id === location.id;
 
     return (
       <div
@@ -159,13 +166,15 @@ export function MaximizedLocationModal({
           }
         }}
         className={`border-2 rounded-xl flex flex-col items-center justify-center text-center transition-all overflow-hidden group ${
-          boat
-            ? boat.storageBoat
-              ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-2`
-            : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
+          isBeingDragged
+            ? 'slot-placeholder'
+            : boat
+              ? boat.storageBoat
+                ? 'border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                : `${getBoatSlotStyle(boat)} border-transparent shadow-md cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+              : isDragging
+                ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
         }`}
         style={{ width: '140px', height: '140px', flexShrink: 0 }}
       >
@@ -343,6 +352,7 @@ export function LocationGrid({
   onSlotClick,
   onBoatClick,
   draggingBoat,
+  draggingFrom,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -497,6 +507,8 @@ export function LocationGrid({
         const boatId = location.boats?.[slotId];
         const boat = allBoats.find(b => b.id === boatId);
         const isDragging = draggingBoat !== null;
+        // Check if THIS slot is the one being dragged (for placeholder styling)
+        const isBeingDragged = draggingFrom?.slotId === slotId && draggingFrom?.location?.id === location.id;
 
         slots.push(
           <div
@@ -530,13 +542,15 @@ export function LocationGrid({
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors group ${
-              boat
-                ? boat.storageBoat
-                  ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-                  : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
-                : isDragging
-                  ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
-                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
+              isBeingDragged
+                ? 'slot-placeholder'
+                : boat
+                  ? boat.storageBoat
+                    ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                    : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+                  : isDragging
+                    ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+                    : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
             }`}
           >
             {renderSlotContent(boat, row, col)}
@@ -556,6 +570,8 @@ export function LocationGrid({
         const boatId = location.boats?.[slotId];
         const boat = allBoats.find(b => b.id === boatId);
         const isDragging = draggingBoat !== null;
+        // Check if THIS slot is the one being dragged (for placeholder styling)
+        const isBeingDragged = draggingFrom?.slotId === slotId && draggingFrom?.location?.id === location.id;
 
         return (
           <div
@@ -589,13 +605,15 @@ export function LocationGrid({
               }
             }}
             className={`location-slot aspect-square border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors group ${
-              boat
-                ? boat.storageBoat
-                  ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-                  : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
-                : isDragging
-                  ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
-                  : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
+              isBeingDragged
+                ? 'slot-placeholder'
+                : boat
+                  ? boat.storageBoat
+                    ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                    : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-2`
+                  : isDragging
+                    ? 'border-blue-400 bg-blue-50 cursor-pointer p-2'
+                    : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-2'
             }`}
           >
             {renderSlotContent(boat, row, col)}
@@ -611,6 +629,8 @@ export function LocationGrid({
     const boatId = location.boats?.[slotId];
     const boat = allBoats.find(b => b.id === boatId);
     const isDragging = draggingBoat !== null;
+    // Check if THIS slot is the one being dragged (for placeholder styling)
+    const isBeingDragged = draggingFrom?.slotId === slotId && draggingFrom?.location?.id === location.id;
 
     return (
       <div
@@ -643,13 +663,15 @@ export function LocationGrid({
           }
         }}
         className={`location-slot border-2 rounded-lg flex flex-col items-center justify-center text-center transition-colors overflow-hidden group ${
-          boat
-            ? boat.storageBoat
-              ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
-              : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-1.5`
-            : isDragging
-              ? 'border-blue-400 bg-blue-50 cursor-pointer p-1.5'
-              : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1.5'
+          isBeingDragged
+            ? 'slot-placeholder'
+            : boat
+              ? boat.storageBoat
+                ? 'border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-0 relative'
+                : `${getBoatSlotStyle(boat)} border-transparent shadow-sm cursor-grab active:cursor-grabbing hover:scale-105 p-1.5`
+              : isDragging
+                ? 'border-blue-400 bg-blue-50 cursor-pointer p-1.5'
+                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1.5'
         }`}
         style={{ width: '100px', height: '100px', flexShrink: 0 }}
       >

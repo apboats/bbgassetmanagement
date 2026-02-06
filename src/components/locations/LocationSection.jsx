@@ -18,6 +18,7 @@ export function LocationSection({
   onSlotClick,
   onBoatClick,
   draggingBoat,
+  draggingFrom,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -54,6 +55,7 @@ export function LocationSection({
             onSlotClick={onSlotClick}
             onBoatClick={onBoatClick}
             draggingBoat={draggingBoat}
+            draggingFrom={draggingFrom}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onDrop={onDrop}
