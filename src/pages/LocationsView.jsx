@@ -59,10 +59,19 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
     handleDragStart,
     handleDragEnd,
     handleGridDrop,
-    handlePoolDrop
+    handlePoolDrop,
+    // Touch handlers for touch devices
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd: handleTouchEndFromHook
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
+
+  // Wrap handleTouchEnd to pass locations array for drop target detection
+  const handleTouchEnd = (e) => {
+    handleTouchEndFromHook(e, locations);
+  };
 
   // Clean up expandedSites when sites are deleted (remove stale IDs)
   useEffect(() => {
@@ -566,6 +575,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                   />
                 )}
 
@@ -586,6 +598,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                   />
                 )}
 
@@ -606,6 +621,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                     draggingBoat={draggingBoat}
                     onMaximize={setMaximizedLocation}
                     canManageLocations={canManageLocations}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                   />
                 )}
 
@@ -638,6 +656,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                             setShowBoatAssignModal(true);
                           }}
                           canManageLocations={canManageLocations}
+                          onTouchStart={handleTouchStart}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
                         />
                       ))}
                     </div>
@@ -682,6 +703,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
                 canManageLocations={canManageLocations}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               />
             )}
 
@@ -702,6 +726,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
                 canManageLocations={canManageLocations}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               />
             )}
 
@@ -722,6 +749,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                 draggingBoat={draggingBoat}
                 onMaximize={setMaximizedLocation}
                 canManageLocations={canManageLocations}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               />
             )}
 
@@ -754,6 +784,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
                         setShowBoatAssignModal(true);
                       }}
                       canManageLocations={canManageLocations}
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
                     />
                   ))}
                 </div>
@@ -847,6 +880,9 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           onDragEnd={handleDragEnd}
           draggingBoat={draggingBoat}
           onClose={() => setMaximizedLocation(null)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
       )}
 
