@@ -332,3 +332,28 @@ export function BoatListItem({
     </div>
   );
 }
+
+// ============================================================================
+// DRAG PREVIEW
+// ============================================================================
+// Floating ghost preview shown during touch drag operations
+// Used by LocationsView, MyViewEditor, and any future drag-and-drop pages
+export function DragPreview({ boat, position, isVisible }) {
+  if (!isVisible || !boat || !position || position.x === 0) return null;
+
+  return (
+    <div
+      className="fixed z-50 pointer-events-none"
+      style={{
+        left: position.x,
+        top: position.y,
+        transform: 'translate(-50%, -50%) scale(0.9)',
+        opacity: 0.85
+      }}
+    >
+      <div className="bg-white rounded-lg border-2 border-blue-400 shadow-2xl p-3 min-w-[160px] max-w-[200px]">
+        <BoatCardContent boat={boat} />
+      </div>
+    </div>
+  );
+}
