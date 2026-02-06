@@ -22,7 +22,11 @@ export function PoolLocation({
   onDragEnd,
   onDragOver,
   onDrop,
-  canManageLocations
+  canManageLocations,
+  // Touch handlers for touch devices
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd
 }) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -109,6 +113,7 @@ export function PoolLocation({
 
       {/* Drop Zone / Boat List */}
       <div
+        data-pool-id={location.id}
         className={`p-4 min-h-[150px] ${isDragging ? 'bg-teal-50 border-2 border-dashed border-teal-400' : 'bg-slate-50'}`}
         onDragOver={handleDragOver}
         onDrop={handleDropOnPool}
@@ -139,6 +144,9 @@ export function PoolLocation({
                   draggable={onDragStart ? true : false}
                   onDragStart={onDragStart ? (e) => onDragStart(e, boat, location.name) : undefined}
                   onDragEnd={onDragEnd}
+                  onTouchStart={onTouchStart ? (e) => onTouchStart(e, boat, location, 'pool') : undefined}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
                 />
               ))}
             </div>

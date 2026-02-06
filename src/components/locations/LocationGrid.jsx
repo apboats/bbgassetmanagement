@@ -25,7 +25,11 @@ export function MaximizedLocationModal({
   onDragStart,
   onDragEnd,
   onDrop,
-  onClose
+  onClose,
+  // Touch handlers for touch devices
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd
 }) {
   // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
   const [viewMode, setViewMode] = useState('layout');
@@ -179,6 +183,8 @@ export function MaximizedLocationModal({
     return (
       <div
         key={slotId}
+        data-slot-id={slotId}
+        data-location-id={location.id}
         draggable={!!boat}
         title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
         onDragStart={(e) => {
@@ -191,6 +197,11 @@ export function MaximizedLocationModal({
         onDrop={(e) => {
           if (onDrop) onDrop(e, location, row, col);
         }}
+        onTouchStart={(e) => {
+          if (boat && onTouchStart) onTouchStart(e, boat, location, slotId);
+        }}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         onClick={(e) => {
           e.stopPropagation();
           if (boat && onBoatClick) {
@@ -224,6 +235,8 @@ export function MaximizedLocationModal({
     return (
       <div
         key={slotId}
+        data-slot-id={slotId}
+        data-location-id={location.id}
         draggable={!!boat}
         title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
         onDragStart={(e) => {
@@ -236,6 +249,11 @@ export function MaximizedLocationModal({
         onDrop={(e) => {
           if (onDrop) onDrop(e, location, row, col);
         }}
+        onTouchStart={(e) => {
+          if (boat && onTouchStart) onTouchStart(e, boat, location, slotId);
+        }}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         onClick={(e) => {
           e.stopPropagation();
           if (boat && onBoatClick) {
@@ -436,7 +454,11 @@ export function LocationGrid({
   onEdit,
   onDelete,
   onRemove,
-  canManageLocations
+  canManageLocations,
+  // Touch handlers for touch devices
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd
 }) {
   // View mode state for U-shaped layouts: 'layout' (grid with hole) or 'concise' (three strips)
   const [viewMode, setViewMode] = useState('layout');
@@ -607,6 +629,8 @@ export function LocationGrid({
         slots.push(
           <div
             key={slotId}
+            data-slot-id={slotId}
+            data-location-id={location.id}
             draggable={!!boat}
             title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
             onDragStart={(e) => {
@@ -619,6 +643,11 @@ export function LocationGrid({
             onDrop={(e) => {
               if (onDrop) onDrop(e, location, row, col);
             }}
+            onTouchStart={(e) => {
+              if (boat && onTouchStart) onTouchStart(e, boat, location, slotId);
+            }}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
             onClick={(e) => {
               // Allow clicks even during drag operations on mobile
               e.stopPropagation();
@@ -659,6 +688,8 @@ export function LocationGrid({
         return (
           <div
             key={slotId}
+            data-slot-id={slotId}
+            data-location-id={location.id}
             draggable={!!boat}
             title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
             onDragStart={(e) => {
@@ -671,6 +702,11 @@ export function LocationGrid({
             onDrop={(e) => {
               if (onDrop) onDrop(e, location, row, col);
             }}
+            onTouchStart={(e) => {
+              if (boat && onTouchStart) onTouchStart(e, boat, location, slotId);
+            }}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
             onClick={(e) => {
               // Allow clicks even during drag operations on mobile
               e.stopPropagation();
@@ -707,6 +743,8 @@ export function LocationGrid({
     return (
       <div
         key={slotId}
+        data-slot-id={slotId}
+        data-location-id={location.id}
         draggable={!!boat}
         title={boat ? 'Drag to move • Click for details' : 'Click to assign boat'}
         onDragStart={(e) => {
@@ -719,6 +757,11 @@ export function LocationGrid({
         onDrop={(e) => {
           if (onDrop) onDrop(e, location, row, col);
         }}
+        onTouchStart={(e) => {
+          if (boat && onTouchStart) onTouchStart(e, boat, location, slotId);
+        }}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         onClick={(e) => {
           e.stopPropagation();
           if (boat && onBoatClick) {

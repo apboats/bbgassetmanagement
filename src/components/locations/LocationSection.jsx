@@ -24,7 +24,11 @@ export function LocationSection({
   onMaximize,
   onEdit,
   onDelete,
-  canManageLocations
+  canManageLocations,
+  // Touch handlers for touch devices
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd
 }) {
   const colors = {
     blue: 'from-blue-500 to-blue-600',
@@ -57,6 +61,9 @@ export function LocationSection({
             onEdit={onEdit ? () => onEdit(location) : undefined}
             onDelete={onDelete ? () => onDelete(location.id) : undefined}
             canManageLocations={canManageLocations}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           />
         ))}
       </div>
