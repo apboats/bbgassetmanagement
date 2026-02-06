@@ -69,6 +69,19 @@ select:focus-visible {
    DRAG AND DROP - LIFT ORIGINAL STYLES
    ============================================================================ */
 
+/* Prevent iOS text selection on draggable slot elements */
+.location-slot,
+[data-slot-id],
+[draggable="true"] {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
 /* Placeholder shown in the slot while its content is being dragged */
 .slot-placeholder {
   background: repeating-linear-gradient(
@@ -91,4 +104,6 @@ select:focus-visible {
   pointer-events: none;
   will-change: transform;
   cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
 }
