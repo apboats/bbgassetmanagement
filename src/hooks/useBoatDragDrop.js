@@ -47,6 +47,35 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       return;
     }
 
+    // Create a custom drag image from the slot element
+    const slotElement = e.currentTarget;
+    if (slotElement && e.dataTransfer) {
+      // Clone the element for the drag image
+      const dragImage = slotElement.cloneNode(true);
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-9999px';
+      dragImage.style.left = '-9999px';
+      dragImage.style.width = `${slotElement.offsetWidth}px`;
+      dragImage.style.height = `${slotElement.offsetHeight}px`;
+      dragImage.style.opacity = '0.9';
+      dragImage.style.transform = 'scale(0.95)';
+      dragImage.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+      dragImage.style.borderRadius = '0.75rem';
+      dragImage.classList.add('dragging-lifted');
+
+      document.body.appendChild(dragImage);
+
+      // Set custom drag image, centered on cursor
+      e.dataTransfer.setDragImage(
+        dragImage,
+        slotElement.offsetWidth / 2,
+        slotElement.offsetHeight / 2
+      );
+
+      // Remove the clone after drag starts (browser captures it)
+      setTimeout(() => dragImage.remove(), 0);
+    }
+
     // Guard against touch devices where dataTransfer may not exist
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
