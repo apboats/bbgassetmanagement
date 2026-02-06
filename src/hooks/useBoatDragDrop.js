@@ -5,6 +5,9 @@ import { useState, useCallback, useRef } from 'react';
  * Manages dragging state and delegates moves to AppContainer's handleMoveBoat
  * Supports both mouse drag-and-drop and touch devices
  *
+ * Touch devices use "lift original" approach - the actual DOM element is lifted
+ * and moved with the finger for a more tactile experience.
+ *
  * @param {Object} options
  * @param {Function} options.onMoveBoat - AppContainer's handleMoveBoat callback
  * @param {Function} options.onSuccess - Optional callback after successful drop
@@ -24,6 +27,12 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   const touchStartPosRef = useRef({ x: 0, y: 0 });
   const pendingDragRef = useRef(null);
   const DRAG_THRESHOLD = 10; // pixels - must move this far to start a drag
+
+  // Lift Original: track the actual DOM element being dragged
+  const draggedElementRef = useRef(null);
+  const originalRectRef = useRef(null);
+  const originalStylesRef = useRef({});
+  const isLiftModeRef = useRef(false);
 
   const handleDragStart = useCallback((e, boat, location, slotId) => {
     // If touch handlers are managing this interaction, don't interfere
@@ -141,6 +150,26 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   }, [draggingBoat, isProcessing, onMoveBoat, onSuccess, onError]);
 
   // ============================================================================
+  // LIFT ORIGINAL HELPERS
+  // ============================================================================
+
+  // Reset the lifted element back to its original state
+  const resetLiftedElement = useCallback(() => {
+    if (draggedElementRef.current && isLiftModeRef.current) {
+      const el = draggedElementRef.current;
+      // Restore original styles
+      Object.keys(originalStylesRef.current).forEach(key => {
+        el.style[key] = originalStylesRef.current[key] || '';
+      });
+      el.classList.remove('dragging-lifted');
+    }
+    draggedElementRef.current = null;
+    originalRectRef.current = null;
+    originalStylesRef.current = {};
+    isLiftModeRef.current = false;
+  }, []);
+
+  // ============================================================================
   // TOUCH EVENT HANDLERS (for touch devices like Vibe Board)
   // ============================================================================
 
@@ -156,6 +185,28 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     // DON'T start dragging yet - store pending drag info
     // Drag will only start if finger moves beyond threshold
     pendingDragRef.current = { boat, location, slotId };
+
+    // LIFT ORIGINAL: Capture the slot element for lifting
+    const slotElement = e.currentTarget.closest('[data-slot-id]') || e.currentTarget;
+    if (slotElement) {
+      draggedElementRef.current = slotElement;
+      originalRectRef.current = slotElement.getBoundingClientRect();
+      // Store original inline styles to restore later
+      originalStylesRef.current = {
+        transform: slotElement.style.transform,
+        transition: slotElement.style.transition,
+        zIndex: slotElement.style.zIndex,
+        position: slotElement.style.position,
+        boxShadow: slotElement.style.boxShadow,
+        opacity: slotElement.style.opacity,
+        width: slotElement.style.width,
+        height: slotElement.style.height,
+        left: slotElement.style.left,
+        top: slotElement.style.top,
+      };
+    }
+    isLiftModeRef.current = true;
+
     console.log('[useBoatDragDrop] Touch started (pending):', { boatId: boat.id });
   }, []);
 
@@ -179,8 +230,30 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
         setDraggingBoat(boat);
         setDraggingFrom({ location, slotId });
         setIsDragging(true);
+
+        // LIFT ORIGINAL: Apply "lifted" styles to the actual element
+        if (draggedElementRef.current && isLiftModeRef.current && originalRectRef.current) {
+          const el = draggedElementRef.current;
+          const rect = originalRectRef.current;
+          el.style.position = 'fixed';
+          el.style.zIndex = '1000';
+          el.style.transition = 'none';
+          el.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+          el.style.width = `${rect.width}px`;
+          el.style.height = `${rect.height}px`;
+          el.style.left = '0';
+          el.style.top = '0';
+          el.style.transform = `translate(${touch.clientX - rect.width/2}px, ${touch.clientY - rect.height/2}px) scale(0.95)`;
+          el.classList.add('dragging-lifted');
+        }
+
         console.log('[useBoatDragDrop] Touch drag started (threshold exceeded):', { boatId: boat.id });
       }
+    } else if (draggingBoat && draggedElementRef.current && isLiftModeRef.current && originalRectRef.current) {
+      // LIFT ORIGINAL: Move the lifted element to follow the finger
+      const el = draggedElementRef.current;
+      const rect = originalRectRef.current;
+      el.style.transform = `translate(${touch.clientX - rect.width/2}px, ${touch.clientY - rect.height/2}px) scale(0.95)`;
     }
   }, [draggingBoat]);
 
@@ -191,11 +264,13 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     // If drag never started (was a tap, not a drag), let click handler work
     if (!draggingBoat) {
       console.log('[useBoatDragDrop] Touch ended - was tap, letting click handler work');
+      resetLiftedElement();
       return;
     }
 
     // If already processing, clean up and exit
     if (isProcessing) {
+      resetLiftedElement();
       setDraggingBoat(null);
       setDraggingFrom(null);
       setIsDragging(false);
@@ -205,8 +280,20 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     const { x, y } = touchPositionRef.current;
     console.log('[useBoatDragDrop] Touch ended at:', { x, y });
 
+    // LIFT ORIGINAL: Temporarily hide the lifted element so elementFromPoint sees what's underneath
+    const liftedEl = draggedElementRef.current;
+    if (liftedEl) {
+      liftedEl.style.pointerEvents = 'none';
+      liftedEl.style.visibility = 'hidden';
+    }
+
     // Find which element is at the touch position
     const element = document.elementFromPoint(x, y);
+
+    // Restore visibility for animation
+    if (liftedEl) {
+      liftedEl.style.visibility = 'visible';
+    }
 
     // Check for grid slot drop target
     const slotElement = element?.closest('[data-slot-id]');
@@ -219,6 +306,8 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
 
       if (targetLocation) {
         console.log('[useBoatDragDrop] Touch drop on grid:', { slotId, locationId, row, col });
+        // Reset lifted element before drop processing
+        resetLiftedElement();
         // Create a synthetic event object for handleGridDrop
         await handleGridDrop(null, targetLocation, row, col);
         return;
@@ -230,16 +319,19 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     if (poolElement) {
       const poolId = poolElement.dataset.poolId;
       console.log('[useBoatDragDrop] Touch drop on pool:', { poolId });
+      // Reset lifted element before drop processing
+      resetLiftedElement();
       await handlePoolDrop(poolId);
       return;
     }
 
     // No valid drop target - cancel the drag
     console.log('[useBoatDragDrop] Touch ended outside drop target - canceling');
+    resetLiftedElement();
     setDraggingBoat(null);
     setDraggingFrom(null);
     setIsDragging(false);
-  }, [draggingBoat, isProcessing, handleGridDrop, handlePoolDrop]);
+  }, [draggingBoat, isProcessing, handleGridDrop, handlePoolDrop, resetLiftedElement]);
 
   return {
     draggingBoat,
