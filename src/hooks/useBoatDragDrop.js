@@ -25,8 +25,10 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
 
   // Gesture differentiation: track start position and pending drag
   const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const touchStartTimeRef = useRef(0);
   const pendingDragRef = useRef(null);
   const DRAG_THRESHOLD = 10; // pixels - must move this far to start a drag
+  const DRAG_DELAY = 150; // ms - must hold this long before drag can activate
 
   // Clone for Drag: track the original element (for dimensions) and the cloned drag element
   const originalElementRef = useRef(null);
@@ -50,35 +52,40 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     // Create a custom drag image from the slot element
     const slotElement = e.currentTarget;
     if (slotElement && e.dataTransfer) {
+      // Use a wrapper container to enforce exact dimensions
+      // This prevents flex children (like storage boat stripes) from expanding
+      const wrapper = document.createElement('div');
+      wrapper.style.width = `${slotElement.offsetWidth}px`;
+      wrapper.style.height = `${slotElement.offsetHeight}px`;
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.position = 'absolute';
+      wrapper.style.top = '-9999px';
+      wrapper.style.left = '-9999px';
+      wrapper.style.borderRadius = '0.75rem';
+      wrapper.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+      wrapper.style.transform = 'scale(0.95)';
+      wrapper.style.opacity = '0.9';
+
       // Clone the element for the drag image
       const dragImage = slotElement.cloneNode(true);
-      dragImage.style.position = 'absolute';
-      dragImage.style.top = '-9999px';
-      dragImage.style.left = '-9999px';
-      dragImage.style.width = `${slotElement.offsetWidth}px`;
-      dragImage.style.height = `${slotElement.offsetHeight}px`;
-      // Constrain the clone so flex children (like storage boat stripes) don't expand
-      dragImage.style.maxWidth = `${slotElement.offsetWidth}px`;
-      dragImage.style.maxHeight = `${slotElement.offsetHeight}px`;
-      dragImage.style.overflow = 'hidden';
-      dragImage.style.boxSizing = 'border-box';
-      dragImage.style.opacity = '0.9';
-      dragImage.style.transform = 'scale(0.95)';
-      dragImage.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
-      dragImage.style.borderRadius = '0.75rem';
+      dragImage.style.width = '100%';
+      dragImage.style.height = '100%';
+      dragImage.style.margin = '0';
+      dragImage.style.position = 'relative';
       dragImage.classList.add('dragging-lifted');
 
-      document.body.appendChild(dragImage);
+      wrapper.appendChild(dragImage);
+      document.body.appendChild(wrapper);
 
       // Set custom drag image, centered on cursor
       e.dataTransfer.setDragImage(
-        dragImage,
+        wrapper,
         slotElement.offsetWidth / 2,
         slotElement.offsetHeight / 2
       );
 
-      // Remove the clone after drag starts (browser captures it)
-      setTimeout(() => dragImage.remove(), 0);
+      // Remove the wrapper after drag starts (browser captures it)
+      setTimeout(() => wrapper.remove(), 0);
     }
 
     // Guard against touch devices where dataTransfer may not exist
@@ -290,13 +297,14 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     // Prevent iOS text selection behavior during drag
     e.preventDefault();
 
-    // Get initial touch position
+    // Get initial touch position and timestamp
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
+    touchStartTimeRef.current = Date.now();
 
     // DON'T start dragging yet - store pending drag info
-    // Drag will only start if finger moves beyond threshold
+    // Drag will only start if finger moves beyond threshold AND delay has passed
     pendingDragRef.current = { boat, location, slotId };
 
     // CLONE FOR DRAG: Capture the slot element for cloning later
@@ -317,13 +325,25 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     const touch = e.touches[0];
     touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
 
-    // Check if we should start dragging (threshold exceeded)
+    // Check if we should start dragging (threshold and delay exceeded)
     if (pendingDragRef.current && !draggingBoat) {
       const dx = touch.clientX - touchStartPosRef.current.x;
       const dy = touch.clientY - touchStartPosRef.current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
+      const elapsed = Date.now() - touchStartTimeRef.current;
 
-      if (distance > DRAG_THRESHOLD) {
+      // If moving fast before delay elapsed, this is probably a scroll gesture
+      // Cancel the pending drag and let native scroll happen
+      if (elapsed < DRAG_DELAY && distance > DRAG_THRESHOLD) {
+        console.log('[useBoatDragDrop] Fast movement before delay - treating as scroll');
+        pendingDragRef.current = null;
+        originalElementRef.current = null;
+        originalRectRef.current = null;
+        return;
+      }
+
+      // Only start drag if both threshold AND delay are met
+      if (distance > DRAG_THRESHOLD && elapsed >= DRAG_DELAY) {
         // Threshold exceeded - now actually start the drag
         const { boat, location, slotId } = pendingDragRef.current;
         setDraggingBoat(boat);
@@ -336,7 +356,7 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
           createDragClone(originalElementRef.current, touch.clientX, touch.clientY);
         }
 
-        console.log('[useBoatDragDrop] Touch drag started (threshold exceeded):', { boatId: boat.id });
+        console.log('[useBoatDragDrop] Touch drag started (threshold and delay exceeded):', { boatId: boat.id });
       }
     } else if (draggingBoat && dragCloneRef.current) {
       // Move the clone to follow the finger
