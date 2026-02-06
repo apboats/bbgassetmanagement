@@ -61,10 +61,33 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
     handleDragStart: handleBoatDragStart,
     handleDragEnd: handleBoatDragEnd,
     handleGridDrop: handleBoatDrop,
-    handlePoolDrop
+    handlePoolDrop,
+    // Touch handlers for touch devices
+    handleTouchStart,
+    handleTouchMove: handleTouchMoveFromHook,
+    handleTouchEnd: handleTouchEndFromHook
   } = useBoatDragDrop({
     onMoveBoat: onMoveBoatFromContainer
   });
+
+  // State for drag preview position (for touch devices)
+  const [dragPreviewPos, setDragPreviewPos] = useState({ x: 0, y: 0 });
+
+  // Wrap handleTouchMove to also update drag preview position
+  const handleBoatTouchMove = (e) => {
+    handleTouchMoveFromHook(e);
+    // Update drag preview position if dragging
+    if (e.touches && e.touches[0]) {
+      setDragPreviewPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  };
+
+  // Wrap handleTouchEnd to pass locations array for drop target detection
+  const handleBoatTouchEnd = (e) => {
+    handleTouchEndFromHook(e, locations);
+    // Clear drag preview position
+    setDragPreviewPos({ x: 0, y: 0 });
+  };
 
   // Sync viewingBoat with boats array when it updates (real-time changes)
   useEffect(() => {
@@ -461,6 +484,27 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
 
   return (
     <div className="space-y-6 animate-slide-in">
+      {/* Floating drag preview for touch devices - follows finger */}
+      {isDragging && draggingBoat && dragPreviewPos.x > 0 && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: dragPreviewPos.x,
+            top: dragPreviewPos.y,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-lg shadow-2xl border-2 border-blue-400 opacity-90">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+              <span className="font-medium text-sm whitespace-nowrap">
+                {draggingBoat.name || draggingBoat.model || `${draggingBoat.year || ''} ${draggingBoat.make || ''}`.trim() || 'Boat'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">My View</h2>
@@ -614,6 +658,9 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handlePoolDrop(location.id)}
                   canManageLocations={canManageLocations}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleBoatTouchMove}
+                  onTouchEnd={handleBoatTouchEnd}
                 />
               );
             }
@@ -650,6 +697,9 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
                   setMaximizedLocation(liveLocation || location);
                 }}
                 canManageLocations={canManageLocations}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleBoatTouchMove}
+                onTouchEnd={handleBoatTouchEnd}
               />
             );
           })}
@@ -742,6 +792,9 @@ export function MyViewEditor({ locations, sites = [], boats, userPreferences, on
           onDragEnd={handleBoatDragEnd}
           draggingBoat={draggingBoat}
           onClose={() => setMaximizedLocation(null)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleBoatTouchMove}
+          onTouchEnd={handleBoatTouchEnd}
         />
       )}
     </div>
