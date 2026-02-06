@@ -270,7 +270,8 @@ export function BoatCard({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onClick={() => onClick && onClick(boat)}
-      className={`p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all ${className}`}
+      className={`p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-400 hover:shadow-md cursor-pointer transition-all select-none ${className}`}
+      style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
     >
       <BoatCardContent
         boat={boat}
