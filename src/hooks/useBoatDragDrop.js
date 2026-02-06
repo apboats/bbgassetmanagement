@@ -155,12 +155,24 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
 
   // Reset the lifted element back to its original state
   const resetLiftedElement = useCallback(() => {
-    if (draggedElementRef.current && isLiftModeRef.current) {
+    if (draggedElementRef.current) {
       const el = draggedElementRef.current;
-      // Restore original styles
-      Object.keys(originalStylesRef.current).forEach(key => {
-        el.style[key] = originalStylesRef.current[key] || '';
-      });
+
+      // Aggressively remove ALL inline styles we might have set during lift
+      // Using removeProperty ensures complete cleanup on iOS
+      el.style.removeProperty('position');
+      el.style.removeProperty('z-index');
+      el.style.removeProperty('transition');
+      el.style.removeProperty('box-shadow');
+      el.style.removeProperty('width');
+      el.style.removeProperty('height');
+      el.style.removeProperty('left');
+      el.style.removeProperty('top');
+      el.style.removeProperty('transform');
+      el.style.removeProperty('pointer-events');
+      el.style.removeProperty('visibility');
+      el.style.removeProperty('opacity');
+
       el.classList.remove('dragging-lifted');
     }
     draggedElementRef.current = null;
