@@ -158,6 +158,10 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     if (draggedElementRef.current) {
       const el = draggedElementRef.current;
 
+      // First, explicitly restore interactivity (critical for iOS)
+      el.style.pointerEvents = 'auto';
+      el.style.visibility = 'visible';
+
       // Aggressively remove ALL inline styles we might have set during lift
       // Using removeProperty ensures complete cleanup on iOS
       el.style.removeProperty('position');
@@ -174,6 +178,10 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       el.style.removeProperty('opacity');
 
       el.classList.remove('dragging-lifted');
+
+      // Force a reflow to ensure iOS applies style changes immediately
+      // This prevents batched style updates from causing interaction issues
+      void el.offsetHeight;
     }
     draggedElementRef.current = null;
     originalRectRef.current = null;
@@ -302,9 +310,10 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     // Find which element is at the touch position
     const element = document.elementFromPoint(x, y);
 
-    // Restore visibility for animation
+    // Restore visibility AND pointer-events immediately (before any async operations)
     if (liftedEl) {
       liftedEl.style.visibility = 'visible';
+      liftedEl.style.pointerEvents = 'auto';
     }
 
     // Check for grid slot drop target
