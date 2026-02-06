@@ -106,4 +106,12 @@ select:focus-visible {
   cursor: grabbing;
   -webkit-user-select: none;
   user-select: none;
+  /* Override slot-placeholder styles - lifted element should keep its boat card appearance */
+  background: inherit !important;
+  border: inherit !important;
+}
+
+/* Ensure content inside lifted element remains visible (overrides .slot-placeholder > *) */
+.dragging-lifted > * {
+  visibility: visible !important;
 }
