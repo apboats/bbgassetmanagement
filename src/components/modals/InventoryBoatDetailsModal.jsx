@@ -6,7 +6,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Wrench, History, FileText, DollarSign } from 'lucide-react';
+import { X, Wrench, History, FileText, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
 
 // Work type configuration by inventory type
 // All types use 'prep' and 'rigging' as database keys, only the labels differ
@@ -70,6 +70,15 @@ import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
 import { WindowStickerModal } from './WindowStickerModal';
+import { EstimateDetailsModal } from './EstimateDetailsModal';
+import { estimatesService } from '../../services/supabaseService';
+
+// Compute hash from estimates for change detection
+const computeEstimatesHash = (estimates) => {
+  if (!estimates || estimates.length === 0) return null;
+  const sorted = [...estimates].sort((a, b) => a.id - b.id);
+  return sorted.map(e => `${e.id}:${e.total_charges || 0}`).join('|');
+};
 
 // Helper to format time ago
 function getTimeAgo(date) {
@@ -88,7 +97,7 @@ function getTimeAgo(date) {
 
 export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], boats = [], inventoryBoats = [], onMoveBoat, onUpdateBoat, onClose }) {
   // Get permissions from centralized hook - ensures consistent access across the app
-  const { canSeeCost, currentUser } = usePermissions();
+  const { canSeeCost, currentUser, isSalesManager, isAdmin } = usePermissions();
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('layout');
@@ -114,6 +123,13 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
 
   // Cost breakdown modal state
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
+
+  // Estimates state
+  const [estimates, setEstimates] = useState([]);
+  const [loadingEstimates, setLoadingEstimates] = useState(false);
+  const [selectedEstimate, setSelectedEstimate] = useState(null);
+  const [selectedEstimateIndex, setSelectedEstimateIndex] = useState(0);
+  const [approvingEstimates, setApprovingEstimates] = useState(false);
 
   // Workflow state - determine work types based on inventory type
   const inventoryType = getInventoryType(boat);
@@ -272,6 +288,60 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   useEffect(() => {
     loadMovementHistory();
   }, [loadMovementHistory]);
+
+  // Load estimates when modal opens
+  useEffect(() => {
+    const loadEstimates = async () => {
+      const dockmasterId = boat.dockmasterId || boat.dockmaster_id;
+      if (!dockmasterId) return;
+
+      setLoadingEstimates(true);
+      try {
+        const data = await estimatesService.getForInventoryBoat(dockmasterId);
+        setEstimates(data);
+      } catch (err) {
+        console.error('Error loading estimates:', err);
+      } finally {
+        setLoadingEstimates(false);
+      }
+    };
+
+    loadEstimates();
+  }, [boat.dockmasterId, boat.dockmaster_id]);
+
+  // Handle estimates approval
+  const handleApproveEstimates = async () => {
+    if (approvingEstimates) return;
+    setApprovingEstimates(true);
+    try {
+      const hash = computeEstimatesHash(estimates);
+      await supabaseService.inventoryBoats.update(boat.id, {
+        estimates_approved_by: currentUser?.id,
+        estimates_approved_at: new Date().toISOString(),
+        estimates_approval_hash: hash
+      });
+      if (onUpdateBoat) {
+        onUpdateBoat({
+          ...boat,
+          estimates_approved_by: currentUser?.id,
+          estimates_approved_at: new Date().toISOString(),
+          estimates_approval_hash: hash
+        });
+      }
+    } catch (err) {
+      console.error('Error approving estimates:', err);
+    } finally {
+      setApprovingEstimates(false);
+    }
+  };
+
+  // Handle estimate navigation
+  const handleEstimateNavigate = (index) => {
+    if (index >= 0 && index < estimates.length) {
+      setSelectedEstimateIndex(index);
+      setSelectedEstimate(estimates[index]);
+    }
+  };
 
   // Enrich boat with location data if missing (centralized logic)
   const { enrichedBoat } = findBoatLocationData(boat, locations);
@@ -912,6 +982,113 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             </button>
           )}
 
+          {/* Dockmaster Estimates Section */}
+          {loadingEstimates && (
+            <div className="p-4 text-center text-slate-500 bg-amber-50 border-2 border-amber-200 rounded-xl">
+              Loading estimates...
+            </div>
+          )}
+
+          {!loadingEstimates && estimates.length > 0 && (
+            <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-xl">
+              {/* Header with count and total */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-amber-600" />
+                  <h4 className="font-semibold text-amber-900">Dockmaster Estimates</h4>
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">
+                    {estimates.length}
+                  </span>
+                </div>
+                <p className="text-lg font-bold text-amber-700">
+                  ${estimates.reduce((sum, e) => sum + (e.total_charges || 0), 0)
+                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {/* Review Estimates button */}
+              <button
+                onClick={() => {
+                  setSelectedEstimateIndex(0);
+                  setSelectedEstimate(estimates[0]);
+                }}
+                className="mt-3 w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Review Estimates ({estimates.length})
+              </button>
+
+              {/* Approval Status */}
+              {(() => {
+                const currentHash = computeEstimatesHash(estimates);
+                const isApproved = boat.estimates_approved_by &&
+                                   boat.estimates_approval_hash === currentHash;
+                const hasChanged = boat.estimates_approved_by &&
+                                   boat.estimates_approval_hash !== currentHash;
+
+                if (isApproved) {
+                  return (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium">Estimates Approved</span>
+                      </div>
+                      <p className="text-sm text-green-700 mt-1">
+                        Approved on {new Date(boat.estimates_approved_at).toLocaleString()}
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (hasChanged) {
+                  return (
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-orange-800">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="font-medium">Estimates Changed</span>
+                      </div>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Previous approval is no longer valid. Estimates have been modified.
+                      </p>
+                      {(isSalesManager || isAdmin) && (
+                        <button
+                          onClick={handleApproveEstimates}
+                          disabled={approvingEstimates}
+                          className="mt-2 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          {approvingEstimates ? 'Approving...' : 'Re-Approve Estimates'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Not approved yet
+                if (isSalesManager || isAdmin) {
+                  return (
+                    <button
+                      onClick={handleApproveEstimates}
+                      disabled={approvingEstimates}
+                      className="mt-3 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      {approvingEstimates ? 'Approving...' : 'Approve Estimates'}
+                    </button>
+                  );
+                }
+
+                return (
+                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-sm text-slate-600 text-center">
+                      Awaiting sales manager approval
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Work Orders Error */}
           {workOrdersError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1266,6 +1443,17 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             </div>
           </div>
         </div>
+      )}
+
+      {/* Estimate Details Modal with navigation */}
+      {selectedEstimate && (
+        <EstimateDetailsModal
+          estimate={selectedEstimate}
+          allEstimates={estimates}
+          currentIndex={selectedEstimateIndex}
+          onNavigate={handleEstimateNavigate}
+          onClose={() => setSelectedEstimate(null)}
+        />
       )}
     </div>
   );
