@@ -382,10 +382,10 @@ function AppContainer() {
     }
   }
 
-  // Load users (admin only)
+  // Load users (all authenticated users - needed for @mentions)
   const loadUsers = async () => {
     try {
-      if (user && user.role === 'admin') {
+      if (user) {
         const data = await usersService.getAll()
         setUsers(data)
       }
