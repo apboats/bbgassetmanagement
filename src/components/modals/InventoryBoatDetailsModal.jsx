@@ -294,6 +294,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           operations:work_order_operations(*)
         `)
         .eq('rigging_id', boat.dockmasterId)  // Match rigging_id to inventory boat's dockmaster_id
+        .or('is_estimate.is.null,is_estimate.eq.false')  // Exclude estimates
         // No status filter - get ALL work orders (open and closed)
         .order('id', { ascending: false });  // Most recent first
 
