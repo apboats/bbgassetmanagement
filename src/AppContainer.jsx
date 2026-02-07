@@ -1298,6 +1298,16 @@ function AppContainer() {
     }
   }
 
+  const handleApproveEstimates = async (requestId, hash) => {
+    try {
+      await requestsService.approveEstimates(requestId, user?.id, hash)
+      await loadRequests()
+    } catch (error) {
+      console.error('Error approving estimates:', error)
+      throw error
+    }
+  }
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -1371,6 +1381,7 @@ function AppContainer() {
       onConfirmRequestComplete={handleConfirmRequestComplete}
       onAttachFile={handleAttachFile}
       onRemoveAttachment={handleRemoveAttachment}
+      onApproveEstimates={handleApproveEstimates}
     />
   )
 }
