@@ -226,6 +226,8 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     clone.style.pointerEvents = 'none';
     clone.style.opacity = '0.95';
     clone.style.transition = 'none';
+    clone.style.overflow = 'hidden';
+    clone.style.borderRadius = '0.75rem';
     clone.classList.add('dragging-lifted');
     clone.id = 'drag-clone';
 
