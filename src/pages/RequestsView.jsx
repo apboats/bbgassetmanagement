@@ -7,9 +7,10 @@
 // Supports drag-and-drop between status columns
 // ============================================================================
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive, Calendar } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
+import { useRequestDragDrop } from '../hooks/useRequestDragDrop';
 import { RequestModal } from '../components/modals/RequestModal';
 import { RequestDetailModal } from '../components/modals/RequestDetailModal';
 
@@ -29,8 +30,8 @@ const TYPE_CONFIG = {
   'prep': { label: 'Prep', color: 'bg-orange-100 text-orange-800' },
 };
 
-// Request Card Component with drag support
-function RequestCard({ request, onClick, onDragStart, onDragEnd }) {
+// Request Card Component with drag and touch support
+function RequestCard({ request, onClick, onDragStart, onDragEnd, onTouchStart, onTouchMove, onTouchEnd }) {
   const statusConfig = STATUS_CONFIG[request.status] || STATUS_CONFIG['open'];
   const typeConfig = TYPE_CONFIG[request.type] || TYPE_CONFIG['rigging'];
   const StatusIcon = statusConfig.icon;
@@ -40,13 +41,15 @@ function RequestCard({ request, onClick, onDragStart, onDragEnd }) {
     : 'No boat linked';
 
   const handleDragStart = (e) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', request.id);
-    if (onDragStart) onDragStart(request);
+    if (onDragStart) onDragStart(e, request);
   };
 
   const handleDragEnd = () => {
     if (onDragEnd) onDragEnd();
+  };
+
+  const handleTouchStart = (e) => {
+    if (onTouchStart) onTouchStart(e, request);
   };
 
   return (
@@ -54,8 +57,11 @@ function RequestCard({ request, onClick, onDragStart, onDragEnd }) {
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onTouchStart={handleTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       onClick={onClick}
-      className="w-full p-4 bg-white rounded-xl border-2 border-slate-200 hover:border-blue-300 hover:shadow-md transition-all text-left cursor-grab active:cursor-grabbing"
+      className="request-card w-full p-4 bg-white rounded-xl border-2 border-slate-200 hover:border-blue-300 hover:shadow-md transition-all text-left cursor-grab active:cursor-grabbing"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -100,24 +106,25 @@ function RequestCard({ request, onClick, onDragStart, onDragEnd }) {
   );
 }
 
-// Kanban Column Component with drop support
-function KanbanColumn({ status, requests, onSelectRequest, onDragStart, onDragEnd, onDrop, isDragOver }) {
+// Kanban Column Component with drop and touch support
+function KanbanColumn({ status, requests, onSelectRequest, onDragStart, onDragEnd, onDragOver, onDrop, isDragOver, onTouchStart, onTouchMove, onTouchEnd }) {
   const config = STATUS_CONFIG[status];
   const StatusIcon = config.icon;
 
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (onDragOver) onDragOver(e);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    const requestId = e.dataTransfer.getData('text/plain');
-    if (onDrop) onDrop(requestId, status);
+    if (onDrop) onDrop(e, status);
   };
 
   return (
     <div
+      data-status={status}
       className={`space-y-3 min-h-[200px] rounded-lg transition-colors ${isDragOver ? config.bgHover : ''}`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -145,6 +152,9 @@ function KanbanColumn({ status, requests, onSelectRequest, onDragStart, onDragEn
               onClick={() => onSelectRequest(request)}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
             />
           ))
         )}
@@ -171,7 +181,25 @@ export function RequestsView({
   const [filterType, setFilterType] = useState('all'); // all, rigging, prep
   const [filterStatus, setFilterStatus] = useState('active'); // active, closed, all
   const [showArchived, setShowArchived] = useState(false);
-  const [dragOverStatus, setDragOverStatus] = useState(null);
+
+  // Drag and drop with touch support
+  const {
+    draggingRequest,
+    isDragging,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleDragStart,
+    handleDragEnd,
+    handleDrop,
+    handleDragOver,
+  } = useRequestDragDrop({
+    onStatusChange: async (requestId, newStatus) => {
+      if (onUpdateRequest) {
+        await onUpdateRequest(requestId, { status: newStatus });
+      }
+    }
+  });
 
   // Get the selected request from the requests array (ensures fresh data)
   const selectedRequest = useMemo(() => {
@@ -241,34 +269,6 @@ export function RequestsView({
       await onConfirmComplete(requestId, currentUser?.id);
     }
   };
-
-  // Drag and drop handlers
-  const handleDragStart = useCallback(() => {
-    // Could add visual feedback here if needed
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDragOverStatus(null);
-  }, []);
-
-  const handleDrop = useCallback(async (requestId, newStatus) => {
-    const request = requests.find(r => r.id === requestId);
-    if (!request || request.status === newStatus) {
-      setDragOverStatus(null);
-      return;
-    }
-
-    // Update the request status
-    if (onUpdateRequest) {
-      try {
-        await onUpdateRequest(requestId, { status: newStatus });
-      } catch (error) {
-        console.error('Error updating request status:', error);
-      }
-    }
-
-    setDragOverStatus(null);
-  }, [requests, onUpdateRequest]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -346,8 +346,12 @@ export function RequestsView({
             onSelectRequest={handleSelectRequest}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
             onDrop={handleDrop}
-            isDragOver={dragOverStatus === status}
+            isDragOver={isDragging && draggingRequest?.status !== status}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           />
         ))}
       </div>
