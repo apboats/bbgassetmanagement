@@ -172,6 +172,8 @@ export function RequestsView({
   onAddMessage,
   onMarkServiceComplete,
   onConfirmComplete,
+  onAttachFile,
+  onRemoveAttachment,
 }) {
   const { canCreateRequests } = usePermissions();
 
@@ -374,6 +376,13 @@ export function RequestsView({
           onAddMessage={handleAddMessage}
           onMarkServiceComplete={handleMarkServiceComplete}
           onConfirmComplete={handleConfirmComplete}
+          onStatusChange={async (requestId, newStatus) => {
+            if (onUpdateRequest) {
+              await onUpdateRequest(requestId, { status: newStatus });
+            }
+          }}
+          onAttachFile={onAttachFile}
+          onRemoveAttachment={onRemoveAttachment}
         />
       )}
     </div>
