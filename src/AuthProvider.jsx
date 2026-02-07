@@ -404,7 +404,7 @@ export const AuthProvider = ({ children }) => {
       // Sales Manager has same permissions as Manager
       canManageLocations: role === 'admin' || role === 'manager' || role === 'sales-manager',
       canEditUsers: role === 'admin',
-      canSeeCost: role === 'admin' || role === 'manager' || role === 'sales-manager' || role === 'sales',
+      canSeeCost: role === 'admin' || role === 'manager' || role === 'sales-manager',
       canDeleteBoats: role === 'admin' || role === 'manager' || role === 'sales-manager',
       // Only Sales Managers, Sales, and Admins can create service requests
       canCreateRequests: role === 'admin' || role === 'sales-manager' || role === 'sales',
