@@ -1030,7 +1030,14 @@ function AppContainer() {
     )
   }
 
-  const handleMoveBoat = async (boatOrBoatId, toLocationOrId, toSlotId, isInventory = false) => {
+  const handleMoveBoat = async (
+    boatOrBoatId,
+    toLocationOrId,
+    toSlotId,
+    isInventory = false,
+    dragFromLocationId = null,  // Optional: from drag hook (avoids stale state on rapid moves)
+    dragFromSlotId = null       // Optional: from drag hook
+  ) => {
     // Handle both boat object and boatId string
     const boatId = typeof boatOrBoatId === 'object' ? boatOrBoatId.id : boatOrBoatId;
 
@@ -1045,25 +1052,28 @@ function AppContainer() {
       : isInventory;
 
     // Find current boat location before move (for optimistic update)
-    // We need to search locations to find the actual slot, since boat.slot may be stale
-    let fromLocationId = null
-    let fromSlotId = null
+    // Use drag hook's values if provided (source of truth, avoids stale React state on rapid moves)
+    // Otherwise search locations (fallback for non-drag moves)
+    let fromLocationId = dragFromLocationId
+    let fromSlotId = dragFromSlotId
 
-    for (const location of locations) {
-      // Check grid slots (location.boats is an object: { "0-1": boatId, ... })
-      if (location.boats) {
-        const slotEntry = Object.entries(location.boats).find(([slot, id]) => id === boatId)
-        if (slotEntry) {
+    if (!fromLocationId) {
+      for (const location of locations) {
+        // Check grid slots (location.boats is an object: { "0-1": boatId, ... })
+        if (location.boats) {
+          const slotEntry = Object.entries(location.boats).find(([slot, id]) => id === boatId)
+          if (slotEntry) {
+            fromLocationId = location.id
+            fromSlotId = slotEntry[0]
+            break
+          }
+        }
+        // Check pool (location.pool_boats is an array of boat IDs)
+        if (location.pool_boats?.includes(boatId)) {
           fromLocationId = location.id
-          fromSlotId = slotEntry[0]
+          fromSlotId = 'pool'
           break
         }
-      }
-      // Check pool (location.pool_boats is an array of boat IDs)
-      if (location.pool_boats?.includes(boatId)) {
-        fromLocationId = location.id
-        fromSlotId = 'pool'
-        break
       }
     }
 
