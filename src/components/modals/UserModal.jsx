@@ -158,6 +158,8 @@ export function UserModal({ user, onSave, onCancel }) {
               disabled={loading}
             >
               <option value="user">User</option>
+              <option value="service">Service</option>
+              <option value="sales">Sales</option>
               <option value="manager">Manager</option>
               <option value="sales-manager">Sales Manager</option>
               <option value="admin">Admin</option>
