@@ -172,22 +172,19 @@ serve(async (req) => {
 
     // Process estimates
     for (const est of estimates) {
-      // Only process records that have rigging_id (for matching to inventory boats)
-      if (!est.riggingId) {
-        console.log(`Skipping estimate ${est.id}: no riggingId`)
-        continue
-      }
+      console.log(`Processing estimate ${est.id}: riggingId=${est.riggingId || 'none'}, title="${est.title}"`)
 
-      console.log(`Processing estimate ${est.id}: riggingId=${est.riggingId}, title="${est.title}"`)
+      const customerId = est.customerId || est.customerID || null
+      const isInternal = customerId === '3112' || customerId === 3112
 
       const estimateData = {
         id: est.id,
-        customer_id: est.customerId || est.customerID || null,
+        customer_id: customerId,
         customer_name: est.customerName || '',
         clerk_id: est.clerkId || null,
-        rigging_id: est.riggingId,
+        rigging_id: est.riggingId || null,
         rigging_type: est.riggingType || null,
-        is_internal: true,
+        is_internal: isInternal,
         is_estimate: true,  // Key flag!
         type: est.type || null,
         tax_schema: est.taxSchema || null,
