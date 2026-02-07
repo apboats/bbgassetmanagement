@@ -127,3 +127,14 @@ select:focus-visible {
 .dragging-lifted > * {
   visibility: visible !important;
 }
+
+/* Request cards - disable touch-action for drag support on touch devices */
+.request-card[draggable="true"] {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
