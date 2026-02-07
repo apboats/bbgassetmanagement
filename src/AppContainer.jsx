@@ -70,6 +70,10 @@ function AppContainer() {
   const inventoryChannelRef = useRef(null)
   const resubscribeInventoryRef = useRef(null)
 
+  // Ref for broadcast channel (instant cross-device sync)
+  const boatBroadcastChannelRef = useRef(null)
+  const broadcastHandlerRef = useRef(null)
+
   // Load all data on mount
   useEffect(() => {
     if (user) {
@@ -161,6 +165,15 @@ function AppContainer() {
         loadRequests()
       })
 
+      // Initialize broadcast channel for instant cross-device sync
+      // This provides <100ms sync vs 2s debounced database polling
+      boatBroadcastChannelRef.current = supabaseService.subscriptions.initBoatBroadcast((payload) => {
+        // Use ref to call handler - ensures we always have current applyOptimisticMove
+        if (broadcastHandlerRef.current) {
+          broadcastHandlerRef.current(payload)
+        }
+      })
+
       console.log('Real-time subscriptions active')
 
       return () => {
@@ -171,6 +184,9 @@ function AppContainer() {
           supabaseService.subscriptions.unsubscribe(inventoryChannelRef.current)
         }
         supabaseService.subscriptions.unsubscribe(requestsChannel)
+        if (boatBroadcastChannelRef.current) {
+          supabaseService.subscriptions.unsubscribe(boatBroadcastChannelRef.current)
+        }
       }
     } catch (error) {
       console.error('Error setting up real-time subscriptions:', error)
@@ -983,6 +999,19 @@ function AppContainer() {
     })
   }
 
+  // Set broadcast handler ref so it always has access to current applyOptimisticMove
+  broadcastHandlerRef.current = (payload) => {
+    console.log('[Broadcast] Applying remote boat change')
+    applyOptimisticMove(
+      payload.boatId,
+      payload.fromLocationId,
+      payload.fromSlotId,
+      payload.toLocationId,
+      payload.toSlotId,
+      payload.isInventory
+    )
+  }
+
   const handleMoveBoat = async (boatOrBoatId, toLocationOrId, toSlotId, isInventory = false) => {
     // Handle both boat object and boatId string
     const boatId = typeof boatOrBoatId === 'object' ? boatOrBoatId.id : boatOrBoatId;
@@ -1026,6 +1055,17 @@ function AppContainer() {
 
     // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
     applyOptimisticMove(boatId, fromLocationId, fromSlotId, toLocationId, toSlotId, isInventoryBoat)
+
+    // BROADCAST: Notify other devices immediately (before DB call completes)
+    // This provides <100ms cross-device sync vs 2s debounced database polling
+    supabaseService.subscriptions.broadcastBoatChange({
+      boatId,
+      fromLocationId,
+      fromSlotId,
+      toLocationId,
+      toSlotId,
+      isInventory: isInventoryBoat
+    })
 
     try {
       // Database call runs in background - UI already updated
