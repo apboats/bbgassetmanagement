@@ -49,6 +49,15 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       return;
     }
 
+    // On touch-capable devices, skip HTML5 drag entirely - our touch system handles it
+    // This prevents the persistent ghost issue on Chromium touch devices (Vibe Board)
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) {
+      console.log('[useBoatDragDrop] Touch device detected - skipping HTML5 drag');
+      e.preventDefault();
+      return;
+    }
+
     // Create a custom drag image from the slot element
     const slotElement = e.currentTarget;
     if (slotElement && e.dataTransfer) {
