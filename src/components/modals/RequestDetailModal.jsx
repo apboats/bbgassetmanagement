@@ -90,6 +90,13 @@ export function RequestDetailModal({
 
   const messages = request.messages || [];
   const boat = request.inventory_boat;
+
+  // Local state for approval (updates immediately after approval)
+  const [approvalData, setApprovalData] = useState({
+    approved_by: boat?.estimates_approved_by,
+    approved_at: boat?.estimates_approved_at,
+    approval_hash: boat?.estimates_approval_hash,
+  });
   const boatName = boat
     ? `${boat.year || ''} ${boat.make || ''} ${boat.model || ''}`.trim()
     : 'No boat linked';
@@ -231,6 +238,12 @@ export function RequestDetailModal({
     try {
       const hash = computeEstimatesHash(estimates);
       await onApproveEstimates(request.id, hash);
+      // Update local state immediately so UI reflects the change
+      setApprovalData({
+        approved_by: currentUser?.id,
+        approved_at: new Date().toISOString(),
+        approval_hash: hash,
+      });
     } catch (err) {
       console.error('Error approving estimates:', err);
     } finally {
@@ -392,13 +405,13 @@ export function RequestDetailModal({
               Review Estimates ({estimates.length})
             </button>
 
-            {/* Approval Status - reads from inventory_boat (single source of truth) */}
+            {/* Approval Status - uses local state for immediate updates */}
             {(() => {
               const currentHash = computeEstimatesHash(estimates);
-              const isApproved = boat?.estimates_approved_by &&
-                                 boat?.estimates_approval_hash === currentHash;
-              const hasChanged = boat?.estimates_approved_by &&
-                                 boat?.estimates_approval_hash !== currentHash;
+              const isApproved = approvalData.approved_by &&
+                                 approvalData.approval_hash === currentHash;
+              const hasChanged = approvalData.approved_by &&
+                                 approvalData.approval_hash !== currentHash;
 
               if (isApproved) {
                 return (
@@ -408,7 +421,7 @@ export function RequestDetailModal({
                       <span className="font-medium">Estimates Approved</span>
                     </div>
                     <p className="text-sm text-green-700 mt-1">
-                      Approved on {new Date(boat.estimates_approved_at).toLocaleString()}
+                      Approved on {new Date(approvalData.approved_at).toLocaleString()}
                     </p>
                   </div>
                 );
