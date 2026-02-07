@@ -2,18 +2,21 @@
 // REQUEST DETAIL MODAL
 // ============================================================================
 // Modal for viewing request details, message thread, and status actions
-// Service can mark complete, original requester can confirm completion
+// Includes status selector and PDF attachment support
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Wrench, CheckCircle, Clock, Ship, User } from 'lucide-react';
+import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink } from 'lucide-react';
 
-// Status configuration
+// Status configuration - matches RequestsView
 const STATUS_CONFIG = {
   'open': { label: 'Open', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
+  'scheduled': { label: 'Scheduled', color: 'bg-cyan-100 text-cyan-800 border-cyan-300', icon: Calendar },
   'service-complete': { label: 'Service Complete', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: Wrench },
   'closed': { label: 'Closed', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle },
 };
+
+const STATUS_ORDER = ['open', 'scheduled', 'service-complete', 'closed'];
 
 const TYPE_CONFIG = {
   'rigging': { label: 'Rigging', color: 'bg-purple-100 text-purple-800' },
@@ -52,11 +55,16 @@ export function RequestDetailModal({
   onAddMessage,
   onMarkServiceComplete,
   onConfirmComplete,
+  onStatusChange,
+  onAttachFile,
+  onRemoveAttachment,
 }) {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const statusConfig = STATUS_CONFIG[request.status] || STATUS_CONFIG['open'];
   const typeConfig = TYPE_CONFIG[request.type] || TYPE_CONFIG['rigging'];
@@ -121,6 +129,66 @@ export function RequestDetailModal({
     }
   };
 
+  const handleStatusChange = async (newStatus) => {
+    if (updating || newStatus === request.status) return;
+    setUpdating(true);
+    try {
+      if (onStatusChange) {
+        await onStatusChange(request.id, newStatus);
+      }
+    } catch (err) {
+      console.error('Error changing status:', err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || uploading) return;
+
+    // Validate file type (PDF only)
+    if (file.type !== 'application/pdf') {
+      alert('Please select a PDF file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      if (onAttachFile) {
+        await onAttachFile(request.id, file);
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      alert('Failed to upload file');
+    } finally {
+      setUploading(false);
+      // Clear the input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAttachment = async (attachmentId) => {
+    if (!confirm('Remove this attachment?')) return;
+    try {
+      if (onRemoveAttachment) {
+        await onRemoveAttachment(request.id, attachmentId);
+      }
+    } catch (err) {
+      console.error('Error removing attachment:', err);
+    }
+  };
+
+  const attachments = request.attachments || [];
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -128,15 +196,28 @@ export function RequestDetailModal({
         <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              {/* Type and Status badges */}
+              {/* Type badge and Status selector */}
               <div className="flex items-center gap-2 mb-2">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeConfig.color}`}>
                   {typeConfig.label}
                 </span>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${statusConfig.color}`}>
-                  <StatusIcon className="w-3 h-3 inline mr-1" />
-                  {statusConfig.label}
-                </span>
+
+                {/* Status Selector Dropdown */}
+                <select
+                  value={request.status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  disabled={updating}
+                  className={`px-2 py-0.5 rounded text-xs font-medium border cursor-pointer ${statusConfig.color} ${updating ? 'opacity-50' : ''}`}
+                >
+                  {STATUS_ORDER.map(status => {
+                    const config = STATUS_CONFIG[status];
+                    return (
+                      <option key={status} value={status}>
+                        {config.label}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               {/* Boat name */}
@@ -202,6 +283,78 @@ export function RequestDetailModal({
               </p>
             </div>
           )}
+
+          {/* PDF Attachments Section */}
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Attachments
+              </h4>
+              {request.status !== 'closed' && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                  >
+                    <Upload className="w-3 h-3" />
+                    {uploading ? 'Uploading...' : 'Attach PDF'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {attachments.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-3">No attachments</p>
+            ) : (
+              <div className="space-y-2">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="flex items-center gap-3 p-2 bg-white border border-slate-200 rounded-lg"
+                  >
+                    <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {attachment.filename || 'Document.pdf'}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {attachment.uploaded_by?.name || 'Unknown'} • {new Date(attachment.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Open PDF"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                      {request.status !== 'closed' && (
+                        <button
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Remove attachment"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Messages */}
