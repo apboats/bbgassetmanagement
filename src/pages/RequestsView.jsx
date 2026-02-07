@@ -174,6 +174,7 @@ export function RequestsView({
   onConfirmComplete,
   onAttachFile,
   onRemoveAttachment,
+  onApproveEstimates,
 }) {
   const { canCreateRequests } = usePermissions();
 
@@ -383,6 +384,7 @@ export function RequestsView({
           }}
           onAttachFile={onAttachFile}
           onRemoveAttachment={onRemoveAttachment}
+          onApproveEstimates={onApproveEstimates}
         />
       )}
     </div>
