@@ -310,22 +310,36 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   }, [boat.dockmasterId, boat.dockmaster_id]);
 
   // Handle estimates approval
+  // Syncs approval to both inventory_boats AND any service_requests referencing this boat
   const handleApproveEstimates = async () => {
     if (approvingEstimates) return;
     setApprovingEstimates(true);
     try {
       const hash = computeEstimatesHash(estimates);
-      await supabaseService.inventoryBoats.update(boat.id, {
+      const approvalData = {
         estimates_approved_by: currentUser?.id,
         estimates_approved_at: new Date().toISOString(),
         estimates_approval_hash: hash
-      });
+      };
+
+      // Update the inventory_boat
+      await supabaseService.inventoryBoats.update(boat.id, approvalData);
+
+      // Also update any service_requests that reference this inventory_boat
+      const { error: requestsError } = await supabase
+        .from('service_requests')
+        .update(approvalData)
+        .eq('inventory_boat_id', boat.id);
+
+      if (requestsError) {
+        console.error('Error syncing approval to service_requests:', requestsError);
+        // Don't throw - the main approval succeeded
+      }
+
       if (onUpdateBoat) {
         onUpdateBoat({
           ...boat,
-          estimates_approved_by: currentUser?.id,
-          estimates_approved_at: new Date().toISOString(),
-          estimates_approval_hash: hash
+          ...approvalData
         });
       }
     } catch (err) {
