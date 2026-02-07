@@ -2320,6 +2320,74 @@ export const boatMovementsService = {
 }
 
 // ============================================================================
+// BOAT NOTES SERVICE
+// ============================================================================
+// Conversational notes for boats (message thread style)
+// Supports both customer boats and inventory boats
+
+export const boatNotesService = {
+  // Get all notes for a customer boat
+  async getForBoat(boatId) {
+    const { data, error } = await supabase
+      .from('boat_notes')
+      .select(`
+        *,
+        user:users(id, name)
+      `)
+      .eq('boat_id', boatId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Get all notes for an inventory boat
+  async getForInventoryBoat(inventoryBoatId) {
+    const { data, error } = await supabase
+      .from('boat_notes')
+      .select(`
+        *,
+        user:users(id, name)
+      `)
+      .eq('inventory_boat_id', inventoryBoatId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Add a note to a customer boat
+  async addToBoat(boatId, userId, message) {
+    const { data, error } = await supabase
+      .from('boat_notes')
+      .insert([{
+        boat_id: boatId,
+        user_id: userId,
+        message
+      }])
+      .select(`*, user:users(id, name)`)
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Add a note to an inventory boat
+  async addToInventoryBoat(inventoryBoatId, userId, message) {
+    const { data, error } = await supabase
+      .from('boat_notes')
+      .insert([{
+        inventory_boat_id: inventoryBoatId,
+        user_id: userId,
+        message
+      }])
+      .select(`*, user:users(id, name)`)
+
+    if (error) throw error
+    return data?.[0]
+  },
+}
+
+// ============================================================================
 // CENTRALIZED MOVE SERVICE
 // ============================================================================
 // Single source of truth for moving boats and logging movement history
@@ -2396,6 +2464,7 @@ export default {
   users: usersService,
   boatShows: boatShowsService,
   boatMovements: boatMovementsService,
+  boatNotes: boatNotesService,
   requests: requestsService,
   requestAttachments: requestAttachmentsService,
   moveBoatWithHistory,
