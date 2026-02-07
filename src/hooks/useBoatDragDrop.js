@@ -144,7 +144,15 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       });
 
       // Delegate to AppContainer's handleMoveBoat
-      await onMoveBoat(draggingBoat.id, targetLocation.id, newSlotId, draggingBoat.isInventory || false);
+      // Pass draggingFrom to avoid race condition with stale React state on rapid moves
+      await onMoveBoat(
+        draggingBoat.id,
+        targetLocation.id,
+        newSlotId,
+        draggingBoat.isInventory || false,
+        draggingFrom?.location?.id,
+        draggingFrom?.slotId
+      );
 
       console.log('[useBoatDragDrop] Grid drop successful');
 
@@ -180,7 +188,15 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
 
       // Delegate to AppContainer's handleMoveBoat
       // For pools, we use 'pool' as the slot identifier
-      await onMoveBoat(draggingBoat.id, poolId, 'pool', draggingBoat.isInventory || false);
+      // Pass draggingFrom to avoid race condition with stale React state on rapid moves
+      await onMoveBoat(
+        draggingBoat.id,
+        poolId,
+        'pool',
+        draggingBoat.isInventory || false,
+        draggingFrom?.location?.id,
+        draggingFrom?.slotId
+      );
 
       console.log('[useBoatDragDrop] Pool drop successful');
 
