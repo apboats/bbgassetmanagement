@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText, MessageSquare } from 'lucide-react';
+import { Camera, Package, Settings, Menu, Home, Map, User, LogOut, Anchor, FileText, MessageSquare, Bell } from 'lucide-react';
 
 // Import pages
 import { LoginScreen } from './pages/LoginScreen';
@@ -14,9 +14,11 @@ import { SettingsView } from './pages/SettingsView';
 import { BoatShowPlanner } from './pages/BoatShowPlanner';
 import { ReportsView } from './pages/ReportsView';
 import { RequestsView } from './pages/RequestsView';
+import { AlertsView } from './pages/AlertsView';
 
 // Import shared components
 import { NavButton } from './components/SharedComponents';
+import { notificationsService } from './services/supabaseService';
 
 // Touch drag polyfill - makes draggable work on touch devices
 if (typeof window !== 'undefined') {
@@ -122,6 +124,25 @@ export default function BoatsByGeorgeAssetManager({
   // UI State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
+
+  // Load unread notification count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (!currentUser?.id) return;
+      try {
+        const count = await notificationsService.getUnreadCount(currentUser.id);
+        setUnreadAlertCount(count);
+      } catch (err) {
+        console.error('Error loading unread count:', err);
+      }
+    };
+
+    loadUnreadCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   // Router hooks
   const navigate = useNavigate();
@@ -363,6 +384,15 @@ export default function BoatsByGeorgeAssetManager({
               <NavButton icon={FileText} label="Reports" active={currentView === 'reports'} onClick={() => navigate('/reports')} />
               <NavButton icon={MessageSquare} label="Requests" active={currentView === 'requests'} onClick={() => navigate('/requests')} />
               <NavButton icon={Camera} label="Scan" active={currentView === 'scan'} onClick={() => navigate('/scan')} />
+              {/* Alerts with badge */}
+              <div className="relative">
+                <NavButton icon={Bell} label="Alerts" active={currentView === 'alerts'} onClick={() => navigate('/alerts')} />
+                {unreadAlertCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {unreadAlertCount > 9 ? '9+' : unreadAlertCount}
+                  </span>
+                )}
+              </div>
               <NavButton icon={Settings} label="Settings" active={currentView === 'settings'} onClick={() => navigate('/settings')} />
               <div className="flex items-center ml-2 pl-2 border-l border-slate-200">
                 <button onClick={handleLogout} className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Logout">
@@ -396,11 +426,20 @@ export default function BoatsByGeorgeAssetManager({
                   { view: 'reports', path: '/reports', icon: FileText, label: 'Reports' },
                   { view: 'requests', path: '/requests', icon: MessageSquare, label: 'Requests' },
                   { view: 'scan', path: '/scan', icon: Camera, label: 'Scan' },
+                  { view: 'alerts', path: '/alerts', icon: Bell, label: 'Alerts', badge: unreadAlertCount },
                   { view: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
-                ].map(({ view, path, icon: Icon, label }) => (
+                ].map(({ view, path, icon: Icon, label, badge }) => (
                   <button key={view} onClick={() => { navigate(path); setShowMobileMenu(false); }}
                     className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${currentView === view ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
-                    <Icon className="w-5 h-5" /><span>{label}</span>
+                    <div className="relative">
+                      <Icon className="w-5 h-5" />
+                      {badge > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {badge > 9 ? '9+' : badge}
+                        </span>
+                      )}
+                    </div>
+                    <span>{label}</span>
                   </button>
                 ))}
               </div>
@@ -461,6 +500,22 @@ export default function BoatsByGeorgeAssetManager({
               onAttachFile={onAttachFile}
               onRemoveAttachment={onRemoveAttachment}
               onApproveEstimates={onApproveEstimates}
+            />
+          } />
+          <Route path="/alerts" element={
+            <AlertsView
+              onNavigateToBoat={(boatId) => {
+                navigate('/boats');
+                // TODO: Open boat detail modal via state/context
+              }}
+              onNavigateToInventoryBoat={(boatId) => {
+                navigate('/inventory');
+                // TODO: Open inventory boat detail modal via state/context
+              }}
+              onNavigateToRequest={(requestId) => {
+                navigate('/requests');
+                // TODO: Open request detail modal via state/context
+              }}
             />
           } />
           {/* Catch-all redirect to dashboard */}
