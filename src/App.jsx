@@ -364,7 +364,7 @@ export default function BoatsByGeorgeAssetManager({
 
       {/* Navigation Bar */}
       <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 lg:h-16">
             <div className="flex items-center gap-2 lg:gap-3 min-w-0">
               <img src="/images/favicon.png" alt="Boats by George" className="w-8 h-8 lg:w-10 lg:h-10 object-contain flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }} />
@@ -449,7 +449,7 @@ export default function BoatsByGeorgeAssetManager({
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
           <Route path="/" element={
             <DashboardView boats={boats} locations={locations} sites={sites} users={users} onNavigate={(view) => navigate(view === 'dashboard' ? '/' : `/${view}`)} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
