@@ -6,8 +6,9 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign } from 'lucide-react';
+import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign, ChevronRight } from 'lucide-react';
 import { estimatesService } from '../../services/supabaseService';
+import { EstimateDetailsModal } from './EstimateDetailsModal';
 
 // Status configuration - matches RequestsView
 const STATUS_CONFIG = {
@@ -66,6 +67,7 @@ export function RequestDetailModal({
   const [uploading, setUploading] = useState(false);
   const [estimates, setEstimates] = useState([]);
   const [loadingEstimates, setLoadingEstimates] = useState(false);
+  const [selectedEstimate, setSelectedEstimate] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -339,7 +341,11 @@ export function RequestDetailModal({
 
             <div className="space-y-2">
               {estimates.map(estimate => (
-                <div key={estimate.id} className="p-3 bg-white rounded-lg border border-amber-100">
+                <div
+                  key={estimate.id}
+                  onClick={() => setSelectedEstimate(estimate)}
+                  className="p-3 bg-white rounded-lg border border-amber-100 cursor-pointer hover:border-amber-300 hover:shadow-md transition-all"
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-900">
@@ -350,22 +356,27 @@ export function RequestDetailModal({
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{estimate.comments}</p>
                       )}
                     </div>
-                    <div className="text-right flex-shrink-0 ml-3">
-                      <p className="font-semibold text-lg text-amber-700">
-                        ${(estimate.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {estimate.creation_date ? new Date(estimate.creation_date).toLocaleDateString() : ''}
-                      </p>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-lg text-amber-700">
+                          ${(estimate.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {estimate.creation_date ? new Date(estimate.creation_date).toLocaleDateString() : ''}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-amber-400" />
                     </div>
                   </div>
 
-                  {/* Operations breakdown */}
+                  {/* Operations preview */}
                   {estimate.operations?.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-amber-100">
-                      <p className="text-xs font-medium text-slate-500 mb-1">Line Items:</p>
+                      <p className="text-xs font-medium text-slate-500 mb-1">
+                        {estimate.operations.length} line item{estimate.operations.length !== 1 ? 's' : ''} — tap for details
+                      </p>
                       <div className="space-y-0.5">
-                        {estimate.operations.map(op => (
+                        {estimate.operations.slice(0, 3).map(op => (
                           <div key={op.id} className="flex justify-between text-sm">
                             <span className="text-slate-600 truncate flex-1 mr-2">
                               {op.opcode_desc || op.opcode}
@@ -584,6 +595,14 @@ export function RequestDetailModal({
           )}
         </div>
       </div>
+
+      {/* Estimate Details Modal */}
+      {selectedEstimate && (
+        <EstimateDetailsModal
+          estimate={selectedEstimate}
+          onClose={() => setSelectedEstimate(null)}
+        />
+      )}
     </div>
   );
 }
