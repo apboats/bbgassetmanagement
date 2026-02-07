@@ -6,10 +6,15 @@
 // Can be used across all components that display estimates
 // ============================================================================
 
-import { useState } from 'react';
-import { X, DollarSign, FileText, Calendar, Ship, Truck, Wrench, Package, Calculator } from 'lucide-react';
+import { X, DollarSign, FileText, Calendar, Ship, Truck, Wrench, Package, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export function EstimateDetailsModal({ estimate, onClose }) {
+export function EstimateDetailsModal({
+  estimate,
+  allEstimates,
+  currentIndex = 0,
+  onNavigate,
+  onClose
+}) {
   if (!estimate) return null;
 
   // Handle both camelCase (API) and snake_case (cached) field names
@@ -346,12 +351,37 @@ export function EstimateDetailsModal({ estimate, onClose }) {
 
         </div>
 
-        {/* Footer */}
+        {/* Footer with navigation */}
         <div className="p-4 border-t border-slate-200 flex-shrink-0">
           <div className="flex justify-between items-center">
-            <p className="text-xs text-slate-500">
-              {estimate.last_synced && `Last synced: ${new Date(estimate.last_synced).toLocaleString()}`}
-            </p>
+            {/* Navigation for multiple estimates */}
+            {allEstimates && allEstimates.length > 1 && onNavigate ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onNavigate(currentIndex - 1)}
+                  disabled={currentIndex === 0}
+                  className="p-2 rounded-lg border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Previous estimate"
+                >
+                  <ChevronLeft className="w-5 h-5 text-slate-600" />
+                </button>
+                <span className="text-sm text-slate-600 min-w-[80px] text-center">
+                  {currentIndex + 1} of {allEstimates.length}
+                </span>
+                <button
+                  onClick={() => onNavigate(currentIndex + 1)}
+                  disabled={currentIndex === allEstimates.length - 1}
+                  className="p-2 rounded-lg border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Next estimate"
+                >
+                  <ChevronRight className="w-5 h-5 text-slate-600" />
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                {estimate.last_synced && `Last synced: ${new Date(estimate.last_synced).toLocaleString()}`}
+              </p>
+            )}
             <button
               onClick={onClose}
               className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"

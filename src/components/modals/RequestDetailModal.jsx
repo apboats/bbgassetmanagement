@@ -6,9 +6,17 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign, ChevronRight } from 'lucide-react';
+import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign, AlertTriangle } from 'lucide-react';
 import { estimatesService } from '../../services/supabaseService';
 import { EstimateDetailsModal } from './EstimateDetailsModal';
+import { usePermissions } from '../../hooks/usePermissions';
+
+// Compute hash from estimates for change detection
+const computeEstimatesHash = (estimates) => {
+  if (!estimates || estimates.length === 0) return null;
+  const sorted = [...estimates].sort((a, b) => a.id - b.id);
+  return sorted.map(e => `${e.id}:${e.total_charges || 0}`).join('|');
+};
 
 // Status configuration - matches RequestsView
 const STATUS_CONFIG = {
@@ -60,6 +68,7 @@ export function RequestDetailModal({
   onStatusChange,
   onAttachFile,
   onRemoveAttachment,
+  onApproveEstimates,
 }) {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -68,8 +77,12 @@ export function RequestDetailModal({
   const [estimates, setEstimates] = useState([]);
   const [loadingEstimates, setLoadingEstimates] = useState(false);
   const [selectedEstimate, setSelectedEstimate] = useState(null);
+  const [selectedEstimateIndex, setSelectedEstimateIndex] = useState(0);
+  const [approvingEstimates, setApprovingEstimates] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const { isSalesManager, isAdmin } = usePermissions();
 
   const statusConfig = STATUS_CONFIG[request.status] || STATUS_CONFIG['open'];
   const typeConfig = TYPE_CONFIG[request.type] || TYPE_CONFIG['rigging'];
@@ -212,6 +225,27 @@ export function RequestDetailModal({
     }
   };
 
+  const handleApproveEstimates = async () => {
+    if (approvingEstimates || !onApproveEstimates) return;
+    setApprovingEstimates(true);
+    try {
+      const hash = computeEstimatesHash(estimates);
+      await onApproveEstimates(request.id, hash);
+    } catch (err) {
+      console.error('Error approving estimates:', err);
+    } finally {
+      setApprovingEstimates(false);
+    }
+  };
+
+  // Handle estimate navigation
+  const handleEstimateNavigate = (index) => {
+    if (index >= 0 && index < estimates.length) {
+      setSelectedEstimateIndex(index);
+      setSelectedEstimate(estimates[index]);
+    }
+  };
+
   const attachments = request.attachments || [];
 
   return (
@@ -322,76 +356,112 @@ export function RequestDetailModal({
           </div>
         )}
 
-        {/* Dockmaster Estimates Section */}
+        {/* Dockmaster Estimates Section - Simplified */}
         {loadingEstimates && (
           <div className="p-4 text-center text-slate-500 bg-amber-50 border-b border-amber-200">
             Loading estimates...
           </div>
         )}
 
-        {estimates.length > 0 && (
+        {!loadingEstimates && estimates.length > 0 && (
           <div className="p-4 bg-amber-50 border-b border-amber-200">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="w-5 h-5 text-amber-600" />
-              <h4 className="font-semibold text-amber-900">Dockmaster Estimates</h4>
-              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">
-                {estimates.length}
-              </span>
+            {/* Header with count and total */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-amber-600" />
+                <h4 className="font-semibold text-amber-900">Dockmaster Estimates</h4>
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">
+                  {estimates.length}
+                </span>
+              </div>
+              <p className="text-lg font-bold text-amber-700">
+                ${estimates.reduce((sum, e) => sum + (e.total_charges || 0), 0)
+                  .toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
             </div>
 
-            <div className="space-y-2">
-              {estimates.map(estimate => (
-                <div
-                  key={estimate.id}
-                  onClick={() => setSelectedEstimate(estimate)}
-                  className="p-3 bg-white rounded-lg border border-amber-100 cursor-pointer hover:border-amber-300 hover:shadow-md transition-all"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900">
-                        Estimate #{estimate.id}
-                      </p>
-                      <p className="text-sm text-slate-600">{estimate.title || 'No title'}</p>
-                      {estimate.comments && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{estimate.comments}</p>
-                      )}
+            {/* Review Estimates button */}
+            <button
+              onClick={() => {
+                setSelectedEstimateIndex(0);
+                setSelectedEstimate(estimates[0]);
+              }}
+              className="mt-3 w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Review Estimates ({estimates.length})
+            </button>
+
+            {/* Approval Status */}
+            {(() => {
+              const currentHash = computeEstimatesHash(estimates);
+              const isApproved = request.estimates_approved_by &&
+                                 request.estimates_approval_hash === currentHash;
+              const hasChanged = request.estimates_approved_by &&
+                                 request.estimates_approval_hash !== currentHash;
+
+              if (isApproved) {
+                return (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="font-medium">Estimates Approved</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                      <div className="text-right">
-                        <p className="font-semibold text-lg text-amber-700">
-                          ${(estimate.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {estimate.creation_date ? new Date(estimate.creation_date).toLocaleDateString() : ''}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-amber-400" />
-                    </div>
+                    <p className="text-sm text-green-700 mt-1">
+                      Approved by <strong>{request.estimates_approver?.name || 'Unknown'}</strong> on{' '}
+                      {new Date(request.estimates_approved_at).toLocaleString()}
+                    </p>
                   </div>
+                );
+              }
 
-                  {/* Operations preview */}
-                  {estimate.operations?.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-amber-100">
-                      <p className="text-xs font-medium text-slate-500 mb-1">
-                        {estimate.operations.length} line item{estimate.operations.length !== 1 ? 's' : ''} — tap for details
-                      </p>
-                      <div className="space-y-0.5">
-                        {estimate.operations.slice(0, 3).map(op => (
-                          <div key={op.id} className="flex justify-between text-sm">
-                            <span className="text-slate-600 truncate flex-1 mr-2">
-                              {op.opcode_desc || op.opcode}
-                            </span>
-                            <span className="text-slate-900 flex-shrink-0">
-                              ${(op.estimated_charges || op.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+              if (hasChanged) {
+                return (
+                  <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-orange-800">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="font-medium">Estimates Changed</span>
                     </div>
-                  )}
+                    <p className="text-sm text-orange-700 mt-1">
+                      Previous approval by {request.estimates_approver?.name || 'Unknown'} is no longer valid.
+                      Estimates have been modified since approval.
+                    </p>
+                    {(isSalesManager || isAdmin) && (
+                      <button
+                        onClick={handleApproveEstimates}
+                        disabled={approvingEstimates}
+                        className="mt-2 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        {approvingEstimates ? 'Approving...' : 'Re-Approve Estimates'}
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              // Not approved yet
+              if (isSalesManager || isAdmin) {
+                return (
+                  <button
+                    onClick={handleApproveEstimates}
+                    disabled={approvingEstimates}
+                    className="mt-3 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    {approvingEstimates ? 'Approving...' : 'Approve Estimates'}
+                  </button>
+                );
+              }
+
+              return (
+                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-sm text-slate-600 text-center">
+                    Awaiting sales manager approval
+                  </p>
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -596,10 +666,13 @@ export function RequestDetailModal({
         </div>
       </div>
 
-      {/* Estimate Details Modal */}
+      {/* Estimate Details Modal with navigation */}
       {selectedEstimate && (
         <EstimateDetailsModal
           estimate={selectedEstimate}
+          allEstimates={estimates}
+          currentIndex={selectedEstimateIndex}
+          onNavigate={handleEstimateNavigate}
           onClose={() => setSelectedEstimate(null)}
         />
       )}
