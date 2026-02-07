@@ -1798,6 +1798,54 @@ export const requestAttachmentsService = {
 }
 
 // ============================================================================
+// ESTIMATES SERVICE (Dockmaster estimates synced via work_orders table)
+// ============================================================================
+
+export const estimatesService = {
+  // Get estimates matching an inventory boat's dockmaster_id
+  async getForInventoryBoat(dockmasterId) {
+    if (!dockmasterId) return []
+
+    const { data, error } = await supabase
+      .from('work_orders')
+      .select(`
+        *,
+        operations:work_order_operations(*)
+      `)
+      .eq('is_estimate', true)
+      .eq('rigging_id', String(dockmasterId))
+      .order('creation_date', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching estimates:', error)
+      return []
+    }
+    return data || []
+  },
+
+  // Trigger manual sync (calls edge function)
+  async sync() {
+    const { data, error } = await supabase.functions.invoke('dockmaster-estimates-incremental')
+    if (error) throw error
+    return data
+  },
+
+  // Get sync status
+  async getSyncStatus() {
+    const { data, error } = await supabase
+      .from('sync_status')
+      .select('*')
+      .eq('id', 'estimates_incremental')
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching estimates sync status:', error)
+    }
+    return data
+  }
+}
+
+// ============================================================================
 // REAL-TIME SUBSCRIPTIONS (Optional - for live updates)
 // ============================================================================
 
