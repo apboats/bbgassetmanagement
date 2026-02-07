@@ -2,7 +2,7 @@
 // ESTIMATE DETAILS MODAL
 // ============================================================================
 // Modal component for displaying detailed estimate information from Dockmaster
-// Shows line items with calculated freight (7% of parts) and shop supplies (10% of labor)
+// Shows line items with parts freight/handling and shop supplies charges
 // Can be used across all components that display estimates
 // ============================================================================
 
@@ -293,7 +293,7 @@ export function EstimateDetailsModal({
               <div className="flex justify-between items-center text-sm pl-6">
                 <span className="text-slate-600 flex items-center gap-2">
                   <Truck className="w-4 h-4 text-slate-400" />
-                  Freight (7% of parts)
+                  Parts Freight and Handling
                 </span>
                 <span className="text-slate-700">{formatCurrency(calculatedFreight)}</span>
               </div>
@@ -310,7 +310,7 @@ export function EstimateDetailsModal({
               </div>
               <div className="flex justify-between items-center text-sm pl-6">
                 <span className="text-slate-600">
-                  Shop Supplies (10% of labor)
+                  Shop Supplies
                 </span>
                 <span className="text-slate-700">{formatCurrency(calculatedShopSupplies)}</span>
               </div>
@@ -332,9 +332,6 @@ export function EstimateDetailsModal({
                   <span className="text-lg font-bold text-amber-900">Estimated Total</span>
                   <span className="text-2xl font-bold text-amber-700">{formatCurrency(grandTotal)}</span>
                 </div>
-                <p className="text-xs text-amber-600 mt-1">
-                  Includes calculated freight and shop supplies
-                </p>
               </div>
 
               {/* Original total comparison */}

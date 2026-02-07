@@ -913,7 +913,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
             )}
           </div>
 
-          {/* Action Buttons Row */}
+          {/* Action Buttons Row 1 - Window Sticker + Show Unit Cost */}
           <div className="grid grid-cols-2 gap-3">
             {/* Window Sticker Button */}
             <button
@@ -931,6 +931,39 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
               </div>
             </button>
 
+            {/* Show Unit Cost Button */}
+            {canSeeCost ? (
+              <button
+                onClick={() => setShowCostBreakdown(true)}
+                className="p-4 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900">Show Unit Cost</p>
+                    <p className="text-xs text-amber-600">View cost breakdown</p>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-xl opacity-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-400 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-500">Unit Cost</p>
+                    <p className="text-xs text-slate-400">Not available</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons Row 2 - Work Orders + Estimates */}
+          <div className="grid grid-cols-2 gap-3">
             {/* Work Orders Button */}
             {boat.dockmasterId ? (
               <button
@@ -965,132 +998,123 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Show Unit Cost Button - Always visible to users with cost permission so they can verify $0 */}
-          {canSeeCost && (
-            <button
-              onClick={() => setShowCostBreakdown(true)}
-              className="w-full p-4 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-amber-900">Show Unit Cost</p>
-                  <p className="text-xs text-amber-600">View cost breakdown</p>
-                </div>
-              </div>
-            </button>
-          )}
-
-          {/* Dockmaster Estimates Section */}
-          {loadingEstimates && (
-            <div className="p-4 text-center text-slate-500 bg-amber-50 border-2 border-amber-200 rounded-xl">
-              Loading estimates...
-            </div>
-          )}
-
-          {!loadingEstimates && estimates.length > 0 && (
-            <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-xl">
-              {/* Header with count and total */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-amber-600" />
-                  <h4 className="font-semibold text-amber-900">Dockmaster Estimates</h4>
-                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">
-                    {estimates.length}
-                  </span>
-                </div>
-                <p className="text-lg font-bold text-amber-700">
-                  ${estimates.reduce((sum, e) => sum + (e.total_charges || 0), 0)
-                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-
-              {/* Review Estimates button */}
+            {/* Estimates Button */}
+            {!loadingEstimates && estimates.length > 0 ? (
               <button
                 onClick={() => {
                   setSelectedEstimateIndex(0);
                   setSelectedEstimate(estimates[0]);
                 }}
-                className="mt-3 w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="p-4 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-colors text-left"
               >
-                <FileText className="w-4 h-4" />
-                Review Estimates ({estimates.length})
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-600 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900">Estimates ({estimates.length})</p>
+                    <p className="text-xs text-amber-600">
+                      ${estimates.reduce((sum, e) => sum + (e.total_charges || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
               </button>
+            ) : loadingEstimates ? (
+              <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900">Estimates</p>
+                    <p className="text-xs text-amber-600">Loading...</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-xl opacity-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-400 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-500">Estimates</p>
+                    <p className="text-xs text-slate-400">None found</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-              {/* Approval Status */}
-              {(() => {
-                const currentHash = computeEstimatesHash(estimates);
-                const isApproved = boat.estimates_approved_by &&
-                                   boat.estimates_approval_hash === currentHash;
-                const hasChanged = boat.estimates_approved_by &&
-                                   boat.estimates_approval_hash !== currentHash;
+          {/* Estimates Approval Status - separate from buttons */}
+          {!loadingEstimates && estimates.length > 0 && (() => {
+            const currentHash = computeEstimatesHash(estimates);
+            const isApproved = boat.estimates_approved_by &&
+                               boat.estimates_approval_hash === currentHash;
+            const hasChanged = boat.estimates_approved_by &&
+                               boat.estimates_approval_hash !== currentHash;
 
-                if (isApproved) {
-                  return (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-green-800">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="font-medium">Estimates Approved</span>
-                      </div>
-                      <p className="text-sm text-green-700 mt-1">
-                        Approved on {new Date(boat.estimates_approved_at).toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                }
+            if (isApproved) {
+              return (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-800">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-medium">Estimates Approved</span>
+                  </div>
+                  <p className="text-sm text-green-700 mt-1">
+                    Approved on {new Date(boat.estimates_approved_at).toLocaleString()}
+                  </p>
+                </div>
+              );
+            }
 
-                if (hasChanged) {
-                  return (
-                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-orange-800">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="font-medium">Estimates Changed</span>
-                      </div>
-                      <p className="text-sm text-orange-700 mt-1">
-                        Previous approval is no longer valid. Estimates have been modified.
-                      </p>
-                      {(isSalesManager || isAdmin) && (
-                        <button
-                          onClick={handleApproveEstimates}
-                          disabled={approvingEstimates}
-                          className="mt-2 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          {approvingEstimates ? 'Approving...' : 'Re-Approve Estimates'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                }
-
-                // Not approved yet
-                if (isSalesManager || isAdmin) {
-                  return (
+            if (hasChanged) {
+              return (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-orange-800">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="font-medium">Estimates Changed</span>
+                  </div>
+                  <p className="text-sm text-orange-700 mt-1">
+                    Previous approval is no longer valid. Estimates have been modified.
+                  </p>
+                  {(isSalesManager || isAdmin) && (
                     <button
                       onClick={handleApproveEstimates}
                       disabled={approvingEstimates}
-                      className="mt-3 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                      className="mt-2 w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      {approvingEstimates ? 'Approving...' : 'Approve Estimates'}
+                      {approvingEstimates ? 'Approving...' : 'Re-Approve Estimates'}
                     </button>
-                  );
-                }
+                  )}
+                </div>
+              );
+            }
 
-                return (
-                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                    <p className="text-sm text-slate-600 text-center">
-                      Awaiting sales manager approval
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+            // Not approved yet
+            if (isSalesManager || isAdmin) {
+              return (
+                <button
+                  onClick={handleApproveEstimates}
+                  disabled={approvingEstimates}
+                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {approvingEstimates ? 'Approving...' : 'Approve Estimates'}
+                </button>
+              );
+            }
+
+            return (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-sm text-slate-600 text-center">
+                  Awaiting sales manager approval
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Work Orders Error */}
           {workOrdersError && (
