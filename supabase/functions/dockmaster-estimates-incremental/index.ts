@@ -145,6 +145,8 @@ serve(async (req) => {
         body: JSON.stringify({
           status: 'O',  // Open estimates
           detail: true,
+          Page: 1,
+          PageSize: 100,
         }),
       })
 
