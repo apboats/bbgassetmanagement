@@ -40,7 +40,8 @@ async function authenticateDockmaster(username: string, password: string) {
 }
 
 // Format date for Dockmaster API (converts to EST/EDT)
-function formatDateForApi(date: Date): string {
+// Returns { lastUpdateDate: "YYYY-MM-DD", lastUpdateTime: "HH:MM:SS.000" }
+function formatDateForApi(date: Date): { lastUpdateDate: string, lastUpdateTime: string } {
   const estString = date.toLocaleString('en-US', {
     timeZone: 'America/New_York',
     year: 'numeric',
@@ -53,8 +54,11 @@ function formatDateForApi(date: Date): string {
   })
   const [datePart, timePart] = estString.split(', ')
   const [month, day, year] = datePart.split('/')
-  const isoFormat = `${year}-${month}-${day}T${timePart}.000`
-  return encodeURIComponent(isoFormat)
+
+  return {
+    lastUpdateDate: `${year}-${month}-${day}`,
+    lastUpdateTime: `${timePart}.000`
+  }
 }
 
 serve(async (req) => {
@@ -94,8 +98,11 @@ serve(async (req) => {
       lookbackTime = fifteenMinutesAgo
     }
 
+    // Format lookback time for Dockmaster API (in ET)
+    const { lastUpdateDate, lastUpdateTime } = formatDateForApi(lookbackTime)
+
     console.log('Estimates incremental sync starting, lookback from (UTC):', lookbackTime.toISOString())
-    console.log('Lookback in EST:', formatDateForApi(lookbackTime))
+    console.log('Lookback in EST:', lastUpdateDate, lastUpdateTime)
 
     // Get Dockmaster credentials
     const { data: config, error: configError } = await supabase
@@ -117,37 +124,30 @@ serve(async (req) => {
       'X-DM_SYSTEM_ID': systemId,
     }
 
-    // Step 1: Try ListNewOrChanged for estimates (if endpoint exists)
-    // If not available, fall back to RetrieveList
+    // Use RetrieveList with lastUpdateDate/lastUpdateTime to get recent estimates
     let estimates: any[] = []
+    let page = 1
+    const pageSize = 100
+    let hasMore = true
 
-    // Try the ListNewOrChanged endpoint first
-    const listChangedUrl = `https://api.dmeapi.com/api/v1/Service/Estimates/ListNewOrChanged?LastUpdate=${formatDateForApi(lookbackTime)}&Page=1&PageSize=100`
-    console.log('Trying ListNewOrChanged:', listChangedUrl)
-
-    const changedResponse = await fetch(listChangedUrl, {
-      method: 'GET',
-      headers: dmHeaders,
-    })
-
-    if (changedResponse.ok) {
-      const changedData = await changedResponse.json()
-      estimates = changedData.content || changedData || []
-      console.log(`ListNewOrChanged returned ${estimates.length} changed estimates`)
-    } else {
-      // Fallback: Use RetrieveList POST to get all open estimates
-      console.log('ListNewOrChanged not available (status:', changedResponse.status, '), using RetrieveList fallback')
+    while (hasMore) {
+      const requestBody = {
+        lastUpdateDate,      // "YYYY-MM-DD" in ET
+        lastUpdateTime,      // "HH:MM:SS.000" in ET
+        status: '',          // Empty = all statuses
+        woIds: [],
+        detail: true,
+        page,
+        pageSize,
+      }
 
       const retrieveUrl = 'https://api.dmeapi.com/api/v1/Service/Estimates/RetrieveList'
+      console.log(`Fetching estimates page ${page}:`, JSON.stringify(requestBody))
+
       const retrieveResponse = await fetch(retrieveUrl, {
         method: 'POST',
         headers: dmHeaders,
-        body: JSON.stringify({
-          status: 'O',  // Open estimates
-          detail: true,
-          Page: 1,
-          PageSize: 100,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!retrieveResponse.ok) {
@@ -156,12 +156,37 @@ serve(async (req) => {
       }
 
       const retrieveData = await retrieveResponse.json()
-      estimates = Array.isArray(retrieveData)
-        ? retrieveData
-        : (retrieveData?.content || retrieveData?.data || [])
 
-      console.log(`RetrieveList returned ${estimates.length} estimates`)
+      // Handle response shapes: list OR {content:[...]} OR {items:[...]}
+      let pageItems: any[] = []
+      if (Array.isArray(retrieveData)) {
+        pageItems = retrieveData
+      } else if (retrieveData?.content) {
+        pageItems = retrieveData.content
+      } else if (retrieveData?.items) {
+        pageItems = retrieveData.items
+      }
+
+      console.log(`Page ${page} returned ${pageItems.length} estimates`)
+      estimates.push(...pageItems)
+
+      // Check if more pages
+      if (retrieveData?.maxPages && retrieveData?.currentPage) {
+        hasMore = retrieveData.currentPage < retrieveData.maxPages
+      } else {
+        hasMore = pageItems.length >= pageSize
+      }
+
+      page++
+
+      // Safety limit
+      if (page > 10) {
+        console.log('Reached page limit, stopping pagination')
+        break
+      }
     }
+
+    console.log(`Total estimates retrieved: ${estimates.length}`)
 
     // Log first estimate to see structure
     if (estimates.length > 0) {
@@ -340,16 +365,13 @@ serve(async (req) => {
 
     const duration = (Date.now() - startTime) / 1000
 
-    // Show EST time in response for easier debugging
-    const lookbackEST = decodeURIComponent(formatDateForApi(lookbackTime))
-
     return new Response(
       JSON.stringify({
         success: true,
         newEstimates: syncedCount,
         updatedEstimates: updatedCount,
         total: estimates.length,
-        lookbackFrom: lookbackEST,
+        lookbackFromET: `${lastUpdateDate} ${lastUpdateTime}`,
         lookbackFromUTC: lookbackTime.toISOString(),
         duration: `${duration.toFixed(1)}s`,
       }),
