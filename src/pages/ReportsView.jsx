@@ -278,7 +278,8 @@ export function ReportsView({ currentUser }) {
             boat:boats(id, name, owner, dockmaster_id, work_order_number, location)
           `)
           .in('id', batchIds)
-          .eq('status', 'O');
+          .eq('status', 'O')
+          .or('is_estimate.is.null,is_estimate.eq.false');  // Exclude estimates
 
         if (woError) throw woError;
         if (batchWOs) allWorkOrders.push(...batchWOs);
