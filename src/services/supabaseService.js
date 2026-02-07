@@ -1516,6 +1516,7 @@ export const requestsService = {
         creator:users!service_requests_created_by_fkey(id, name),
         service_completer:users!service_requests_service_completed_by_fkey(id, name),
         confirmer:users!service_requests_confirmed_by_fkey(id, name),
+        estimates_approver:users!service_requests_estimates_approved_by_fkey(id, name),
         messages:request_messages(*, user:users(id, name)),
         attachments:request_attachments(*, uploaded_by:users(id, name))
       `)
@@ -1651,6 +1652,22 @@ export const requestsService = {
         status: 'closed',
         confirmed_by: userId,
         confirmed_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  },
+
+  // Approve estimates (sales manager only)
+  async approveEstimates(id, userId, hash) {
+    const { data, error } = await supabase
+      .from('service_requests')
+      .update({
+        estimates_approved_by: userId,
+        estimates_approved_at: new Date().toISOString(),
+        estimates_approval_hash: hash
       })
       .eq('id', id)
       .select()
