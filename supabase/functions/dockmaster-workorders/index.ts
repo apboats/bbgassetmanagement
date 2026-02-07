@@ -65,6 +65,7 @@ serve(async (req) => {
         `)
         .eq('boat_id', boatUuid)
         .eq('status', 'O')
+        .or('is_estimate.is.null,is_estimate.eq.false')  // Exclude estimates
 
       if (!cacheError && cachedWorkOrders && cachedWorkOrders.length > 0) {
         console.log('Returning cached work orders:', cachedWorkOrders.length)
