@@ -8,7 +8,7 @@
 // ============================================================================
 
 import { useState, useMemo } from 'react';
-import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive, Calendar } from 'lucide-react';
+import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive, Calendar, AlertCircle } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { useRequestDragDrop } from '../hooks/useRequestDragDrop';
 import { RequestModal } from '../components/modals/RequestModal';
@@ -88,6 +88,21 @@ function RequestCard({ request, onClick, onDragStart, onDragEnd, onTouchStart, o
 
           {/* Description preview */}
           <p className="text-sm text-slate-600 mt-2 line-clamp-2">{request.description}</p>
+
+          {/* Deadline date if set */}
+          {request.deadline_date && (
+            <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${
+              new Date(request.deadline_date) < new Date() && request.status !== 'closed'
+                ? 'text-red-600'
+                : 'text-amber-600'
+            }`}>
+              <AlertCircle className="w-3.5 h-3.5" />
+              Due: {new Date(request.deadline_date).toLocaleDateString()}
+              {new Date(request.deadline_date) < new Date() && request.status !== 'closed' && (
+                <span className="text-red-500 font-semibold">(Overdue)</span>
+              )}
+            </div>
+          )}
 
           {/* Footer info */}
           <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
@@ -183,6 +198,7 @@ export function RequestsView({
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [filterType, setFilterType] = useState('all'); // all, rigging, prep
   const [filterStatus, setFilterStatus] = useState('active'); // active, closed, all
+  const [filterDueDate, setFilterDueDate] = useState('all'); // all, has-deadline, overdue, this-week, this-month
   const [showArchived, setShowArchived] = useState(false);
 
   // Drag and drop with touch support
@@ -212,6 +228,15 @@ export function RequestsView({
 
   // Filter requests
   const filteredRequests = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Calculate date ranges
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
     return requests.filter(req => {
       // Type filter
       if (filterType !== 'all' && req.type !== filterType) return false;
@@ -220,12 +245,29 @@ export function RequestsView({
       if (filterStatus === 'active' && req.status === 'closed') return false;
       if (filterStatus === 'closed' && req.status !== 'closed') return false;
 
+      // Due date filter
+      if (filterDueDate !== 'all') {
+        const deadline = req.deadline_date ? new Date(req.deadline_date) : null;
+
+        if (filterDueDate === 'has-deadline' && !deadline) return false;
+        if (filterDueDate === 'no-deadline' && deadline) return false;
+        if (filterDueDate === 'overdue') {
+          if (!deadline || deadline >= today || req.status === 'closed') return false;
+        }
+        if (filterDueDate === 'this-week') {
+          if (!deadline || deadline < today || deadline > endOfWeek) return false;
+        }
+        if (filterDueDate === 'this-month') {
+          if (!deadline || deadline < today || deadline > endOfMonth) return false;
+        }
+      }
+
       // Archived filter
       if (!showArchived && req.archived_at) return false;
 
       return true;
     });
-  }, [requests, filterType, filterStatus, showArchived]);
+  }, [requests, filterType, filterStatus, filterDueDate, showArchived]);
 
   // Group by status for kanban-style view
   const groupedRequests = useMemo(() => {
@@ -319,6 +361,20 @@ export function RequestsView({
           <option value="active">Active</option>
           <option value="closed">Closed</option>
           <option value="all">All Status</option>
+        </select>
+
+        {/* Due Date Filter */}
+        <select
+          value={filterDueDate}
+          onChange={(e) => setFilterDueDate(e.target.value)}
+          className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Due Dates</option>
+          <option value="overdue">Overdue</option>
+          <option value="this-week">Due This Week</option>
+          <option value="this-month">Due This Month</option>
+          <option value="has-deadline">Has Deadline</option>
+          <option value="no-deadline">No Deadline</option>
         </select>
 
         {/* Archived Toggle */}
