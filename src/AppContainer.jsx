@@ -276,8 +276,14 @@ function AppContainer() {
         springCompletedBy: boat.spring_completed_by || null,
         springCompletedAt: boat.spring_completed_at || null,
       }))
-      
-      setBoats(transformedData)
+
+      // Only update if data changed (prevents flicker from debounced reloads)
+      setBoats(prevBoats => {
+        if (JSON.stringify(prevBoats) === JSON.stringify(transformedData)) {
+          return prevBoats // Same reference = no re-render
+        }
+        return transformedData
+      })
     } catch (error) {
       console.error('Error loading boats:', error)
     }
@@ -311,7 +317,13 @@ function AppContainer() {
         isInventory: true, // Mark as inventory boat
       }))
 
-      setInventoryBoats(transformedData)
+      // Only update if data changed (prevents flicker from debounced reloads)
+      setInventoryBoats(prevBoats => {
+        if (JSON.stringify(prevBoats) === JSON.stringify(transformedData)) {
+          return prevBoats // Same reference = no re-render
+        }
+        return transformedData
+      })
     } catch (error) {
       // Retry with exponential backoff for statement timeout errors
       if (error.code === '57014' && retryCount < 3) {
@@ -328,7 +340,13 @@ function AppContainer() {
   const loadLocations = async () => {
     try {
       const data = await locationsService.getAll()
-      setLocations(data)
+      // Only update if data changed (prevents flicker from debounced reloads)
+      setLocations(prevLocations => {
+        if (JSON.stringify(prevLocations) === JSON.stringify(data)) {
+          return prevLocations // Same reference = no re-render
+        }
+        return data
+      })
     } catch (error) {
       console.error('Error loading locations:', error)
     }
