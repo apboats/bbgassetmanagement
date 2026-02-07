@@ -1661,45 +1661,35 @@ export const requestsService = {
   },
 
   // Approve estimates (sales manager only)
-  // Syncs approval to both service_requests AND the associated inventory_boat
-  async approveEstimates(id, userId, hash) {
+  // Stores approval on inventory_boats table (single source of truth)
+  async approveEstimates(requestId, userId, hash) {
     const approvalData = {
       estimates_approved_by: userId,
       estimates_approved_at: new Date().toISOString(),
       estimates_approval_hash: hash
     }
 
-    // First, get the request to find the inventory_boat_id
+    // Get the request to find the inventory_boat_id
     const { data: request, error: fetchError } = await supabase
       .from('service_requests')
       .select('inventory_boat_id')
-      .eq('id', id)
+      .eq('id', requestId)
       .single()
 
     if (fetchError) throw fetchError
 
-    // Update the service_request
+    if (!request?.inventory_boat_id) {
+      throw new Error('Request has no linked inventory boat')
+    }
+
+    // Update only the inventory_boat (single source of truth)
     const { data, error } = await supabase
-      .from('service_requests')
+      .from('inventory_boats')
       .update(approvalData)
-      .eq('id', id)
+      .eq('id', request.inventory_boat_id)
       .select()
 
     if (error) throw error
-
-    // Also update the inventory_boat if one is linked
-    if (request?.inventory_boat_id) {
-      const { error: boatError } = await supabase
-        .from('inventory_boats')
-        .update(approvalData)
-        .eq('id', request.inventory_boat_id)
-
-      if (boatError) {
-        console.error('Error syncing approval to inventory_boat:', boatError)
-        // Don't throw - the main approval succeeded
-      }
-    }
-
     return data?.[0]
   },
 
