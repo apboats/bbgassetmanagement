@@ -413,27 +413,27 @@ export default function BoatsByGeorgeAssetManager({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
           <Route path="/" element={
-            <DashboardView boats={boats} locations={locations} sites={sites} onNavigate={(view) => navigate(view === 'dashboard' ? '/' : `/${view}`)} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
+            <DashboardView boats={boats} locations={locations} sites={sites} users={users} onNavigate={(view) => navigate(view === 'dashboard' ? '/' : `/${view}`)} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} onMoveBoat={onMoveBoat} />
           } />
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
           <Route path="/locations" element={
-            <LocationsView locations={locations} sites={sites} boats={getCombinedBoats()} onUpdateLocations={saveLocations}
+            <LocationsView locations={locations} sites={sites} boats={getCombinedBoats()} users={users} onUpdateLocations={saveLocations}
               onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }}
               onMoveBoat={onMoveBoat} onAddSite={onAddSite} onUpdateSite={onUpdateSite} onDeleteSite={onDeleteSite} onReorderSites={onReorderSites} />
           } />
           <Route path="/boats" element={
-            <BoatsView boats={boats} locations={locations} sites={sites} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
+            <BoatsView boats={boats} locations={locations} sites={sites} users={users} onUpdateBoats={saveBoats} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
           } />
           <Route path="/scan" element={
             <ScanView boats={boats} locations={locations} onUpdateBoats={saveBoats} onUpdateLocations={saveLocations} />
           } />
           <Route path="/myview" element={
-            <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} userPreferences={userPreferences}
+            <MyViewEditor locations={locations} sites={sites} boats={getCombinedBoats()} users={users} userPreferences={userPreferences}
               onSavePreferences={(prefs) => saveUserPreferences(currentUser?.id || currentUser?.username || 'default-user', prefs)} onUpdateLocations={saveLocations}
               onUpdateBoats={(updatedBoats) => { saveBoats(updatedBoats.filter(b => !b.isInventory)); saveInventoryBoats(updatedBoats.filter(b => b.isInventory)); }} onMoveBoat={onMoveBoat} />
           } />
           <Route path="/inventory" element={
-            <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} lastSync={lastInventorySync}
+            <InventoryView inventoryBoats={inventoryBoats} boats={boats} locations={locations} sites={sites} users={users} lastSync={lastInventorySync}
               onSyncNow={syncInventoryBoats} onSyncRiggingWOs={syncInternalWorkOrders} onUpdateInventoryBoats={saveInventoryBoats}
               onUpdateSingleBoat={onUpdateInventoryBoat} onMoveBoat={onMoveBoat} dockmasterConfig={dockmasterConfig} />
           } />
@@ -452,6 +452,7 @@ export default function BoatsByGeorgeAssetManager({
               requests={requests}
               inventoryBoats={inventoryBoats}
               currentUser={currentUser}
+              users={users}
               onCreateRequest={onCreateRequest}
               onUpdateRequest={onUpdateRequest}
               onAddMessage={onAddRequestMessage}
