@@ -286,22 +286,20 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
     const targetCenterX = targetRect.left + targetRect.width / 2;
     const targetCenterY = targetRect.top + targetRect.height / 2;
 
-    // Enable transition for smooth animation
-    clone.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
+    // Phase 1: Quick move to target with subtle settle easing (150ms)
+    // cubic-bezier(0.2, 0.8, 0.2, 1.1) creates a subtle overshoot then settle effect
+    clone.style.transition = 'transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1.1)';
+    clone.style.transform = `translate(${targetCenterX - cloneRect.width / 2}px, ${targetCenterY - cloneRect.height / 2}px) scale(1)`;
 
-    // Animate to target position with scale down and fade
-    clone.style.transform = `translate(${targetCenterX - cloneRect.width / 2}px, ${targetCenterY - cloneRect.height / 2}px) scale(0.9)`;
-    clone.style.opacity = '0';
+    // Phase 2: Quick fade after settling (120ms delay, 100ms fade)
+    setTimeout(() => {
+      if (dragCloneRef.current === clone) {
+        clone.style.transition = 'opacity 100ms ease-out';
+        clone.style.opacity = '0';
+      }
+    }, 120);
 
     // Remove clone after animation completes
-    const handleTransitionEnd = () => {
-      clone.removeEventListener('transitionend', handleTransitionEnd);
-      removeDragClone();
-    };
-
-    clone.addEventListener('transitionend', handleTransitionEnd);
-
-    // Fallback timeout in case transitionend doesn't fire
     setTimeout(() => {
       if (dragCloneRef.current === clone) {
         removeDragClone();
