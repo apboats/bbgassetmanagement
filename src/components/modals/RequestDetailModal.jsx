@@ -6,7 +6,8 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink } from 'lucide-react';
+import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign } from 'lucide-react';
+import { estimatesService } from '../../services/supabaseService';
 
 // Status configuration - matches RequestsView
 const STATUS_CONFIG = {
@@ -63,6 +64,8 @@ export function RequestDetailModal({
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [estimates, setEstimates] = useState([]);
+  const [loadingEstimates, setLoadingEstimates] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -83,6 +86,26 @@ export function RequestDetailModal({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load estimates when modal opens (if boat has dockmaster_id)
+  useEffect(() => {
+    const loadEstimates = async () => {
+      const dockmasterId = boat?.dockmaster_id || boat?.dockmasterId;
+      if (!dockmasterId) return;
+
+      setLoadingEstimates(true);
+      try {
+        const data = await estimatesService.getForInventoryBoat(dockmasterId);
+        setEstimates(data);
+      } catch (err) {
+        console.error('Error loading estimates:', err);
+      } finally {
+        setLoadingEstimates(false);
+      }
+    };
+
+    loadEstimates();
+  }, [boat?.dockmaster_id, boat?.dockmasterId]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
@@ -293,6 +316,70 @@ export function RequestDetailModal({
                   <p className="font-semibold text-slate-900">{boat.color}</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Dockmaster Estimates Section */}
+        {loadingEstimates && (
+          <div className="p-4 text-center text-slate-500 bg-amber-50 border-b border-amber-200">
+            Loading estimates...
+          </div>
+        )}
+
+        {estimates.length > 0 && (
+          <div className="p-4 bg-amber-50 border-b border-amber-200">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="w-5 h-5 text-amber-600" />
+              <h4 className="font-semibold text-amber-900">Dockmaster Estimates</h4>
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full">
+                {estimates.length}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {estimates.map(estimate => (
+                <div key={estimate.id} className="p-3 bg-white rounded-lg border border-amber-100">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900">
+                        Estimate #{estimate.id}
+                      </p>
+                      <p className="text-sm text-slate-600">{estimate.title || 'No title'}</p>
+                      {estimate.comments && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{estimate.comments}</p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3">
+                      <p className="font-semibold text-lg text-amber-700">
+                        ${(estimate.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {estimate.creation_date ? new Date(estimate.creation_date).toLocaleDateString() : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Operations breakdown */}
+                  {estimate.operations?.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-amber-100">
+                      <p className="text-xs font-medium text-slate-500 mb-1">Line Items:</p>
+                      <div className="space-y-0.5">
+                        {estimate.operations.map(op => (
+                          <div key={op.id} className="flex justify-between text-sm">
+                            <span className="text-slate-600 truncate flex-1 mr-2">
+                              {op.opcode_desc || op.opcode}
+                            </span>
+                            <span className="text-slate-900 flex-shrink-0">
+                              ${(op.estimated_charges || op.total_charges || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
