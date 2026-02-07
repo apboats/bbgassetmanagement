@@ -6,9 +6,10 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Package, X, Trash2, ChevronLeft, History, Send, MessageSquare } from 'lucide-react';
+import { Package, X, Trash2, ChevronLeft, History, MessageSquare } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
+import { MentionInput, renderMessageWithMentions } from '../MentionInput';
 import supabaseService, { boatLifecycleService, boatNotesService } from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -45,7 +46,7 @@ function StatusButton({ status, label, active, onClick }) {
   );
 }
 
-export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, boats = [], inventoryBoats = [] }) {
+export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpdateLocations, locations = [], sites = [], onMoveBoat, boats = [], inventoryBoats = [], users = [] }) {
   // Get permissions from centralized hook - ensures consistent access across the app
   const { currentUser } = usePermissions();
 
@@ -145,13 +146,6 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
       alert('Failed to send note. Please try again.');
     } finally {
       setSendingNote(false);
-    }
-  };
-
-  const handleNoteKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendNote();
     }
   };
 
@@ -668,7 +662,9 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
                             {note.user?.name || 'Unknown'}
                           </p>
                         )}
-                        <p className="text-sm whitespace-pre-wrap">{note.message}</p>
+                        <p className="text-sm">
+                          {renderMessageWithMentions(note.message, currentUser?.id)}
+                        </p>
                         <p className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-slate-500'}`}>
                           {getTimeAgo(new Date(note.created_at))}
                         </p>
@@ -683,24 +679,15 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             {/* Message Input */}
             {!isArchived && (
               <div className="p-3 border-t border-slate-200 bg-slate-50">
-                <div className="flex gap-2">
-                  <textarea
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    onKeyPress={handleNoteKeyPress}
-                    placeholder="Type a note..."
-                    rows={1}
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                    disabled={sendingNote}
-                  />
-                  <button
-                    onClick={handleSendNote}
-                    disabled={!newNote.trim() || sendingNote}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
+                <MentionInput
+                  value={newNote}
+                  onChange={setNewNote}
+                  onSubmit={handleSendNote}
+                  users={users}
+                  placeholder="Type a note... Use @ to mention someone"
+                  disabled={sendingNote}
+                  submitDisabled={!newNote.trim() || sendingNote}
+                />
               </div>
             )}
             {isArchived && (

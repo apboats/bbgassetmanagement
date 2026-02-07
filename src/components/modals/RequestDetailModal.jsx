@@ -6,9 +6,10 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign, AlertTriangle } from 'lucide-react';
+import { X, Wrench, CheckCircle, Clock, Ship, User, Calendar, FileText, Upload, Trash2, ExternalLink, DollarSign, AlertTriangle } from 'lucide-react';
 import { estimatesService } from '../../services/supabaseService';
 import { EstimateDetailsModal } from './EstimateDetailsModal';
+import { MentionInput, renderMessageWithMentions } from '../MentionInput';
 import { usePermissions } from '../../hooks/usePermissions';
 
 // Compute hash from estimates for change detection
@@ -34,7 +35,7 @@ const TYPE_CONFIG = {
 };
 
 // Message component
-function Message({ message, isCurrentUser }) {
+function Message({ message, isCurrentUser, currentUserId }) {
   return (
     <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -49,7 +50,9 @@ function Message({ message, isCurrentUser }) {
             {message.user?.name || 'Unknown'}
           </p>
         )}
-        <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+        <p className="text-sm">
+          {renderMessageWithMentions(message.message, currentUserId)}
+        </p>
         <p className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-slate-500'}`}>
           {new Date(message.created_at).toLocaleString()}
         </p>
@@ -61,6 +64,7 @@ function Message({ message, isCurrentUser }) {
 export function RequestDetailModal({
   request,
   currentUser,
+  users = [],
   onClose,
   onAddMessage,
   onMarkServiceComplete,
@@ -140,13 +144,6 @@ export function RequestDetailModal({
       console.error('Error sending message:', err);
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
     }
   };
 
@@ -615,6 +612,7 @@ export function RequestDetailModal({
                   key={msg.id}
                   message={msg}
                   isCurrentUser={msg.user_id === currentUser?.id}
+                  currentUserId={currentUser?.id}
                 />
               ))
           )}
@@ -624,24 +622,16 @@ export function RequestDetailModal({
         {/* Message Input */}
         {request.status !== 'closed' && (
           <div className="p-4 border-t border-slate-200 bg-slate-50">
-            <div className="flex gap-2">
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                rows={2}
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                disabled={sending}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sending}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors self-end"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
+            <MentionInput
+              value={newMessage}
+              onChange={setNewMessage}
+              onSubmit={handleSendMessage}
+              users={users}
+              placeholder="Type a message... Use @ to mention someone"
+              disabled={sending}
+              submitDisabled={!newMessage.trim() || sending}
+              rows={2}
+            />
           </div>
         )}
 
