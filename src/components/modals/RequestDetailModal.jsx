@@ -392,13 +392,13 @@ export function RequestDetailModal({
               Review Estimates ({estimates.length})
             </button>
 
-            {/* Approval Status */}
+            {/* Approval Status - reads from inventory_boat (single source of truth) */}
             {(() => {
               const currentHash = computeEstimatesHash(estimates);
-              const isApproved = request.estimates_approved_by &&
-                                 request.estimates_approval_hash === currentHash;
-              const hasChanged = request.estimates_approved_by &&
-                                 request.estimates_approval_hash !== currentHash;
+              const isApproved = boat?.estimates_approved_by &&
+                                 boat?.estimates_approval_hash === currentHash;
+              const hasChanged = boat?.estimates_approved_by &&
+                                 boat?.estimates_approval_hash !== currentHash;
 
               if (isApproved) {
                 return (
@@ -408,8 +408,7 @@ export function RequestDetailModal({
                       <span className="font-medium">Estimates Approved</span>
                     </div>
                     <p className="text-sm text-green-700 mt-1">
-                      Approved by <strong>{request.estimates_approver?.name || 'Unknown'}</strong> on{' '}
-                      {new Date(request.estimates_approved_at).toLocaleString()}
+                      Approved on {new Date(boat.estimates_approved_at).toLocaleString()}
                     </p>
                   </div>
                 );
@@ -423,8 +422,7 @@ export function RequestDetailModal({
                       <span className="font-medium">Estimates Changed</span>
                     </div>
                     <p className="text-sm text-orange-700 mt-1">
-                      Previous approval by {request.estimates_approver?.name || 'Unknown'} is no longer valid.
-                      Estimates have been modified since approval.
+                      Previous approval is no longer valid. Estimates have been modified.
                     </p>
                     {(isSalesManager || isAdmin) && (
                       <button

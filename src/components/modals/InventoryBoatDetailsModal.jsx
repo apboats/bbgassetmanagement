@@ -310,7 +310,7 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   }, [boat.dockmasterId, boat.dockmaster_id]);
 
   // Handle estimates approval
-  // Syncs approval to both inventory_boats AND any service_requests referencing this boat
+  // Stores approval on inventory_boats only (single source of truth)
   const handleApproveEstimates = async () => {
     if (approvingEstimates) return;
     setApprovingEstimates(true);
@@ -322,19 +322,8 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
         estimates_approval_hash: hash
       };
 
-      // Update the inventory_boat
+      // Update only the inventory_boat (single source of truth)
       await supabaseService.inventoryBoats.update(boat.id, approvalData);
-
-      // Also update any service_requests that reference this inventory_boat
-      const { error: requestsError } = await supabase
-        .from('service_requests')
-        .update(approvalData)
-        .eq('inventory_boat_id', boat.id);
-
-      if (requestsError) {
-        console.error('Error syncing approval to service_requests:', requestsError);
-        // Don't throw - the main approval succeeded
-      }
 
       if (onUpdateBoat) {
         onUpdateBoat({
