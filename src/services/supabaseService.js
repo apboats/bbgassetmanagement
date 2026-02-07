@@ -1705,7 +1705,21 @@ export const requestsService = {
       .select(`*, user:users(id, name)`)
 
     if (error) throw error
-    return data?.[0]
+
+    const msg = data?.[0]
+
+    // Create notifications for any mentioned users
+    if (msg) {
+      notificationsService.createForMentions({
+        message,
+        sourceType: 'request_message',
+        sourceId: msg.id,
+        requestId,
+        createdBy: userId,
+      }).catch(err => console.error('Failed to create mention notifications:', err))
+    }
+
+    return msg
   },
 
   // Archive old closed requests (call periodically or via cron)
@@ -2368,7 +2382,21 @@ export const boatNotesService = {
       .select(`*, user:users(id, name)`)
 
     if (error) throw error
-    return data?.[0]
+
+    const note = data?.[0]
+
+    // Create notifications for any mentioned users
+    if (note) {
+      notificationsService.createForMentions({
+        message,
+        sourceType: 'boat_note',
+        sourceId: note.id,
+        boatId,
+        createdBy: userId,
+      }).catch(err => console.error('Failed to create mention notifications:', err))
+    }
+
+    return note
   },
 
   // Add a note to an inventory boat
@@ -2383,7 +2411,21 @@ export const boatNotesService = {
       .select(`*, user:users(id, name)`)
 
     if (error) throw error
-    return data?.[0]
+
+    const note = data?.[0]
+
+    // Create notifications for any mentioned users
+    if (note) {
+      notificationsService.createForMentions({
+        message,
+        sourceType: 'inventory_boat_note',
+        sourceId: note.id,
+        inventoryBoatId,
+        createdBy: userId,
+      }).catch(err => console.error('Failed to create mention notifications:', err))
+    }
+
+    return note
   },
 }
 
@@ -2449,6 +2491,130 @@ export async function moveBoatWithHistory(boatId, toLocationId, toSlotId, userId
 }
 
 // ============================================================================
+// NOTIFICATIONS SERVICE
+// ============================================================================
+// Handles user notifications for @mentions
+
+// Helper to extract mentioned user IDs from text
+function extractMentionedUserIds(text) {
+  if (!text) return []
+  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
+  const userIds = []
+  let match
+  while ((match = mentionRegex.exec(text)) !== null) {
+    userIds.push(match[2])
+  }
+  return [...new Set(userIds)] // Remove duplicates
+}
+
+export const notificationsService = {
+  // Get notifications for a user
+  async getForUser(userId, includeRead = false) {
+    let query = supabase
+      .from('notifications')
+      .select(`
+        *,
+        created_by_user:users!notifications_created_by_fkey(id, name),
+        boat:boats(id, name),
+        inventory_boat:inventory_boats(id, year, make, model, stock_number),
+        request:service_requests(id, type, description)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (!includeRead) {
+      query = query.is('read_at', null)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  },
+
+  // Get unread count for a user
+  async getUnreadCount(userId) {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .is('read_at', null)
+
+    if (error) throw error
+    return count || 0
+  },
+
+  // Mark a single notification as read
+  async markAsRead(notificationId) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', notificationId)
+
+    if (error) throw error
+  },
+
+  // Mark all notifications as read for a user
+  async markAllAsRead(userId) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('read_at', null)
+
+    if (error) throw error
+  },
+
+  // Create notifications for mentioned users
+  async createForMentions({
+    message,
+    sourceType,    // 'boat_note', 'inventory_boat_note', 'request_message'
+    sourceId,
+    boatId = null,
+    inventoryBoatId = null,
+    requestId = null,
+    createdBy,
+  }) {
+    const mentionedUserIds = extractMentionedUserIds(message)
+
+    // Don't notify the person who wrote the message
+    const usersToNotify = mentionedUserIds.filter(id => id !== createdBy)
+
+    if (usersToNotify.length === 0) return []
+
+    // Create a preview (first 100 chars, strip mention formatting)
+    const preview = message
+      .replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1')  // Replace @[Name](id) with @Name
+      .slice(0, 100)
+      .trim()
+
+    const notifications = usersToNotify.map(userId => ({
+      user_id: userId,
+      type: 'mention',
+      source_type: sourceType,
+      source_id: sourceId,
+      boat_id: boatId,
+      inventory_boat_id: inventoryBoatId,
+      request_id: requestId,
+      message_preview: preview,
+      created_by: createdBy,
+    }))
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert(notifications)
+      .select()
+
+    if (error) {
+      console.error('Error creating notifications:', error)
+      // Don't throw - notification failure shouldn't break the main action
+      return []
+    }
+
+    return data || []
+  },
+}
+
+// ============================================================================
 // EXPORT ALL SERVICES
 // ============================================================================
 
@@ -2467,6 +2633,7 @@ export default {
   boatNotes: boatNotesService,
   requests: requestsService,
   requestAttachments: requestAttachmentsService,
+  notifications: notificationsService,
   moveBoatWithHistory,
   subscriptions,
   getAllBoatsCombined,
