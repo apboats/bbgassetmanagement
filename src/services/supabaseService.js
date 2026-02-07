@@ -1512,17 +1512,32 @@ export const requestsService = {
       .from('service_requests')
       .select(`
         *,
-        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number, dockmaster_id, color),
         creator:users!service_requests_created_by_fkey(id, name),
         service_completer:users!service_requests_service_completed_by_fkey(id, name),
         confirmer:users!service_requests_confirmed_by_fkey(id, name),
-        messages:request_messages(*, user:users(id, name))
+        messages:request_messages(*, user:users(id, name)),
+        attachments:request_attachments(*, uploaded_by:users(id, name))
       `)
       .is('archived_at', null)  // Exclude archived by default
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data || []
+
+    // Add public URLs to attachments
+    const result = (data || []).map(req => {
+      if (req.attachments && req.attachments.length > 0) {
+        req.attachments = req.attachments.map(att => {
+          const { data: { publicUrl } } = supabase.storage
+            .from('request-attachments')
+            .getPublicUrl(att.file_path)
+          return { ...att, url: publicUrl }
+        })
+      }
+      return req
+    })
+
+    return result
   },
 
   // Get all including archived
@@ -1531,16 +1546,31 @@ export const requestsService = {
       .from('service_requests')
       .select(`
         *,
-        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number, dockmaster_id, color),
         creator:users!service_requests_created_by_fkey(id, name),
         service_completer:users!service_requests_service_completed_by_fkey(id, name),
         confirmer:users!service_requests_confirmed_by_fkey(id, name),
-        messages:request_messages(*, user:users(id, name))
+        messages:request_messages(*, user:users(id, name)),
+        attachments:request_attachments(*, uploaded_by:users(id, name))
       `)
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data || []
+
+    // Add public URLs to attachments
+    const result = (data || []).map(req => {
+      if (req.attachments && req.attachments.length > 0) {
+        req.attachments = req.attachments.map(att => {
+          const { data: { publicUrl } } = supabase.storage
+            .from('request-attachments')
+            .getPublicUrl(att.file_path)
+          return { ...att, url: publicUrl }
+        })
+      }
+      return req
+    })
+
+    return result
   },
 
   // Get single request by ID
@@ -1549,16 +1579,28 @@ export const requestsService = {
       .from('service_requests')
       .select(`
         *,
-        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number),
+        inventory_boat:inventory_boats(id, name, make, model, year, hull_id, stock_number, dockmaster_id, color),
         creator:users!service_requests_created_by_fkey(id, name),
         service_completer:users!service_requests_service_completed_by_fkey(id, name),
         confirmer:users!service_requests_confirmed_by_fkey(id, name),
-        messages:request_messages(*, user:users(id, name))
+        messages:request_messages(*, user:users(id, name)),
+        attachments:request_attachments(*, uploaded_by:users(id, name))
       `)
       .eq('id', id)
       .single()
 
     if (error) throw error
+
+    // Add public URLs to attachments
+    if (data && data.attachments && data.attachments.length > 0) {
+      data.attachments = data.attachments.map(att => {
+        const { data: { publicUrl } } = supabase.storage
+          .from('request-attachments')
+          .getPublicUrl(att.file_path)
+        return { ...att, url: publicUrl }
+      })
+    }
+
     return data
   },
 
@@ -1648,6 +1690,111 @@ export const requestsService = {
     if (error) throw error
     return data || []
   },
+}
+
+// ============================================================================
+// REQUEST ATTACHMENTS (PDF file storage)
+// ============================================================================
+
+export const requestAttachmentsService = {
+  // Upload a PDF file and create database record
+  async upload(requestId, file, uploadedBy) {
+    // 1. Generate unique filename
+    const timestamp = Date.now()
+    const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const filePath = `${requestId}/${timestamp}_${safeFilename}`
+
+    // 2. Upload to storage bucket
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('request-attachments')
+      .upload(filePath, file, {
+        contentType: 'application/pdf',
+        upsert: false
+      })
+
+    if (uploadError) throw uploadError
+
+    // 3. Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('request-attachments')
+      .getPublicUrl(filePath)
+
+    // 4. Create database record
+    const { data, error } = await supabase
+      .from('request_attachments')
+      .insert({
+        request_id: requestId,
+        filename: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type || 'application/pdf',
+        uploaded_by: uploadedBy
+      })
+      .select(`
+        *,
+        uploaded_by:users!request_attachments_uploaded_by_fkey(id, name)
+      `)
+      .single()
+
+    if (error) throw error
+
+    // Return with URL for immediate display
+    return { ...data, url: publicUrl }
+  },
+
+  // Delete attachment (storage + database)
+  async delete(attachmentId) {
+    // 1. Get the attachment record to find file path
+    const { data: attachment, error: fetchError } = await supabase
+      .from('request_attachments')
+      .select('file_path')
+      .eq('id', attachmentId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // 2. Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('request-attachments')
+      .remove([attachment.file_path])
+
+    if (storageError) {
+      console.warn('Storage delete error (continuing):', storageError)
+      // Continue anyway - DB record deletion is more important
+    }
+
+    // 3. Delete database record
+    const { error: dbError } = await supabase
+      .from('request_attachments')
+      .delete()
+      .eq('id', attachmentId)
+
+    if (dbError) throw dbError
+
+    return true
+  },
+
+  // Get all attachments for a request
+  async getForRequest(requestId) {
+    const { data, error } = await supabase
+      .from('request_attachments')
+      .select(`
+        *,
+        uploaded_by:users!request_attachments_uploaded_by_fkey(id, name)
+      `)
+      .eq('request_id', requestId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    // Add public URLs
+    return (data || []).map(att => {
+      const { data: { publicUrl } } = supabase.storage
+        .from('request-attachments')
+        .getPublicUrl(att.file_path)
+      return { ...att, url: publicUrl }
+    })
+  }
 }
 
 // ============================================================================
@@ -2168,6 +2315,7 @@ export default {
   boatShows: boatShowsService,
   boatMovements: boatMovementsService,
   requests: requestsService,
+  requestAttachments: requestAttachmentsService,
   moveBoatWithHistory,
   subscriptions,
   getAllBoatsCombined,
