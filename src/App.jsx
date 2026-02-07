@@ -505,16 +505,13 @@ export default function BoatsByGeorgeAssetManager({
           <Route path="/alerts" element={
             <AlertsView
               onNavigateToBoat={(boatId) => {
-                navigate('/boats');
-                // TODO: Open boat detail modal via state/context
+                navigate(`/boats?openBoat=${boatId}`);
               }}
               onNavigateToInventoryBoat={(boatId) => {
-                navigate('/inventory');
-                // TODO: Open inventory boat detail modal via state/context
+                navigate(`/inventory?openBoat=${boatId}`);
               }}
               onNavigateToRequest={(requestId) => {
-                navigate('/requests');
-                // TODO: Open request detail modal via state/context
+                navigate(`/requests?openRequest=${requestId}`);
               }}
             />
           } />
