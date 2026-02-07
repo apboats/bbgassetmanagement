@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { useState, useMemo } from 'react';
-import { X, Search, Ship } from 'lucide-react';
+import { X, Search, Ship, Calendar } from 'lucide-react';
 
 // Sales status labels and colors (matches InventoryBoatCard)
 const salesStatusLabels = {
@@ -25,6 +25,7 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
   const [type, setType] = useState('rigging');
   const [selectedBoatId, setSelectedBoatId] = useState('');
   const [description, setDescription] = useState('');
+  const [deadlineDate, setDeadlineDate] = useState('');
   const [boatSearch, setBoatSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -76,6 +77,7 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
         type,
         inventory_boat_id: selectedBoatId,
         description: description.trim(),
+        deadline_date: deadlineDate || null,
       });
     } catch (err) {
       console.error('Error creating request:', err);
@@ -256,6 +258,22 @@ export function RequestModal({ inventoryBoats = [], onSave, onClose }) {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
               required
             />
+          </div>
+
+          {/* Deadline Date */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Deadline Date <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="date"
+                value={deadlineDate}
+                onChange={(e) => setDeadlineDate(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Error */}

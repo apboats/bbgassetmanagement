@@ -492,6 +492,16 @@ export function RequestDetailModal({
                 </span>
               </div>
               <p className="text-slate-700 mt-1 whitespace-pre-wrap">{request.description}</p>
+
+              {/* Deadline date display */}
+              {request.deadline_date && (
+                <div className="mt-2 flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-amber-500" />
+                  <span className="text-slate-600">
+                    Due: <span className="font-medium text-amber-700">{new Date(request.deadline_date).toLocaleDateString()}</span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
