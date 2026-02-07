@@ -196,28 +196,11 @@ export function RequestDetailModal({
         <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              {/* Type badge and Status selector */}
+              {/* Type badge only - status selector moved below header */}
               <div className="flex items-center gap-2 mb-2">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeConfig.color}`}>
                   {typeConfig.label}
                 </span>
-
-                {/* Status Selector Dropdown */}
-                <select
-                  value={request.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  disabled={updating}
-                  className={`px-2 py-0.5 rounded text-xs font-medium border cursor-pointer ${statusConfig.color} ${updating ? 'opacity-50' : ''}`}
-                >
-                  {STATUS_ORDER.map(status => {
-                    const config = STATUS_CONFIG[status];
-                    return (
-                      <option key={status} value={status}>
-                        {config.label}
-                      </option>
-                    );
-                  })}
-                </select>
               </div>
 
               {/* Boat name */}
@@ -239,6 +222,80 @@ export function RequestDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Status Selector - Prominent horizontal pills */}
+        <div className="p-3 bg-white border-b border-slate-200">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {STATUS_ORDER.map(status => {
+              const config = STATUS_CONFIG[status];
+              const StatusIconBtn = config.icon;
+              const isActive = request.status === status;
+
+              return (
+                <button
+                  key={status}
+                  onClick={() => handleStatusChange(status)}
+                  disabled={updating}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium text-sm transition-all ${
+                    isActive
+                      ? `${config.color} ring-2 ring-offset-1 ring-current`
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <StatusIconBtn className="w-4 h-4" />
+                  {config.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Boat Details - Comprehensive info for service team */}
+        {boat && (
+          <div className="p-4 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Ship className="w-5 h-5 text-blue-600" />
+              <h4 className="font-semibold text-blue-900">Boat Details</h4>
+            </div>
+
+            {/* Boat name (prominent) */}
+            <p className="text-lg font-bold text-slate-900 mb-3">
+              {boat.year || ''} {boat.make || ''} {boat.model || ''}
+            </p>
+
+            {/* Details grid */}
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {boat.stock_number && (
+                <div className="p-2 bg-white rounded border border-blue-100">
+                  <p className="text-xs text-slate-500">Stock #</p>
+                  <p className="font-mono font-semibold text-slate-900">{boat.stock_number}</p>
+                </div>
+              )}
+              {(boat.dockmaster_id || boat.dockmasterId) && (
+                <div className="p-2 bg-white rounded border border-blue-100">
+                  <p className="text-xs text-slate-500">Dockmaster ID</p>
+                  <p className="font-mono font-semibold text-slate-900">
+                    {boat.dockmaster_id || boat.dockmasterId}
+                  </p>
+                </div>
+              )}
+              {(boat.hull_id || boat.hullId) && (
+                <div className="p-2 bg-white rounded border border-blue-100">
+                  <p className="text-xs text-slate-500">Hull ID (HIN)</p>
+                  <p className="font-mono font-semibold text-slate-900">
+                    {boat.hull_id || boat.hullId}
+                  </p>
+                </div>
+              )}
+              {boat.color && (
+                <div className="p-2 bg-white rounded border border-blue-100">
+                  <p className="text-xs text-slate-500">Color</p>
+                  <p className="font-semibold text-slate-900">{boat.color}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Request Info */}
         <div className="p-4 bg-slate-50 border-b border-slate-200">
