@@ -40,6 +40,7 @@ serve(async (req) => {
       `)
       .eq('rigging_id', dockmasterId)
       .eq('is_internal', true)
+      .or('is_estimate.is.null,is_estimate.eq.false')  // Exclude estimates
 
     // By default, only return open work orders
     if (!includeAll) {
