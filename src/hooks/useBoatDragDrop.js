@@ -347,8 +347,8 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
   // ============================================================================
 
   const handleTouchStart = useCallback((e, boat, location, slotId) => {
-    // Prevent iOS text selection behavior during drag
-    e.preventDefault();
+    // Note: e.preventDefault() removed - CSS touch-action: none on [draggable="true"]
+    // now handles preventing default browser touch behavior (fixes Chromium passive listener warning)
 
     // Get initial touch position and timestamp
     const touch = e.touches[0];
@@ -399,6 +399,11 @@ export function useBoatDragDrop({ onMoveBoat, onSuccess, onError }) {
       if (distance > DRAG_THRESHOLD && elapsed >= DRAG_DELAY) {
         // Threshold exceeded - now actually start the drag
         const { boat, location, slotId } = pendingDragRef.current;
+
+        // CRITICAL: Clear pending ref synchronously BEFORE async state updates
+        // This prevents createDragClone from being called multiple times on rapid touchmove events
+        pendingDragRef.current = null;
+
         setDraggingBoat(boat);
         setDraggingFrom({ location, slotId });
         setIsDragging(true);
