@@ -7,7 +7,8 @@
 // Supports drag-and-drop between status columns
 // ============================================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Filter, MessageSquare, Wrench, CheckCircle, Clock, Archive, Calendar, AlertCircle } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { useRequestDragDrop } from '../hooks/useRequestDragDrop';
@@ -198,6 +199,7 @@ export function RequestsView({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [filterType, setFilterType] = useState('all'); // all, rigging, prep
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filterStatus, setFilterStatus] = useState('active'); // active, closed, all
   const [filterDueDate, setFilterDueDate] = useState('all'); // all, has-deadline, overdue, this-week, this-month
   const [showArchived, setShowArchived] = useState(false);
@@ -226,6 +228,19 @@ export function RequestsView({
     if (!selectedRequestId) return null;
     return requests.find(r => r.id === selectedRequestId) || null;
   }, [requests, selectedRequestId]);
+
+  // Open modal from URL parameter (e.g., from alerts page)
+  useEffect(() => {
+    const openRequestId = searchParams.get('openRequest');
+    if (openRequestId && requests.length > 0) {
+      const request = requests.find(r => r.id === openRequestId);
+      if (request) {
+        setSelectedRequestId(openRequestId);
+        // Clear the param so refresh doesn't reopen
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, requests, setSearchParams]);
 
   // Filter requests
   const filteredRequests = useMemo(() => {

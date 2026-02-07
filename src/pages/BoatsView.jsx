@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, X, Package, Map, Edit2, Trash2, Users, Shield, Building2 } from 'lucide-react';
 import { useRemoveBoat } from '../hooks/useRemoveBoat';
 import { BoatDetailsModal } from '../components/modals/BoatDetailsModal';
@@ -28,6 +29,7 @@ export function BoatsView({ boats, locations, sites = [], users = [], onUpdateBo
   const [editingBoat, setEditingBoat] = useState(null);
   const [viewingBoat, setViewingBoat] = useState(null);
   const [showBoatTypeSelector, setShowBoatTypeSelector] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { removeBoat } = useRemoveBoat({
     onMoveBoat,
@@ -44,6 +46,21 @@ export function BoatsView({ boats, locations, sites = [], users = [], onUpdateBo
       }
     }
   }, [boats, locations]);
+
+  // Open modal from URL parameter (e.g., from alerts page)
+  useEffect(() => {
+    const openBoatId = searchParams.get('openBoat');
+    if (openBoatId && boats.length > 0) {
+      const boat = boats.find(b => b.id === openBoatId);
+      if (boat) {
+        const location = boat.location ? locations.find(l => l.name === boat.location) : null;
+        const slotId = location ? Object.keys(location.boats || {}).find(key => location.boats[key] === boat.id) : null;
+        setViewingBoat({ ...boat, currentLocation: location, currentSlot: slotId });
+        // Clear the param so refresh doesn't reopen
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, boats, locations, setSearchParams]);
 
   const handleLocationToggle = (locationName) => {
     setFilterLocations(prev => prev.includes(locationName) ? prev.filter(l => l !== locationName) : [...prev, locationName]);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Package, Map, Edit2, X, Plus, RefreshCw } from 'lucide-react';
 import { useRemoveBoat } from '../hooks/useRemoveBoat';
 import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDetailsModal';
@@ -15,6 +16,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriceRange, setFilterPriceRange] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Price range options for filtering
   const PRICE_RANGES = [
@@ -52,6 +54,19 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
       }
     }
   }, [inventoryBoats]);
+
+  // Open modal from URL parameter (e.g., from alerts page)
+  useEffect(() => {
+    const openBoatId = searchParams.get('openBoat');
+    if (openBoatId && inventoryBoats.length > 0) {
+      const boat = inventoryBoats.find(b => b.id === openBoatId);
+      if (boat) {
+        setViewingBoat(boat);
+        // Clear the param so refresh doesn't reopen
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, inventoryBoats, setSearchParams]);
 
   // Extract unique values for filters with cascading/progressive filtering
   // Years are always shown from all boats
