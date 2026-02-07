@@ -1655,6 +1655,37 @@ export const requestsService = {
 // ============================================================================
 
 export const subscriptions = {
+  // Broadcast channel for instant cross-device sync
+  boatBroadcastChannel: null,
+
+  // Initialize boat broadcast channel for instant peer-to-peer sync
+  // Uses Supabase Broadcast (not database) for <100ms latency
+  initBoatBroadcast(onReceive) {
+    this.boatBroadcastChannel = supabase
+      .channel('boat-sync', {
+        config: { broadcast: { self: false } }  // Don't receive own broadcasts
+      })
+      .on('broadcast', { event: 'boat_change' }, ({ payload }) => {
+        console.log('[Broadcast] Received boat change:', payload)
+        onReceive(payload)
+      })
+      .subscribe()
+
+    return this.boatBroadcastChannel
+  },
+
+  // Send boat change to all other devices instantly
+  broadcastBoatChange(payload) {
+    if (this.boatBroadcastChannel) {
+      this.boatBroadcastChannel.send({
+        type: 'broadcast',
+        event: 'boat_change',
+        payload
+      })
+      console.log('[Broadcast] Sent boat change:', payload)
+    }
+  },
+
   // Subscribe to boats changes
   subscribeToBoats(callback) {
     return supabase
