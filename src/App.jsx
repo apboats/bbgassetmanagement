@@ -115,6 +115,8 @@ export default function BoatsByGeorgeAssetManager({
   onAddRequestMessage,
   onMarkServiceComplete,
   onConfirmRequestComplete,
+  onAttachFile,
+  onRemoveAttachment,
 }) {
   // UI State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
@@ -454,6 +456,8 @@ export default function BoatsByGeorgeAssetManager({
               onAddMessage={onAddRequestMessage}
               onMarkServiceComplete={onMarkServiceComplete}
               onConfirmComplete={onConfirmRequestComplete}
+              onAttachFile={onAttachFile}
+              onRemoveAttachment={onRemoveAttachment}
             />
           } />
           {/* Catch-all redirect to dashboard */}

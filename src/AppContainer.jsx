@@ -38,6 +38,7 @@ const {
   dockmaster: dockmasterService,
   users: usersService,
   requests: requestsService,
+  requestAttachments: requestAttachmentsService,
 } = supabaseService
 
 function AppContainer() {
@@ -1253,6 +1254,50 @@ function AppContainer() {
     }
   }
 
+  const handleAttachFile = async (requestId, file) => {
+    try {
+      const attachment = await requestAttachmentsService.upload(
+        requestId,
+        file,
+        user?.id
+      )
+
+      // Update local requests state to include new attachment
+      setRequests(prev => prev.map(req => {
+        if (req.id === requestId) {
+          return {
+            ...req,
+            attachments: [...(req.attachments || []), attachment]
+          }
+        }
+        return req
+      }))
+    } catch (error) {
+      console.error('Error uploading attachment:', error)
+      throw error // Let modal handle the error display
+    }
+  }
+
+  const handleRemoveAttachment = async (requestId, attachmentId) => {
+    try {
+      await requestAttachmentsService.delete(attachmentId)
+
+      // Update local state to remove attachment
+      setRequests(prev => prev.map(req => {
+        if (req.id === requestId) {
+          return {
+            ...req,
+            attachments: (req.attachments || []).filter(a => a.id !== attachmentId)
+          }
+        }
+        return req
+      }))
+    } catch (error) {
+      console.error('Error removing attachment:', error)
+      throw error
+    }
+  }
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -1324,6 +1369,8 @@ function AppContainer() {
       onAddRequestMessage={handleAddRequestMessage}
       onMarkServiceComplete={handleMarkServiceComplete}
       onConfirmRequestComplete={handleConfirmRequestComplete}
+      onAttachFile={handleAttachFile}
+      onRemoveAttachment={handleRemoveAttachment}
     />
   )
 }
