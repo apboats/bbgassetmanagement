@@ -393,17 +393,21 @@ export const AuthProvider = ({ children }) => {
   const permissions = useMemo(() => {
     const role = user?.role || 'user';
     return {
+      // Role checks
       isAdmin: role === 'admin',
       isManager: role === 'manager',
       isSalesManager: role === 'sales-manager',
+      isService: role === 'service',
+      isSales: role === 'sales',
       isUser: role === 'user',
+      // Permission checks
       // Sales Manager has same permissions as Manager
       canManageLocations: role === 'admin' || role === 'manager' || role === 'sales-manager',
       canEditUsers: role === 'admin',
-      canSeeCost: role === 'admin' || role === 'manager' || role === 'sales-manager',
+      canSeeCost: role === 'admin' || role === 'manager' || role === 'sales-manager' || role === 'sales',
       canDeleteBoats: role === 'admin' || role === 'manager' || role === 'sales-manager',
-      // Only Sales Managers and Admins can create service requests
-      canCreateRequests: role === 'admin' || role === 'sales-manager',
+      // Only Sales Managers, Sales, and Admins can create service requests
+      canCreateRequests: role === 'admin' || role === 'sales-manager' || role === 'sales',
       hasRole: (...roles) => roles.includes(role),
     };
   }, [user?.role]);
