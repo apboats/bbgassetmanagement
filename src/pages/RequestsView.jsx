@@ -182,6 +182,7 @@ export function RequestsView({
   requests = [],
   inventoryBoats = [],
   currentUser,
+  users = [],
   onCreateRequest,
   onUpdateRequest,
   onAddMessage,
@@ -429,6 +430,7 @@ export function RequestsView({
         <RequestDetailModal
           request={selectedRequest}
           currentUser={currentUser}
+          users={users}
           onClose={handleCloseDetail}
           onAddMessage={handleAddMessage}
           onMarkServiceComplete={handleMarkServiceComplete}

@@ -17,7 +17,7 @@ import { getActiveSeason } from '../utils/seasonHelpers';
 // - DockmasterImportModal: imported from ../components/modals/DockmasterImportModal
 
 // Main BoatsView Component
-export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmasterConfig, onMoveBoat }) {
+export function BoatsView({ boats, locations, sites = [], users = [], onUpdateBoats, dockmasterConfig, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkPhase, setFilterWorkPhase] = useState('all');
@@ -655,7 +655,7 @@ export function BoatsView({ boats, locations, sites = [], onUpdateBoats, dockmas
       {showAddBoat && <BoatModal boat={null} locations={locations} onSave={handleAddBoat} onCancel={() => setShowAddBoat(false)} />}
       {showBoatTypeSelector && <DockmasterImportModal dockmasterConfig={dockmasterConfig} onImport={handleAddBoat} onCancel={() => setShowBoatTypeSelector(false)} />}
       {viewingBoat && (
-        <BoatDetailsModal boat={viewingBoat} locations={locations} sites={sites} boats={boats} inventoryBoats={[]} onRemove={() => removeBoat(viewingBoat)} onUpdateBoat={handleUpdateBoatFromModal} onMoveBoat={handleMoveBoat} onClose={() => setViewingBoat(null)} />
+        <BoatDetailsModal boat={viewingBoat} locations={locations} sites={sites} boats={boats} inventoryBoats={[]} users={users} onRemove={() => removeBoat(viewingBoat)} onUpdateBoat={handleUpdateBoatFromModal} onMoveBoat={handleMoveBoat} onClose={() => setViewingBoat(null)} />
       )}
     </div>
   );

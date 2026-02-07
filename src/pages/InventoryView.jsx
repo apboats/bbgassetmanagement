@@ -5,7 +5,7 @@ import { InventoryBoatDetailsModal } from '../components/modals/InventoryBoatDet
 import { InventoryBoatCard } from '../components/InventoryBoatCard';
 import { findBoatLocationData, useBoatLocation } from '../components/BoatComponents';
 
-export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
+export function InventoryView({ inventoryBoats, boats = [], locations, sites = [], users = [], lastSync, onSyncNow, dockmasterConfig, onUpdateInventoryBoats, onUpdateSingleBoat, onMoveBoat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingBoat, setViewingBoat] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -127,26 +127,8 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
     })();
 
     // Type filter (New vs Used/Brokerage)
-    // Try multiple possible field names from Dockmaster API, default to 'NEW'
     const rawData = boat.rawData || boat.raw_data || {};
-    const boatType = (
-      rawData.type ||
-      rawData.inventoryType ||
-      rawData.unitType ||
-      rawData.condition ||
-      'NEW'
-    ).toUpperCase();
-    // Debug: log first boat's type fields to help diagnose
-    if (filterType !== 'all' && inventoryBoats.indexOf(boat) === 0) {
-      console.log('[Type Filter Debug] First boat raw_data fields:', {
-        type: rawData.type,
-        inventoryType: rawData.inventoryType,
-        unitType: rawData.unitType,
-        condition: rawData.condition,
-        resolvedBoatType: boatType,
-        rawDataKeys: Object.keys(rawData).slice(0, 20)
-      });
-    }
+    const boatType = (rawData.type || 'NEW').toUpperCase();
     const matchesType = filterType === 'all' ||
       (filterType === 'NEW' && boatType === 'NEW') ||
       (filterType === 'USED_BROKERAGE' && (boatType === 'USED' || boatType === 'BROKERAGE'));
@@ -578,6 +560,7 @@ export function InventoryView({ inventoryBoats, boats = [], locations, sites = [
           sites={sites}
           boats={boats.filter(b => !b.isInventory)}
           inventoryBoats={inventoryBoats}
+          users={users}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}

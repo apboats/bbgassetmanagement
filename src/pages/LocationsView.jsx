@@ -14,7 +14,7 @@ import { LocationGrid, MaximizedLocationModal } from '../components/locations/Lo
 import { LocationSection } from '../components/locations/LocationSection';
 import { boatLifecycleService } from '../services/supabaseService';
 
-export function LocationsView({ locations, sites = [], boats, onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites }) {
+export function LocationsView({ locations, sites = [], boats, users = [], onUpdateLocations, onUpdateBoats, onMoveBoat: onMoveBoatFromContainer, onAddSite, onUpdateSite, onDeleteSite, onReorderSites }) {
   // Get permissions from centralized hook
   const { canManageLocations } = usePermissions();
 
@@ -788,6 +788,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           sites={sites}
           boats={boats}
           inventoryBoats={inventoryBoats}
+          users={users}
           onMoveBoat={handleMoveBoat}
           onUpdateBoat={handleUpdateBoatFromModal}
           onClose={() => setViewingBoat(null)}
@@ -800,6 +801,7 @@ export function LocationsView({ locations, sites = [], boats, onUpdateLocations,
           sites={sites}
           boats={boats}
           inventoryBoats={inventoryBoats}
+          users={users}
           onRemove={() => removeBoat(viewingBoat)}
           onUpdateBoat={handleUpdateBoatFromModal}
           onMoveBoat={handleMoveBoat}
