@@ -133,12 +133,14 @@ export function RequestDetailModal({
     loadEstimates();
   }, [boat?.dockmaster_id, boat?.dockmasterId]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
+  const handleSendMessage = async (messageText) => {
+    // Use passed text (from MentionInput) or fall back to state
+    const text = messageText || newMessage;
+    if (!text.trim() || sending) return;
 
     setSending(true);
     try {
-      await onAddMessage(request.id, newMessage.trim());
+      await onAddMessage(request.id, text.trim());
       setNewMessage('');
     } catch (err) {
       console.error('Error sending message:', err);

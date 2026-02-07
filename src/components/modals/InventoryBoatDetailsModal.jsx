@@ -318,12 +318,14 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   }, [notes]);
 
   // Handle sending a new note
-  const handleSendNote = async () => {
-    if (!newNote.trim() || sendingNote) return;
+  const handleSendNote = async (noteText) => {
+    // Use passed text (from MentionInput) or fall back to state
+    const text = noteText || newNote;
+    if (!text.trim() || sendingNote) return;
 
     setSendingNote(true);
     try {
-      const addedNote = await boatNotesService.addToInventoryBoat(boat.id, currentUser?.id, newNote.trim());
+      const addedNote = await boatNotesService.addToInventoryBoat(boat.id, currentUser?.id, text.trim());
       setNotes(prev => [...prev, addedNote]);
       setNewNote('');
     } catch (err) {

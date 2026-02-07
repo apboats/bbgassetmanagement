@@ -133,12 +133,14 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   }, [notes]);
 
   // Handle sending a new note
-  const handleSendNote = async () => {
-    if (!newNote.trim() || sendingNote || isArchived) return;
+  const handleSendNote = async (noteText) => {
+    // Use passed text (from MentionInput) or fall back to state
+    const text = noteText || newNote;
+    if (!text.trim() || sendingNote || isArchived) return;
 
     setSendingNote(true);
     try {
-      const addedNote = await boatNotesService.addToBoat(boat.id, currentUser?.id, newNote.trim());
+      const addedNote = await boatNotesService.addToBoat(boat.id, currentUser?.id, text.trim());
       setNotes(prev => [...prev, addedNote]);
       setNewNote('');
     } catch (err) {
