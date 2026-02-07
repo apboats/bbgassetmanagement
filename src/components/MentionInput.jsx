@@ -199,20 +199,13 @@ export function MentionInput({
       // Transform mentions before submit
       const transformedValue = transformMentionsForStorage(value, mentions);
 
-      // Update parent's value with transformed text
-      if (transformedValue !== value) {
-        onChange(transformedValue);
-      }
-
       // Clear mentions tracking
       setMentions(new Map());
 
-      // Use setTimeout to ensure state update propagates before submit
-      setTimeout(() => {
-        onSubmit();
-      }, 0);
+      // Pass transformed text directly to onSubmit (avoids async state timing issues)
+      onSubmit(transformedValue);
     }
-  }, [value, mentions, onChange, onSubmit, submitDisabled]);
+  }, [value, mentions, onSubmit, submitDisabled]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e) => {
