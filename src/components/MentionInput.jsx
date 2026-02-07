@@ -86,6 +86,21 @@ export function extractMentionedUserIds(text) {
   return [...new Set(userIds)]; // Remove duplicates
 }
 
+// Transform @Name mentions to @[Name](userId) format for storage
+function transformMentionsForStorage(text, mentionsMap) {
+  if (!text || mentionsMap.size === 0) return text;
+
+  let result = text;
+  mentionsMap.forEach((userId, name) => {
+    // Escape special regex characters in name
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match @Name followed by space, end of string, or punctuation
+    const pattern = new RegExp(`@${escapedName}(?=\\s|$|[.,!?;:])`, 'g');
+    result = result.replace(pattern, `@[${name}](${userId})`);
+  });
+  return result;
+}
+
 export function MentionInput({
   value,
   onChange,
@@ -101,6 +116,8 @@ export function MentionInput({
   const [mentionSearch, setMentionSearch] = useState('');
   const [mentionIndex, setMentionIndex] = useState(0);
   const [cursorPosition, setCursorPosition] = useState(0);
+  // Track mentions for transformation on submit: Map<name, userId>
+  const [mentions, setMentions] = useState(new Map());
   const textareaRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -153,12 +170,15 @@ export function MentionInput({
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     const textAfterCursor = value.slice(cursorPosition);
 
-    // Build the mention text
-    const mention = `@[${user.name}](${user.id})`;
+    // Insert clean @Name (not the full format with brackets)
+    const displayMention = `@${user.name}`;
 
-    // Replace @search with the mention
-    const newValue = value.slice(0, lastAtIndex) + mention + ' ' + textAfterCursor;
+    // Replace @search with the clean mention
+    const newValue = value.slice(0, lastAtIndex) + displayMention + ' ' + textAfterCursor;
     onChange(newValue);
+
+    // Track mention for transformation on submit
+    setMentions(prev => new Map(prev).set(user.name, user.id));
 
     setShowMentions(false);
     setMentionSearch('');
@@ -166,12 +186,33 @@ export function MentionInput({
     // Focus back on textarea
     setTimeout(() => {
       if (textareaRef.current) {
-        const newCursorPos = lastAtIndex + mention.length + 1;
+        const newCursorPos = lastAtIndex + displayMention.length + 1;
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
   }, [value, cursorPosition, onChange]);
+
+  // Handle submit with mention transformation
+  const handleInternalSubmit = useCallback(() => {
+    if (onSubmit && !submitDisabled) {
+      // Transform mentions before submit
+      const transformedValue = transformMentionsForStorage(value, mentions);
+
+      // Update parent's value with transformed text
+      if (transformedValue !== value) {
+        onChange(transformedValue);
+      }
+
+      // Clear mentions tracking
+      setMentions(new Map());
+
+      // Use setTimeout to ensure state update propagates before submit
+      setTimeout(() => {
+        onSubmit();
+      }, 0);
+    }
+  }, [value, mentions, onChange, onSubmit, submitDisabled]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e) => {
@@ -190,11 +231,9 @@ export function MentionInput({
       }
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (onSubmit && !submitDisabled) {
-        onSubmit();
-      }
+      handleInternalSubmit();
     }
-  }, [showMentions, filteredUsers, mentionIndex, selectUser, onSubmit, submitDisabled]);
+  }, [showMentions, filteredUsers, mentionIndex, selectUser, handleInternalSubmit]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -208,6 +247,13 @@ export function MentionInput({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Clear mentions tracking when value is cleared (after submit)
+  useEffect(() => {
+    if (!value) {
+      setMentions(new Map());
+    }
+  }, [value]);
 
   return (
     <div className={`relative ${className}`}>
@@ -268,7 +314,7 @@ export function MentionInput({
         {onSubmit && (
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={handleInternalSubmit}
             disabled={submitDisabled || disabled}
             className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
