@@ -5,11 +5,11 @@
 // Includes work phases, status updates, location management, and work orders
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Package, X, Trash2, ChevronLeft, History } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Package, X, Trash2, ChevronLeft, History, Send, MessageSquare } from 'lucide-react';
 import { WorkOrdersModal } from './WorkOrdersModal';
 import { SlotGridDisplay } from '../locations/SlotGridDisplay';
-import supabaseService, { boatLifecycleService } from '../../services/supabaseService';
+import supabaseService, { boatLifecycleService, boatNotesService } from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
 import { usePermissions } from '../../hooks/usePermissions';
 import { SEASONS, SEASON_LABELS, getActiveSeason } from '../../utils/seasonHelpers';
@@ -63,8 +63,11 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   const [isProcessing, setIsProcessing] = useState(false);
   const [movementHistory, setMovementHistory] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
-  const [notesText, setNotesText] = useState(boat.notes || '');
-  const [savingNotes, setSavingNotes] = useState(false);
+  const [notes, setNotes] = useState([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [sendingNote, setSendingNote] = useState(false);
+  const notesEndRef = useRef(null);
   const [activeSeason, setActiveSeason] = useState(
     boat.storageBoat ? getActiveSeason(boat) : 'fall'
   );
@@ -103,6 +106,54 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
   useEffect(() => {
     loadMovementHistory();
   }, [loadMovementHistory]);
+
+  // Load notes when modal opens
+  const loadNotes = useCallback(async () => {
+    if (boat?.id) {
+      setLoadingNotes(true);
+      try {
+        const notesData = await boatNotesService.getForBoat(boat.id);
+        setNotes(notesData);
+      } catch (err) {
+        console.error('Error loading notes:', err);
+      } finally {
+        setLoadingNotes(false);
+      }
+    }
+  }, [boat?.id]);
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
+
+  // Scroll to bottom of notes when they change
+  useEffect(() => {
+    notesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [notes]);
+
+  // Handle sending a new note
+  const handleSendNote = async () => {
+    if (!newNote.trim() || sendingNote || isArchived) return;
+
+    setSendingNote(true);
+    try {
+      const addedNote = await boatNotesService.addToBoat(boat.id, currentUser?.id, newNote.trim());
+      setNotes(prev => [...prev, addedNote]);
+      setNewNote('');
+    } catch (err) {
+      console.error('Error sending note:', err);
+      alert('Failed to send note. Please try again.');
+    } finally {
+      setSendingNote(false);
+    }
+  };
+
+  const handleNoteKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendNote();
+    }
+  };
 
   const statusLabels = {
     'needs-approval': 'Needs Approval',
@@ -404,26 +455,6 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
     }
   };
 
-  const handleSaveNotes = async () => {
-    if (isArchived) return; // Can't save notes for archived boats
-
-    setSavingNotes(true);
-    try {
-      const updatedBoat = {
-        ...boat,
-        notes: notesText.trim(),
-        notesUpdatedBy: currentUser?.name || currentUser?.username || 'Unknown',
-        notesUpdatedAt: new Date().toISOString()
-      };
-      await onUpdateBoat(updatedBoat);
-    } catch (error) {
-      console.error('Error saving notes:', error);
-      alert('Failed to save notes. Please try again.');
-    } finally {
-      setSavingNotes(false);
-    }
-  };
-
   const handleReleaseBoat = async () => {
     if (confirm(`Release ${boat.name} back to owner? This will remove it from its current location and archive it. This action cannot be undone.`)) {
       try {
@@ -604,44 +635,78 @@ export function BoatDetailsModal({ boat, onRemove, onClose, onUpdateBoat, onUpda
             </div>
           </div>
 
-          {/* Notes Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-base md:text-lg font-bold text-slate-900">Notes</h4>
-              {boat.notesUpdatedBy && boat.notesUpdatedAt && (
-                <p className="text-xs text-slate-500">
-                  Last updated by {boat.notesUpdatedBy || 'Unknown'} on {boat.notesUpdatedAt ? new Date(boat.notesUpdatedAt).toLocaleDateString() : ''}
-                </p>
-              )}
+          {/* Notes Section - Conversational Thread */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-2 p-3 bg-slate-50 border-b border-slate-200">
+              <MessageSquare className="w-4 h-4 text-slate-600" />
+              <h4 className="text-sm font-semibold text-slate-900">Notes</h4>
+              <span className="text-xs text-slate-500">({notes.length})</span>
             </div>
-            <textarea
-              value={notesText}
-              onChange={(e) => setNotesText(e.target.value)}
-              disabled={isArchived}
-              placeholder={isArchived ? 'No notes' : 'Add notes about this boat...'}
-              rows={4}
-              className={`w-full px-3 py-2 border rounded-lg text-sm resize-y ${
-                isArchived
-                  ? 'bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed'
-                  : 'bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900'
-              }`}
-            />
-            {!isArchived && (
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={handleSaveNotes}
-                  disabled={savingNotes || notesText.trim() === (boat.notes || '')}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
-                >
-                  {savingNotes ? 'Saving...' : 'Save Note'}
-                </button>
-                <p className="text-xs text-slate-500">
-                  Click "Save Note" to record your changes
+
+            {/* Messages Area */}
+            <div className="h-48 overflow-y-auto p-3 space-y-3 bg-white">
+              {loadingNotes ? (
+                <p className="text-center text-slate-500 py-4 text-sm">Loading notes...</p>
+              ) : notes.length === 0 ? (
+                <p className="text-center text-slate-400 py-4 text-sm">
+                  {isArchived ? 'No notes recorded' : 'No notes yet. Start the conversation!'}
                 </p>
+              ) : (
+                notes.map((note) => {
+                  const isCurrentUser = note.user_id === currentUser?.id;
+                  return (
+                    <div key={note.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[80%] rounded-xl px-3 py-2 ${
+                          isCurrentUser
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-900'
+                        }`}
+                      >
+                        {!isCurrentUser && (
+                          <p className="text-xs font-medium mb-1 opacity-75">
+                            {note.user?.name || 'Unknown'}
+                          </p>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap">{note.message}</p>
+                        <p className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-slate-500'}`}>
+                          {getTimeAgo(new Date(note.created_at))}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={notesEndRef} />
+            </div>
+
+            {/* Message Input */}
+            {!isArchived && (
+              <div className="p-3 border-t border-slate-200 bg-slate-50">
+                <div className="flex gap-2">
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    onKeyPress={handleNoteKeyPress}
+                    placeholder="Type a note..."
+                    rows={1}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                    disabled={sendingNote}
+                  />
+                  <button
+                    onClick={handleSendNote}
+                    disabled={!newNote.trim() || sendingNote}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
             {isArchived && (
-              <p className="text-xs text-slate-500 mt-2">Notes are read-only for archived boats</p>
+              <div className="p-2 bg-slate-50 border-t border-slate-200">
+                <p className="text-xs text-slate-500 text-center">Notes are read-only for archived boats</p>
+              </div>
             )}
           </div>
 

@@ -5,8 +5,8 @@
 // Includes work phases, status updates, location management, and work orders
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Wrench, History, FileText, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Wrench, History, FileText, DollarSign, CheckCircle, AlertTriangle, Send, MessageSquare } from 'lucide-react';
 
 // Work type configuration by inventory type
 // All types use 'prep' and 'rigging' as database keys, only the labels differ
@@ -63,7 +63,7 @@ function StatusButton({ status, label, active, onClick, disabled }) {
     </button>
   );
 }
-import supabaseService from '../../services/supabaseService';
+import supabaseService, { boatNotesService } from '../../services/supabaseService';
 import { supabase } from '../../supabaseClient';
 import { usePermissions } from '../../hooks/usePermissions';
 import { findBoatLocationData, useBoatLocation } from '../BoatComponents';
@@ -114,9 +114,12 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
   const [movementHistory, setMovementHistory] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
 
-  // Notes state
-  const [notesText, setNotesText] = useState(boat.notes || '');
-  const [savingNotes, setSavingNotes] = useState(false);
+  // Notes state - conversational
+  const [notes, setNotes] = useState([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [sendingNote, setSendingNote] = useState(false);
+  const notesEndRef = useRef(null);
 
   // Window sticker state
   const [showWindowSticker, setShowWindowSticker] = useState(false);
@@ -289,6 +292,54 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
     loadMovementHistory();
   }, [loadMovementHistory]);
 
+  // Load notes when modal opens
+  const loadNotes = useCallback(async () => {
+    if (boat?.id) {
+      setLoadingNotes(true);
+      try {
+        const notesData = await boatNotesService.getForInventoryBoat(boat.id);
+        setNotes(notesData);
+      } catch (err) {
+        console.error('Error loading notes:', err);
+      } finally {
+        setLoadingNotes(false);
+      }
+    }
+  }, [boat?.id]);
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
+
+  // Scroll to bottom of notes when they change
+  useEffect(() => {
+    notesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [notes]);
+
+  // Handle sending a new note
+  const handleSendNote = async () => {
+    if (!newNote.trim() || sendingNote) return;
+
+    setSendingNote(true);
+    try {
+      const addedNote = await boatNotesService.addToInventoryBoat(boat.id, currentUser?.id, newNote.trim());
+      setNotes(prev => [...prev, addedNote]);
+      setNewNote('');
+    } catch (err) {
+      console.error('Error sending note:', err);
+      alert('Failed to send note. Please try again.');
+    } finally {
+      setSendingNote(false);
+    }
+  };
+
+  const handleNoteKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendNote();
+    }
+  };
+
   // Load estimates when modal opens
   useEffect(() => {
     const loadEstimates = async () => {
@@ -397,26 +448,6 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
     'S': 'Sold',
     'R': 'Reserved',
     'FP': 'Floor Planned'
-  };
-
-  const handleSaveNotes = async () => {
-    setSavingNotes(true);
-    try {
-      const updatedBoat = {
-        ...boat,
-        notes: notesText.trim(),
-        notes_updated_by: 'User', // Inventory boats don't have currentUser prop, could add if needed
-        notes_updated_at: new Date().toISOString()
-      };
-      if (onUpdateBoat) {
-        await onUpdateBoat(updatedBoat);
-      }
-    } catch (error) {
-      console.error('Error saving notes:', error);
-      alert('Failed to save notes. Please try again.');
-    } finally {
-      setSavingNotes(false);
-    }
   };
 
   const handleMove = async (targetLocation, targetSlot) => {
@@ -806,34 +837,71 @@ export function InventoryBoatDetailsModal({ boat, locations = [], sites = [], bo
           )}
 
 
-          {/* Notes Section */}
-          <div className="p-4 bg-slate-50 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-slate-700">Notes</h4>
-              {boat.notes_updated_by && boat.notes_updated_at && (
-                <p className="text-xs text-slate-500">
-                  Updated by {boat.notes_updated_by} on {new Date(boat.notes_updated_at).toLocaleDateString()}
-                </p>
-              )}
+          {/* Notes Section - Conversational Thread */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-2 p-3 bg-slate-50 border-b border-slate-200">
+              <MessageSquare className="w-4 h-4 text-slate-600" />
+              <h4 className="text-sm font-semibold text-slate-900">Notes</h4>
+              <span className="text-xs text-slate-500">({notes.length})</span>
             </div>
-            <textarea
-              value={notesText}
-              onChange={(e) => setNotesText(e.target.value)}
-              placeholder="Add notes about this inventory boat..."
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-y bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-slate-900"
-            />
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                onClick={handleSaveNotes}
-                disabled={savingNotes || notesText.trim() === (boat.notes || '')}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
-              >
-                {savingNotes ? 'Saving...' : 'Save Note'}
-              </button>
-              <p className="text-xs text-slate-400">
-                Click "Save Note" to record your changes
-              </p>
+
+            {/* Messages Area */}
+            <div className="h-48 overflow-y-auto p-3 space-y-3 bg-white">
+              {loadingNotes ? (
+                <p className="text-center text-slate-500 py-4 text-sm">Loading notes...</p>
+              ) : notes.length === 0 ? (
+                <p className="text-center text-slate-400 py-4 text-sm">
+                  No notes yet. Start the conversation!
+                </p>
+              ) : (
+                notes.map((note) => {
+                  const isCurrentUser = note.user_id === currentUser?.id;
+                  return (
+                    <div key={note.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[80%] rounded-xl px-3 py-2 ${
+                          isCurrentUser
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-900'
+                        }`}
+                      >
+                        {!isCurrentUser && (
+                          <p className="text-xs font-medium mb-1 opacity-75">
+                            {note.user?.name || 'Unknown'}
+                          </p>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap">{note.message}</p>
+                        <p className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-slate-500'}`}>
+                          {getTimeAgo(new Date(note.created_at))}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={notesEndRef} />
+            </div>
+
+            {/* Message Input */}
+            <div className="p-3 border-t border-slate-200 bg-slate-50">
+              <div className="flex gap-2">
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  onKeyPress={handleNoteKeyPress}
+                  placeholder="Type a note..."
+                  rows={1}
+                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                  disabled={sendingNote}
+                />
+                <button
+                  onClick={handleSendNote}
+                  disabled={!newNote.trim() || sendingNote}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
