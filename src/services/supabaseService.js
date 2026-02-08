@@ -2610,6 +2610,33 @@ export const notificationsService = {
       return []
     }
 
+    // Trigger push notifications (fire-and-forget)
+    if (data && data.length > 0) {
+      // Get sender name for the push notification title
+      const { data: sender } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', createdBy)
+        .single()
+
+      const senderName = sender?.name || 'Someone'
+
+      let url = '/alerts'
+      if (boatId) url = `/boats?openBoat=${boatId}`
+      if (inventoryBoatId) url = `/inventory?openBoat=${inventoryBoatId}`
+      if (requestId) url = `/requests?openRequest=${requestId}`
+
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userIds: usersToNotify,
+          title: `${senderName} mentioned you`,
+          body: preview,
+          url,
+          tag: `mention-${sourceType}-${sourceId}`,
+        }
+      }).catch(err => console.error('Failed to send push notification:', err))
+    }
+
     return data || []
   },
 }
