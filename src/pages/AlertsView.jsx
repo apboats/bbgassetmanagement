@@ -6,9 +6,10 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Ship, MessageSquare, Clock, Wrench, ExternalLink } from 'lucide-react';
+import { Bell, BellRing, Check, CheckCheck, Ship, MessageSquare, Clock, Wrench, ExternalLink, X } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { notificationsService } from '../services/supabaseService';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // Time ago helper
 function getTimeAgo(date) {
@@ -127,6 +128,10 @@ export function AlertsView({
   onNavigateToRequest,
 }) {
   const { currentUser } = usePermissions();
+  const push = usePushNotifications(currentUser?.id);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(
+    () => localStorage.getItem('bbg-push-banner-dismissed') === 'true'
+  );
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -232,6 +237,39 @@ export function AlertsView({
           </label>
         </div>
       </div>
+
+      {/* Push notification prompt */}
+      {push.isSupported && !push.isSubscribed && !pushBannerDismissed && !push.isLoading && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <BellRing className="w-5 h-5 text-blue-600 flex-shrink-0" />
+            <div>
+              <p className="font-medium text-blue-900 text-sm">Enable push notifications</p>
+              <p className="text-xs text-blue-700">Get notified on your device when someone @mentions you</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={async () => {
+                const success = await push.subscribe();
+                if (success) setPushBannerDismissed(true);
+              }}
+              className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Enable
+            </button>
+            <button
+              onClick={() => {
+                setPushBannerDismissed(true);
+                localStorage.setItem('bbg-push-banner-dismissed', 'true');
+              }}
+              className="p-1 text-blue-400 hover:text-blue-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Notifications list */}
       {loading ? (
