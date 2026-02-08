@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient';
 import { usersService } from '../services/supabaseService';
 import { usePermissions } from '../hooks/usePermissions';
 import { UserModal } from '../components/modals/UserModal';
+import { PushNotificationSettings } from '../components/PushNotificationSettings';
 
 export function SettingsView({ dockmasterConfig, onSaveConfig, users, onUpdateUsers, onReloadUsers }) {
   // Get permissions from centralized hook
@@ -120,6 +121,16 @@ export function SettingsView({ dockmasterConfig, onSaveConfig, users, onUpdateUs
             }`}
           >
             My Profile
+          </button>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`flex-1 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'notifications'
+                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Notifications
           </button>
           {isAdmin && (
             <>
@@ -249,6 +260,15 @@ export function SettingsView({ dockmasterConfig, onSaveConfig, users, onUpdateUs
                     </form>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 mb-6">Notification Preferences</h3>
+              <div className="max-w-2xl">
+                <PushNotificationSettings userId={currentUser?.id} />
               </div>
             </div>
           )}
